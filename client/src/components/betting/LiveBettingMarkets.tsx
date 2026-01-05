@@ -200,6 +200,8 @@ function LiveBettingMarkets() {
     retry: 2, 
     retryDelay: 1000,
     staleTime: 15000, // Consider data fresh for 15 seconds
+    refetchOnWindowFocus: false, // Prevent flicker on tab focus
+    placeholderData: (previousData) => previousData ?? [], // Keep previous data during refetch
   });
   
   // Process and normalize events, using cached events if API fails

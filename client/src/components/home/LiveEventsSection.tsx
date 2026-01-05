@@ -5,17 +5,28 @@ import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import FeaturedEventCard from "./FeaturedEventCard";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useLiveEvents } from "@/hooks/useEvents";
 
 export function LiveEventsSection() {
-  const { data: liveEvents = [], isLoading } = useLiveEvents();
+  const { data: liveEvents = [], isLoading, isFetching } = useLiveEvents();
+  
+  // Cache previous events to prevent flickering during refetch
+  const cachedEventsRef = useRef<any[]>([]);
+  const stableEvents = useMemo(() => {
+    if (liveEvents.length > 0) {
+      cachedEventsRef.current = liveEvents;
+      return liveEvents;
+    }
+    return cachedEventsRef.current;
+  }, [liveEvents]);
 
-  if (isLoading) {
+  // Only show loading on initial load, not during refetch
+  if (isLoading && stableEvents.length === 0) {
     return <div className="p-12 text-center">Loading live events...</div>;
   }
 
-  if (liveEvents.length === 0) {
+  if (stableEvents.length === 0) {
     return (
       <Card className="mb-4">
         <CardHeader className="bg-gray-100 p-3 flex flex-row items-center justify-between">
@@ -37,7 +48,7 @@ export function LiveEventsSection() {
   }
 
   // Group events by league
-  const groupedEvents = liveEvents.reduce((acc, event) => {
+  const groupedEvents = stableEvents.reduce((acc, event) => {
     // Create a safe league key from league name
     const key = event.leagueSlug || 
                 (event.leagueName ? event.leagueName.toLowerCase().replace(/\s+/g, '-') : 'unknown');
@@ -149,33 +160,45 @@ export function LiveEventsSection() {
     }
   };
 
-  // Get sports count to organize leagues by sport
-  const sportGroups = liveEvents.reduce((acc, event) => {
-    const sportId = event.sportId || 0;
-    if (!acc[sportId]) {
-      acc[sportId] = {
-        name: getSportName(sportId),
-        count: 0,
-        events: []
-      };
-    }
-    acc[sportId].count++;
-    acc[sportId].events.push(event);
-    return acc;
-  }, {} as Record<number, { name: string; count: number; events: Event[] }>);
+  // Get sports count to organize leagues by sport - memoized to prevent recalculation
+  const sportGroups = useMemo(() => {
+    return stableEvents.reduce((acc, event) => {
+      const sportId = event.sportId || 0;
+      if (!acc[sportId]) {
+        acc[sportId] = {
+          name: getSportName(sportId),
+          count: 0,
+          events: []
+        };
+      }
+      acc[sportId].count++;
+      acc[sportId].events.push(event);
+      return acc;
+    }, {} as Record<number, { name: string; count: number; events: Event[] }>);
+  }, [stableEvents]);
 
-  // Sort sports by count 
-  const sortedSports = Object.values(sportGroups).sort((a, b) => b.count - a.count);
+  // Define type for sport groups
+  type SportGroup = { name: string; count: number; events: Event[] };
+  
+  // Sort sports by count - memoized for stability
+  const sortedSports = useMemo((): SportGroup[] => {
+    const groups = Object.values(sportGroups) as SportGroup[];
+    return groups.sort((a, b) => b.count - a.count);
+  }, [sportGroups]);
   
   // State for expanded/collapsed sport sections
   const [expandedSports, setExpandedSports] = useState<Record<string, boolean>>({});
   
-  // Initialize the first sport as expanded
+  // Track if we've initialized - only run once
+  const initializedRef = useRef(false);
+  
+  // Initialize the first sport as expanded - only once on first data load
   useEffect(() => {
-    if (sortedSports.length > 0 && Object.keys(expandedSports).length === 0) {
+    if (sortedSports.length > 0 && !initializedRef.current) {
+      initializedRef.current = true;
       setExpandedSports({ [sortedSports[0].name]: true });
     }
-  }, [sortedSports, expandedSports]);
+  }, [sortedSports]);
   
   // Toggle accordion
   const toggleSportExpand = (sportName: string) => {
@@ -213,7 +236,7 @@ export function LiveEventsSection() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {liveEvents.slice(0, 6).map((event) => (
+            {stableEvents.slice(0, 6).map((event) => (
               <div key={event.id} className="relative bg-[#112225] rounded-md border border-[#1e3a3f] overflow-hidden shadow-md h-full flex flex-col">
                 {/* Event header */}
                 <div className="bg-[#0b1618] p-3 relative border-b border-[#1e3a3f]">
@@ -278,7 +301,7 @@ export function LiveEventsSection() {
                   <div className="space-y-3">
                     {event.markets && event.markets[0] && event.markets[0].outcomes ? (
                       // Use real market data when available
-                      event.markets[0].outcomes.map((outcome, index) => (
+                      event.markets[0].outcomes.map((outcome: { id?: string; name: string; odds: number }, index: number) => (
                         <button 
                           key={outcome.id || index}
                           className="w-full bg-[#1e3a3f] hover:bg-cyan-800 text-cyan-300 py-2.5 px-3 rounded-sm text-sm font-medium transition-colors flex justify-between items-center border border-[#2a4c55]"

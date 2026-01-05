@@ -137,12 +137,29 @@ class SettlementWorkerService {
       }
 
       console.log(`🎯 SettlementWorker: Processing ${unsettledBets.length} unsettled bets`);
+      
+      // Debug: Log unsettled bet details for matching
+      for (const bet of unsettledBets) {
+        console.log(`📊 Unsettled bet: externalEventId=${bet.externalEventId}, eventId=${bet.eventId}, prediction=${bet.prediction}, homeTeam=${bet.homeTeam}, awayTeam=${bet.awayTeam}`);
+        
+        // Check if this bet's event is in the finished matches
+        const betExtId = String(bet.externalEventId || '').trim();
+        const matchingFinished = finishedMatches.find(m => String(m.eventId || '').trim() === betExtId);
+        if (matchingFinished) {
+          console.log(`🎯 Found finished match for bet: ${matchingFinished.homeTeam} vs ${matchingFinished.awayTeam} (${matchingFinished.homeScore}-${matchingFinished.awayScore})`);
+        } else {
+          console.log(`⏳ Match ${betExtId} not yet finished or not in today's results`);
+        }
+      }
 
       for (const match of finishedMatches) {
         // IMPROVED MATCHING: Use multiple strategies to find bets for this match
         const betsForMatch = unsettledBets.filter(bet => {
-          // Strategy 1: Exact external event ID match (most reliable)
-          if (bet.externalEventId && bet.externalEventId === match.eventId) {
+          // Strategy 1: Exact external event ID match (most reliable) - compare as strings
+          const betExtId = String(bet.externalEventId || '').trim();
+          const matchId = String(match.eventId || '').trim();
+          if (betExtId && matchId && betExtId === matchId) {
+            console.log(`✅ MATCH FOUND: bet externalEventId=${betExtId} matches finished match ${matchId}`);
             return true;
           }
           
