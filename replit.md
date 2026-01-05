@@ -41,9 +41,9 @@ Preferred communication style: Simple, everyday language.
 - **Authentication Flow**: Wallet connection, address verification, session creation, balance synchronization from blockchain, and transaction authorization.
 
 ### Architecture Model
-- **Hybrid Custodial Model**: Users deposit SUI/SBETS to the platform treasury wallet. Bets are tracked in PostgreSQL, and settlements are processed off-chain. Withdrawals can be automated or manual.
-  - **Treasury Wallet**: `0x20850db591c4d575b5238baf975e54580d800e69b8b5b421de796a311d3bea50`
-  - **Admin Wallet**: `0x747c44940ec9f0136e3accdd81f37d5b3cc1d62d7747968d633cabb6aa5aa45f`
+- **Full On-Chain Model**: Users place bets directly on the smart contract. Bets are tracked in PostgreSQL for UI, and settlements are automated on-chain. Revenue is withdrawn by admin.
+  - **Admin Wallet (owns AdminCap)**: `0x20850db591c4d575b5238baf975e54580d800e69b8b5b421de796a311d3bea50`
+  - **Treasury**: Managed by smart contract at BettingPlatform shared object
 
 #### Fund Flow - FULL ON-CHAIN DUAL TOKEN SYSTEM
 

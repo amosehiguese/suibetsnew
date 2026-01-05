@@ -7,9 +7,10 @@ const SBETS_PACKAGE_ID = process.env.SBETS_TOKEN_ADDRESS?.split('::')[0] || '0x6
 const BETTING_PACKAGE_ID = process.env.BETTING_PACKAGE_ID || '0x9ca7d3b57c018fb171724dc808a542d2ec27354f6526b75e968d308d29bb6626';
 const BETTING_PLATFORM_ID = process.env.BETTING_PLATFORM_ID || '0xfb946f078082f42c93b7c1db30365f590338fd477ac20c564498d9315ca89e9c';
 const ADMIN_CAP_ID = process.env.ADMIN_CAP_ID || '0x49bee21bdf21522f401d5a3d6677604f0738bbd20f9bffef97d2223bdf2a1cb5';
-const PLATFORM_REVENUE_WALLET = process.env.PLATFORM_REVENUE_WALLET || '0x20850db591c4d575b5238baf975e54580d800e69b8b5b421de796a311d3bea50';
-const ADMIN_WALLET = process.env.ADMIN_WALLET_ADDRESS || '0x747c44940ec9f0136e3accdd81f37d5b3cc1d62d7747968d633cabb6aa5aa45f';
-const REVENUE_WALLET = process.env.REVENUE_WALLET_ADDRESS || PLATFORM_REVENUE_WALLET;
+// Admin wallet that owns AdminCap - MUST match the wallet that deployed the contract
+const ADMIN_WALLET = process.env.ADMIN_WALLET_ADDRESS || '0x20850db591c4d575b5238baf975e54580d800e69b8b5b421de796a311d3bea50';
+const PLATFORM_REVENUE_WALLET = process.env.PLATFORM_REVENUE_WALLET || ADMIN_WALLET;
+const REVENUE_WALLET = process.env.REVENUE_WALLET_ADDRESS || ADMIN_WALLET;
 // SECURITY: ADMIN_PRIVATE_KEY must be stored as encrypted secret on Railway/production
 // NEVER log, expose, or commit this value. Used only for on-chain payouts.
 const ADMIN_PRIVATE_KEY = process.env.ADMIN_PRIVATE_KEY;
