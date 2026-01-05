@@ -65,7 +65,7 @@ export default function ActivityPage() {
       title: bet.status === 'won' ? 'Bet Won!' : bet.status === 'lost' ? 'Bet Lost' : 'Bet Placed',
       description: `${bet.eventName || 'Unknown Event'} - ${bet.selection || 'Unknown Selection'}`,
       amount: bet.status === 'won' ? bet.potentialWin : bet.stake,
-      currency: 'SUI',
+      currency: bet.currency || 'SUI',
       timestamp: bet.placedAt || bet.createdAt,
       status: 'completed'
     }));

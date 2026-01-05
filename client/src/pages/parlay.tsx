@@ -6,6 +6,8 @@ import { useCurrentAccount, useSuiClientQuery } from '@mysten/dapp-kit';
 import { useToast } from '@/hooks/use-toast';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useOnChainBet } from '@/hooks/useOnChainBet';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 const suibetsLogo = "/images/suibets-logo.png";
 import { 
   Layers, 
@@ -36,9 +38,10 @@ export default function ParlayPage() {
   const [stake, setStake] = useState('10');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPlacingBet, setIsPlacingBet] = useState(false);
+  const [betCurrency, setBetCurrency] = useState<'SUI' | 'SBETS'>('SUI');
   const { placeBetOnChain, isLoading: isOnChainLoading } = useOnChainBet();
 
-  // Fetch on-chain wallet balance (what's in user's Sui wallet)
+  // Fetch on-chain SUI wallet balance
   const { data: onChainBalance, refetch: refetchOnChain } = useSuiClientQuery(
     'getBalance',
     { owner: walletAddress || '' },
@@ -48,6 +51,17 @@ export default function ParlayPage() {
   // Convert from MIST to SUI (1 SUI = 1,000,000,000 MIST)
   const walletSuiBalance = onChainBalance?.totalBalance 
     ? Number(onChainBalance.totalBalance) / 1_000_000_000 
+    : 0;
+
+  // Fetch on-chain SBETS balance
+  const SBETS_TOKEN_ADDRESS = import.meta.env.VITE_SBETS_TOKEN_ADDRESS || '0x6a4d9c0eab7ac40371a7453d1aa6c89b130950e8af6868ba975fdd81371a7285::sbets::SBETS';
+  const { data: sbetsBalanceData, refetch: refetchSbets } = useSuiClientQuery(
+    'getBalance',
+    { owner: walletAddress || '', coinType: SBETS_TOKEN_ADDRESS },
+    { enabled: !!walletAddress }
+  );
+  const walletSbetsBalance = sbetsBalanceData?.totalBalance 
+    ? Number(sbetsBalanceData.totalBalance) / 1_000_000_000 
     : 0;
 
   const { data: balanceData } = useQuery<{ suiBalance: number; sbetsBalance: number }>({
@@ -88,8 +102,9 @@ export default function ParlayPage() {
       return;
     }
     // Use on-chain wallet balance for direct betting
-    if (stakeAmount > walletSuiBalance) {
-      toast({ title: 'Insufficient Balance', description: `You only have ${walletSuiBalance.toFixed(4)} SUI in your wallet`, variant: 'destructive' });
+    const currentBalance = betCurrency === 'SUI' ? walletSuiBalance : walletSbetsBalance;
+    if (stakeAmount > currentBalance) {
+      toast({ title: 'Insufficient Balance', description: `You only have ${currentBalance.toFixed(4)} ${betCurrency} in your wallet`, variant: 'destructive' });
       return;
     }
 
@@ -109,7 +124,7 @@ export default function ParlayPage() {
         betAmount: stakeAmount,
         odds: totalOdds,
         walrusBlobId: '',
-        coinType: 'SUI',
+        coinType: betCurrency,
         walletAddress: walletAddress,
       });
 
@@ -167,8 +182,9 @@ export default function ParlayPage() {
       queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).includes('/api/user/balance') }),
       queryClient.invalidateQueries({ queryKey: ['/api/bets'] }),
       refetchOnChain(),
+      refetchSbets(),
     ]);
-    toast({ title: 'Refreshed', description: 'Balance updated from blockchain' });
+    toast({ title: 'Refreshed', description: 'Balances updated from blockchain' });
     setIsRefreshing(false);
   };
 
@@ -215,7 +231,7 @@ export default function ParlayPage() {
             </button>
             {walletAddress ? (
               <div className="text-right">
-                <p className="text-green-400 text-xs" title="On-chain wallet balance">Wallet: {walletSuiBalance.toFixed(4)} SUI</p>
+                <p className="text-green-400 text-xs" title="On-chain wallet balance">{walletSuiBalance.toFixed(4)} SUI | {walletSbetsBalance.toFixed(0)} SBETS</p>
                 <p className="text-gray-500 text-xs">{walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}</p>
               </div>
             ) : (
@@ -345,18 +361,34 @@ export default function ParlayPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Your Balance:</span>
-                  <span className="text-cyan-400 font-medium">{(balanceData?.suiBalance || 0).toFixed(4)} SUI</span>
+                  <span className="text-cyan-400 font-medium">
+                    {betCurrency === 'SUI' 
+                      ? `${walletSuiBalance.toFixed(4)} SUI` 
+                      : `${walletSbetsBalance.toFixed(0)} SBETS`}
+                  </span>
+                </div>
+                {/* Currency Toggle */}
+                <div className="flex items-center justify-between pt-2 border-t border-cyan-900/30">
+                  <Label htmlFor="currency-toggle" className="text-gray-400 text-sm">
+                    Bet with SBETS
+                  </Label>
+                  <Switch
+                    id="currency-toggle"
+                    checked={betCurrency === 'SBETS'}
+                    onCheckedChange={(checked) => setBetCurrency(checked ? 'SBETS' : 'SUI')}
+                    data-testid="switch-currency"
+                  />
                 </div>
               </div>
 
               <div className="border-t border-cyan-900/30 pt-6 mb-6">
-                <label className="text-gray-400 text-sm mb-2 block">Stake (SUI)</label>
+                <label className="text-gray-400 text-sm mb-2 block">Stake ({betCurrency})</label>
                 <input
                   type="number"
                   value={stake}
                   onChange={(e) => setStake(e.target.value)}
                   min="0"
-                  step="0.1"
+                  step={betCurrency === 'SBETS' ? '100' : '0.1'}
                   className="w-full bg-black/50 border border-cyan-900/30 rounded-xl p-4 text-white text-xl font-bold focus:outline-none focus:border-cyan-500"
                   data-testid="input-stake"
                 />
@@ -364,7 +396,7 @@ export default function ParlayPage() {
 
               <div className="bg-black/50 border border-cyan-500/30 rounded-xl p-4 mb-6">
                 <p className="text-gray-400 text-sm mb-1">Potential Payout</p>
-                <p className="text-3xl font-bold text-cyan-400">{potentialPayout.toFixed(2)} SUI</p>
+                <p className="text-3xl font-bold text-cyan-400">{potentialPayout.toFixed(betCurrency === 'SBETS' ? 0 : 2)} {betCurrency}</p>
               </div>
 
               <button
