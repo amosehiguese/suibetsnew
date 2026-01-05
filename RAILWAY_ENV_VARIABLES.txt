@@ -2,57 +2,116 @@
 RAILWAY ENVIRONMENT VARIABLES
 ===================================
 
-Copy these to Railway Dashboard → Project Settings → Variables:
+CRITICAL: VITE_* variables MUST be set BEFORE building!
+Railway injects env vars at runtime, but Vite embeds them at BUILD time.
+Set all variables FIRST, then trigger a new deployment.
 
+===================================
+REQUIRED VARIABLES (copy to Railway Dashboard → Variables):
+===================================
+
+# Core Settings
 NODE_ENV=production
 PORT=3000
 HOST=0.0.0.0
-VITE_API_URL=https://your-railway-domain.up.railway.app
 
+# SECURITY: Generate unique values for production!
+SESSION_SECRET=<generate-a-random-64-char-string>
+ADMIN_PASSWORD=<set-a-secure-admin-password>
+
+# Frontend Configuration (CRITICAL - must be set BEFORE build)
+VITE_API_URL=https://suibets.up.railway.app
+CORS_ORIGIN=https://suibets.up.railway.app
+
+# Smart Contract Addresses (CRITICAL - must match mainnet deployment)
+# These MUST be set before building or betting will fail!
+VITE_BETTING_PACKAGE_ID=0xfaf371c3c9fe2544cc1ce9a40b07621503b300bf3a65b8fab0dba134636e8b32
+VITE_BETTING_PLATFORM_ID=0xae1b0dfed589c6ce5b7dafdb7477954670f0f73530668b5476e3a429b64099b3
+VITE_SBETS_TOKEN_ADDRESS=0x6a4d9c0eab7ac40371a7453d1aa6c89b130950e8af6868ba975fdd81371a7285::sbets::SBETS
+
+# Backend contract addresses (mirror of VITE_* for server-side)
+BETTING_PACKAGE_ID=0xfaf371c3c9fe2544cc1ce9a40b07621503b300bf3a65b8fab0dba134636e8b32
+BETTING_PLATFORM_ID=0xae1b0dfed589c6ce5b7dafdb7477954670f0f73530668b5476e3a429b64099b3
+ADMIN_CAP_ID=0xaec276da96bc9fb7781213f3aedb18eacf30af1932dc577abbe5529583251827
+
+# Blockchain Configuration
 SBETS_TOKEN_ADDRESS=0x6a4d9c0eab7ac40371a7453d1aa6c89b130950e8af6868ba975fdd81371a7285::sbets::SBETS
 ADMIN_WALLET_ADDRESS=0x20850db591c4d575b5238baf975e54580d800e69b8b5b421de796a311d3bea50
 REVENUE_WALLET_ADDRESS=0x20850db591c4d575b5238baf975e54580d800e69b8b5b421de796a311d3bea50
 
-# Smart Contract (redeployed January 5, 2026)
-BETTING_PACKAGE_ID=0xfaf371c3c9fe2544cc1ce9a40b07621503b300bf3a65b8fab0dba134636e8b32
-BETTING_PLATFORM_ID=0xae1b0dfed589c6ce5b7dafdb7477954670f0f73530668b5476e3a429b64099b3
-ADMIN_CAP_ID=0xaec276da96bc9fb7781213f3aedb18eacf30af1932dc577abbe5529583251827
-VITE_BETTING_PACKAGE_ID=0xfaf371c3c9fe2544cc1ce9a40b07621503b300bf3a65b8fab0dba134636e8b32
-VITE_BETTING_PLATFORM_ID=0xae1b0dfed589c6ce5b7dafdb7477954670f0f73530668b5476e3a429b64099b3
-
+# API Keys
 API_SPORTS_KEY=3ec255b133882788e32f6349eff77b21
 AI_INTEGRATIONS_OPENAI_API_KEY=<your_openai_key>
 
-CORS_ORIGIN=https://your-railway-domain.up.railway.app
-
+# Database (auto-filled by Railway PostgreSQL Plugin)
 DATABASE_URL=<Auto-filled by Railway PostgreSQL Plugin>
 
 ===================================
-SETUP STEPS:
+WHY BETTING FAILS ON RAILWAY
 ===================================
 
-1. Create railway.json in project root (use RAILWAY_CONFIG.json content)
+ROOT CAUSE: Vite embeds VITE_* environment variables at BUILD time,
+not runtime. If these variables are not set when Railway runs 
+`npm run build`, the frontend will use fallback/undefined values.
 
-2. Push to GitHub
+SYMPTOMS:
+- Wallet connects successfully
+- Betting transactions fail with contract errors
+- Console shows undefined contract addresses
 
-3. On Railway.app:
-   - Click "Create New"
-   - Select "Deploy from GitHub"
+SOLUTION:
+1. Set ALL environment variables in Railway Dashboard FIRST
+2. Trigger a NEW deployment (Railway → Redeploy)
+3. The build will now embed correct contract addresses
+
+===================================
+SETUP STEPS
+===================================
+
+1. Fork/clone repo to GitHub
+
+2. On Railway.app:
+   - Click "New Project"
+   - Select "Deploy from GitHub repo"
    - Choose your repo
-   - Click "Create"
 
-4. Add PostgreSQL Plugin:
-   - Click "+ Add"
+3. Add PostgreSQL:
+   - Click "+ Add Service"
    - Select "PostgreSQL"
-   - Click "Create"
-   - The DATABASE_URL will auto-populate
+   - DATABASE_URL auto-populates
 
-5. Set Environment Variables:
-   - Go to "Variables"
-   - Add each variable from this file
-   - Copy-paste the values
+4. Set Environment Variables (BEFORE first deploy):
+   - Go to project → Variables tab
+   - Add ALL variables from this file
+   - Replace <placeholders> with real values
 
-6. Deploy:
-   - Click "Deploy"
-   - Wait for build to complete
-   - Check /health endpoint when done
+5. Deploy:
+   - Railway auto-deploys on variable change
+   - Or click "Redeploy" to force new build
+   - Check /health endpoint when complete
+
+6. Verify:
+   - Open your Railway URL
+   - Connect wallet
+   - Try placing a small bet
+   - Check browser console for errors
+
+===================================
+TROUBLESHOOTING
+===================================
+
+"Betting fails but wallet connects":
+→ VITE_* variables were not set during build
+→ Solution: Add variables, then Redeploy
+
+"CORS errors":
+→ CORS_ORIGIN doesn't match your Railway URL
+→ Solution: Update CORS_ORIGIN to exact Railway domain
+
+"Contract not found":
+→ Wrong contract addresses
+→ Solution: Verify BETTING_PACKAGE_ID and BETTING_PLATFORM_ID
+
+"Database connection failed":
+→ PostgreSQL plugin not linked
+→ Solution: Add PostgreSQL service, ensure DATABASE_URL exists

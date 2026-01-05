@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes-simple"; // Main SuiBets API implementation
 import { setupVite, serveStatic, log } from "./vite";
 import { initDb, seedDb } from "./db";
@@ -6,6 +7,64 @@ import { setupBlockchainAuth } from "./blockchain-auth";
 import { blockchainStorage } from "./blockchain-storage";
 
 const app = express();
+
+// CORS configuration for Railway deployment
+const allowedOrigins = [
+  process.env.CORS_ORIGIN,
+  process.env.VITE_API_URL,
+  'https://suibets.up.railway.app',
+  'https://suibets-production.up.railway.app',
+  'https://suibets.io',
+  'https://www.suibets.io',
+  'http://localhost:5000',
+  'http://localhost:5173',
+].filter(Boolean) as string[];
+
+// Railway dynamic domain patterns
+const railwayDomainPatterns = [
+  /^https:\/\/.*\.up\.railway\.app$/,
+  /^https:\/\/.*\.railway\.app$/,
+];
+
+const isProduction = process.env.NODE_ENV === 'production';
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    // Allow all origins in development
+    if (!isProduction) return callback(null, true);
+    
+    // Allow wallet browser extensions (chrome-extension://, moz-extension://, etc.)
+    if (origin.includes('-extension://')) {
+      return callback(null, true);
+    }
+    
+    // Production: Check against allowed origins
+    const isAllowed = allowedOrigins.some(allowed => 
+      origin === allowed || origin.startsWith(allowed)
+    );
+    
+    // Also allow any Railway domain
+    const isRailwayDomain = railwayDomainPatterns.some(pattern => pattern.test(origin));
+    
+    if (isAllowed || isRailwayDomain) {
+      return callback(null, true);
+    }
+    
+    // Log rejected origins for debugging
+    console.log(`[CORS] Origin rejected: ${origin}`);
+    return callback(new Error('Not allowed by CORS'), false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+}));
+
+// Handle preflight requests explicitly
+app.options('*', cors());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
