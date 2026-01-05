@@ -88,13 +88,13 @@ Preferred communication style: Simple, everyday language.
 - **Security Model**: Capability-based access control using One-Time Witness (OTW) pattern
     - **AdminCap**: Single capability minted at deployment, required for all admin operations
     - **OracleCap**: Can be minted by admin for settlement oracles
-- **Deployed Contract (Mainnet)** - DEPLOYED January 4, 2026:
-    - Package ID: `0x9ca7d3b57c018fb171724dc808a542d2ec27354f6526b75e968d308d29bb6626`
-    - BettingPlatform (Shared): `0xfb946f078082f42c93b7c1db30365f590338fd477ac20c564498d9315ca89e9c`
-    - AdminCap: `0x49bee21bdf21522f401d5a3d6677604f0738bbd20f9bffef97d2223bdf2a1cb5`
-    - UpgradeCap: `0x58b55a1787ac5fd0804aeb92e580e4db80f82fbfc91ac04cc19daf6881170c00`
-    - Admin Wallet (owns AdminCap + UpgradeCap): `0x20850db591c4d575b5238baf975e54580d800e69b8b5b421de796a311d3bea50`
+- **Deployed Contract (Mainnet)** - REDEPLOYED January 5, 2026:
+    - Package ID: `0xfaf371c3c9fe2544cc1ce9a40b07621503b300bf3a65b8fab0dba134636e8b32`
+    - BettingPlatform (Shared): `0xae1b0dfed589c6ce5b7dafdb7477954670f0f73530668b5476e3a429b64099b3`
+    - AdminCap: `0xaec276da96bc9fb7781213f3aedb18eacf30af1932dc577abbe5529583251827`
+    - Admin Wallet (owns AdminCap): `0x20850db591c4d575b5238baf975e54580d800e69b8b5b421de796a311d3bea50`
     - Module: `betting`
+    - **Separate Bet Limits**: SUI (min 0.05, max 400) | SBETS (min 1000, max 50,000,000)
     - **All frontend/backend code updated to use these addresses**
 - **SUI Betting Functions**:
     - `place_bet` - Place bet with SUI (any user)

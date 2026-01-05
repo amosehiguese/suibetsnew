@@ -38,9 +38,12 @@ module suibets::betting {
     const PLATFORM_FEE_BPS: u64 = 100;
     const BPS_DENOMINATOR: u64 = 10000;
 
-    // Default bet limits (in smallest units: 1 SUI/SBETS = 1_000_000_000)
-    const DEFAULT_MIN_BET: u64 = 100_000_000; // 0.1 SUI/SBETS
-    const DEFAULT_MAX_BET: u64 = 100_000_000_000; // 100 SUI/SBETS
+    // Default bet limits for SUI (in MIST: 1 SUI = 1_000_000_000)
+    const DEFAULT_MIN_BET_SUI: u64 = 50_000_000; // 0.05 SUI
+    const DEFAULT_MAX_BET_SUI: u64 = 400_000_000_000; // 400 SUI
+    // Default bet limits for SBETS (in smallest units: 1 SBETS = 1_000_000_000)
+    const DEFAULT_MIN_BET_SBETS: u64 = 1_000_000_000_000; // 1000 SBETS
+    const DEFAULT_MAX_BET_SBETS: u64 = 50_000_000_000_000_000; // 50,000,000 SBETS
     const MAX_FEE_BPS: u64 = 1000; // 10% max fee
 
     // One-Time Witness for init verification
@@ -184,10 +187,10 @@ module suibets::betting {
             platform_fee_bps: PLATFORM_FEE_BPS,
             total_bets: 0,
             paused: false,
-            min_bet_sui: DEFAULT_MIN_BET,
-            max_bet_sui: DEFAULT_MAX_BET,
-            min_bet_sbets: DEFAULT_MIN_BET,
-            max_bet_sbets: DEFAULT_MAX_BET,
+            min_bet_sui: DEFAULT_MIN_BET_SUI,
+            max_bet_sui: DEFAULT_MAX_BET_SUI,
+            min_bet_sbets: DEFAULT_MIN_BET_SBETS,
+            max_bet_sbets: DEFAULT_MAX_BET_SBETS,
         };
 
         event::emit(PlatformCreated {

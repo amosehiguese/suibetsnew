@@ -38,9 +38,12 @@ module suibets::betting {
     const PLATFORM_FEE_BPS: u64 = 100;
     const BPS_DENOMINATOR: u64 = 10000;
 
-    // Default bet limits (in smallest units: 1 SUI/SBETS = 1_000_000_000)
-    const DEFAULT_MIN_BET: u64 = 100_000_000; // 0.1 SUI/SBETS
-    const DEFAULT_MAX_BET: u64 = 100_000_000_000; // 100 SUI/SBETS
+    // Default bet limits for SUI (in MIST: 1 SUI = 1_000_000_000)
+    const DEFAULT_MIN_BET_SUI: u64 = 50_000_000; // 0.05 SUI
+    const DEFAULT_MAX_BET_SUI: u64 = 400_000_000_000; // 400 SUI
+    // Default bet limits for SBETS (in smallest units: 1 SBETS = 1_000_000_000)
+    const DEFAULT_MIN_BET_SBETS: u64 = 1_000_000_000_000; // 1000 SBETS
+    const DEFAULT_MAX_BET_SBETS: u64 = 50_000_000_000_000_000; // 50,000,000 SBETS
     const MAX_FEE_BPS: u64 = 1000; // 10% max fee
 
     // One-Time Witness for init verification
@@ -73,8 +76,11 @@ module suibets::betting {
         platform_fee_bps: u64,
         total_bets: u64,
         paused: bool,
-        min_bet: u64,
-        max_bet: u64,
+        // Separate bet limits for SUI and SBETS
+        min_bet_sui: u64,
+        max_bet_sui: u64,
+        min_bet_sbets: u64,
+        max_bet_sbets: u64,
     }
 
     // Individual bet object owned by bettor
@@ -181,8 +187,10 @@ module suibets::betting {
             platform_fee_bps: PLATFORM_FEE_BPS,
             total_bets: 0,
             paused: false,
-            min_bet: DEFAULT_MIN_BET,
-            max_bet: DEFAULT_MAX_BET,
+            min_bet_sui: DEFAULT_MIN_BET_SUI,
+            max_bet_sui: DEFAULT_MAX_BET_SUI,
+            min_bet_sbets: DEFAULT_MIN_BET_SBETS,
+            max_bet_sbets: DEFAULT_MAX_BET_SBETS,
         };
 
         event::emit(PlatformCreated {
@@ -214,8 +222,8 @@ module suibets::betting {
         
         let stake = coin::value(&payment);
         assert!(stake > 0, EInvalidAmount);
-        assert!(stake >= platform.min_bet, EExceedsMinBet);
-        assert!(stake <= platform.max_bet, EExceedsMaxBet);
+        assert!(stake >= platform.min_bet_sui, EExceedsMinBet);
+        assert!(stake <= platform.max_bet_sui, EExceedsMaxBet);
         assert!(odds >= 100, EInvalidOdds);
 
         let potential_payout = (stake * odds) / 100;
@@ -468,8 +476,8 @@ module suibets::betting {
         
         let stake = coin::value(&payment);
         assert!(stake > 0, EInvalidAmount);
-        assert!(stake >= platform.min_bet, EExceedsMinBet);
-        assert!(stake <= platform.max_bet, EExceedsMaxBet);
+        assert!(stake >= platform.min_bet_sbets, EExceedsMinBet);
+        assert!(stake <= platform.max_bet_sbets, EExceedsMaxBet);
         assert!(odds >= 100, EInvalidOdds);
 
         let potential_payout = (stake * odds) / 100;
@@ -804,15 +812,26 @@ module suibets::betting {
         platform.platform_fee_bps = new_fee_bps;
     }
 
-    // Update bet limits
-    public entry fun update_limits(
+    // Update bet limits for SUI
+    public entry fun update_limits_sui(
         _admin_cap: &AdminCap,
         platform: &mut BettingPlatform,
         min_bet: u64,
         max_bet: u64,
     ) {
-        platform.min_bet = min_bet;
-        platform.max_bet = max_bet;
+        platform.min_bet_sui = min_bet;
+        platform.max_bet_sui = max_bet;
+    }
+
+    // Update bet limits for SBETS
+    public entry fun update_limits_sbets(
+        _admin_cap: &AdminCap,
+        platform: &mut BettingPlatform,
+        min_bet: u64,
+        max_bet: u64,
+    ) {
+        platform.min_bet_sbets = min_bet;
+        platform.max_bet_sbets = max_bet;
     }
 
     // Pause/Unpause platform
