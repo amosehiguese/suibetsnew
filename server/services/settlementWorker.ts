@@ -33,13 +33,13 @@ interface UnsettledBet {
 const REVENUE_WALLET = 'platform_revenue';
 
 class SettlementWorkerService {
-  private isRunning = false;
+  private _isRunning = false;
   private intervalId: NodeJS.Timeout | null = null;
   private settledEventIdsCache = new Set<string>(); // In-memory cache, synced from DB
   private checkInterval = 30 * 1000; // 30 seconds
 
   async start() {
-    if (this.isRunning) {
+    if (this._isRunning) {
       console.log('⚙️ SettlementWorker already running');
       return;
     }
@@ -47,7 +47,7 @@ class SettlementWorkerService {
     // Load settled events from database on startup (survives restarts)
     await this.loadSettledEventsFromDB();
 
-    this.isRunning = true;
+    this._isRunning = true;
     console.log('🚀 SettlementWorker started - checking for finished matches every 30s');
 
     this.intervalId = setInterval(async () => {
@@ -112,7 +112,7 @@ class SettlementWorkerService {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
-    this.isRunning = false;
+    this._isRunning = false;
     console.log('⏹️ SettlementWorker stopped');
   }
 
@@ -528,11 +528,24 @@ class SettlementWorkerService {
 
   getStatus() {
     return {
-      isRunning: this.isRunning,
+      isRunning: this._isRunning,
       settledEventsInMemory: this.settledEventIdsCache.size,
       settledBetsInMemory: this.settledBetIds.size,
       checkInterval: this.checkInterval / 1000
     };
+  }
+
+  // Helper methods for testing
+  isRunningNow(): boolean {
+    return this._isRunning;
+  }
+
+  getSettledEventsCount(): number {
+    return this.settledEventIdsCache.size;
+  }
+
+  getSettledBetsCount(): number {
+    return this.settledBetIds.size;
   }
 }
 

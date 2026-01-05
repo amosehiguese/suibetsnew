@@ -415,6 +415,65 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
     }
   });
 
+  // Test all blockchain settlement functions
+  app.get("/api/admin/test-settlement-functions", async (req: Request, res: Response) => {
+    try {
+      const tests: any = {
+        timestamp: new Date().toISOString(),
+        adminKeyConfigured: false,
+        platformInfo: null,
+        settlementWorkerStatus: null,
+        pendingBets: 0,
+        errors: []
+      };
+      
+      // Test 1: Check admin key configuration
+      tests.adminKeyConfigured = blockchainBetService.isAdminKeyConfigured();
+      
+      // Test 2: Get platform info (treasury balances)
+      try {
+        const platformInfo = await blockchainBetService.getPlatformInfo();
+        tests.platformInfo = platformInfo;
+      } catch (e: any) {
+        tests.errors.push(`Platform info error: ${e.message}`);
+      }
+      
+      // Test 3: Settlement worker status
+      tests.settlementWorkerStatus = {
+        isRunning: settlementWorker.isRunningNow(),
+        settledEventsCount: settlementWorker.getSettledEventsCount(),
+        settledBetsCount: settlementWorker.getSettledBetsCount()
+      };
+      
+      // Test 4: Get pending bets count
+      try {
+        const pendingBets = await storage.getAllBets('pending');
+        tests.pendingBets = pendingBets.length;
+        tests.pendingBetDetails = pendingBets.map(b => ({
+          id: b.id,
+          eventId: b.eventId,
+          externalEventId: b.externalEventId,
+          currency: b.currency,
+          stake: b.stake,
+          hasBetObjectId: !!b.betObjectId
+        }));
+      } catch (e: any) {
+        tests.errors.push(`Pending bets error: ${e.message}`);
+      }
+      
+      // Overall status
+      tests.allSystemsOperational = 
+        tests.adminKeyConfigured && 
+        tests.platformInfo !== null && 
+        tests.settlementWorkerStatus?.isRunning === true &&
+        tests.errors.length === 0;
+      
+      res.json(tests);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Trigger auto-settlement manually (admin only)
   app.post("/api/admin/trigger-settlement", async (req: Request, res: Response) => {
     try {
