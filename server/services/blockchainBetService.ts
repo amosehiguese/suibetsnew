@@ -539,17 +539,17 @@ export class BlockchainBetService {
 
     try {
       const amountMist = Math.floor(amountSui * 1e9);
-      const recipient = recipientAddress || REVENUE_WALLET;
       const tx = new Transaction();
       
+      // withdraw_fees signature: (admin_cap, platform, amount, clock)
+      // Fees go to tx sender (the admin keypair) automatically
       tx.moveCall({
         target: `${BETTING_PACKAGE_ID}::betting::withdraw_fees`,
         arguments: [
           tx.object(ADMIN_CAP_ID),          // admin_cap: &AdminCap
-          tx.object(BETTING_PLATFORM_ID),
-          tx.pure.u64(amountMist),
-          tx.pure.address(recipient),       // recipient: address
-          tx.object('0x6'),
+          tx.object(BETTING_PLATFORM_ID),   // platform: &mut BettingPlatform
+          tx.pure.u64(amountMist),          // amount: u64
+          tx.object('0x6'),                 // clock: &Clock
         ],
       });
 
@@ -699,17 +699,17 @@ export class BlockchainBetService {
 
     try {
       const amountMist = Math.floor(amount * 1e9);
-      const recipient = recipientAddress || REVENUE_WALLET;
       const tx = new Transaction();
       
+      // withdraw_fees_sbets signature: (admin_cap, platform, amount, clock)
+      // Fees go to tx sender (the admin keypair) automatically
       tx.moveCall({
         target: `${BETTING_PACKAGE_ID}::betting::withdraw_fees_sbets`,
         arguments: [
           tx.object(ADMIN_CAP_ID),          // admin_cap: &AdminCap
-          tx.object(BETTING_PLATFORM_ID),
-          tx.pure.u64(amountMist),
-          tx.pure.address(recipient),       // recipient: address
-          tx.object('0x6'),
+          tx.object(BETTING_PLATFORM_ID),   // platform: &mut BettingPlatform
+          tx.pure.u64(amountMist),          // amount: u64
+          tx.object('0x6'),                 // clock: &Clock
         ],
       });
 
