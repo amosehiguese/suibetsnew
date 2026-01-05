@@ -64,20 +64,30 @@ export default function DepositsWithdrawalsPage() {
 
   const withdrawMutation = useMutation({
     mutationFn: async (data: { amount: number; address: string }) => {
-      return apiRequest('POST', '/api/transactions/withdraw', { ...data, currency: 'SUI', fromAddress: walletAddress });
+      // Backend expects userId and amount, executeOnChain triggers real blockchain transfer
+      return apiRequest('POST', '/api/user/withdraw', { 
+        userId: walletAddress, 
+        amount: data.amount,
+        executeOnChain: true,
+        destinationAddress: data.address
+      });
     },
-    onSuccess: () => {
-      toast({ title: 'Withdrawal Submitted', description: `${withdrawAmount} SUI withdrawal is processing on-chain` });
+    onSuccess: (response: any) => {
+      const status = response?.withdrawal?.status || 'pending';
+      if (status === 'completed') {
+        toast({ title: 'Withdrawal Complete', description: `${withdrawAmount} SUI has been sent to your wallet` });
+      } else {
+        toast({ title: 'Withdrawal Submitted', description: `${withdrawAmount} SUI withdrawal is being processed` });
+      }
       setWithdrawAmount('');
       setWithdrawAddress('');
       queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
-      // Invalidate all balance queries to ensure refresh
       queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).includes('/api/user/balance') });
-      // Also refetch on-chain balance
       refetchOnChain();
     },
-    onError: () => {
-      toast({ title: 'Withdrawal Failed', description: 'Please check your balance and try again', variant: 'destructive' });
+    onError: (error: any) => {
+      const message = error?.message || 'Please check your balance and try again';
+      toast({ title: 'Withdrawal Failed', description: message, variant: 'destructive' });
     }
   });
 
