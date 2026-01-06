@@ -94,6 +94,43 @@ export class ApiSportsService {
   }
   
   /**
+   * Extract event ID from various API response formats
+   * Raw API-Sports: fixture.id, Transformed: id
+   */
+  private extractEventId(event: any): string | null {
+    // Transformed format (our SportEvent)
+    if (event.id !== undefined) return String(event.id);
+    // Raw API-Sports format: { fixture: { id: 123 }, ... }
+    if (event.fixture?.id !== undefined) return String(event.fixture.id);
+    // Other possible formats
+    if (event.event_id !== undefined) return String(event.event_id);
+    return null;
+  }
+  
+  /**
+   * Extract match minute/elapsed time from various formats
+   */
+  private extractMinute(event: any): number | undefined {
+    // Transformed format
+    if (event.minute !== undefined) return event.minute;
+    if (event.elapsed !== undefined) return event.elapsed;
+    // Raw API-Sports format
+    if (event.fixture?.status?.elapsed !== undefined) return event.fixture.status.elapsed;
+    return undefined;
+  }
+  
+  /**
+   * Extract start time from various formats
+   */
+  private extractStartTime(event: any): string | undefined {
+    // Transformed format
+    if (event.startTime) return event.startTime;
+    // Raw API-Sports format
+    if (event.fixture?.date) return event.fixture.date;
+    return undefined;
+  }
+
+  /**
    * Get ALL cached events (live + upcoming) for unified event validation
    * Used to verify that an event exists in our system before accepting bets
    * Returns lookup result with metadata about where the event was found
@@ -111,29 +148,25 @@ export class ApiSportsService {
     try {
       // First, check live events cache
       // Cache keys are like: live_events_football_v7 (with version suffix)
-      const allCacheKeys = Array.from(this.cache.keys());
-      console.log(`[lookupEventSync] Looking for event ${eventId}, cache keys: ${allCacheKeys.join(', ')}`);
-      
       for (const [key, cached] of this.cache.entries()) {
         if (key.startsWith('live_events_')) {
           if (cached && cached.data) {
             // Handle both array format and { events: [...] } object format
             const events = Array.isArray(cached.data) ? cached.data : (cached.data.events ?? []);
-            const eventIds = Array.isArray(events) ? events.slice(0, 5).map((e: any) => String(e.id)) : [];
-            console.log(`[lookupEventSync] Checking ${key}: isArray=${Array.isArray(cached.data)}, events.length=${Array.isArray(events) ? events.length : 'N/A'}, first5IDs: ${eventIds.join(',')}`);
             if (Array.isArray(events)) {
-              const event = events.find((e: any) => String(e.id) === eventId);
+              const event = events.find((e: any) => this.extractEventId(e) === eventId);
               if (event) {
                 // Get minute from event data - DO NOT default to 0
-                // Missing minute data should be treated as unverifiable for security
-                const minuteValue = event.minute ?? event.elapsed;
+                const minuteValue = this.extractMinute(event);
+                const startTime = this.extractStartTime(event);
+                console.log(`[lookupEventSync] Found event ${eventId} in ${key}, minute=${minuteValue}`);
                 return {
                   found: true,
                   isLive: true,
                   minute: minuteValue, // undefined if not available - fail-closed
                   cacheAgeMs: Date.now() - cached.timestamp,
                   source: 'live',
-                  startTime: event.startTime,
+                  startTime,
                   shouldBeLive: true // Already live
                 };
               }
@@ -149,14 +182,13 @@ export class ApiSportsService {
           if (cached && cached.data) {
             // Handle both array format and { events: [...] } object format
             const events = Array.isArray(cached.data) ? cached.data : (cached.data.events ?? []);
-            console.log(`[lookupEventSync] Checking upcoming ${key}: isArray=${Array.isArray(cached.data)}, events.length=${Array.isArray(events) ? events.length : 'N/A'}`);
             if (Array.isArray(events)) {
-              const event = events.find((e: any) => String(e.id) === eventId);
+              const event = events.find((e: any) => this.extractEventId(e) === eventId);
               if (event) {
                 // Check if the match should have started based on startTime
-                const startTime = event.startTime;
+                const startTime = this.extractStartTime(event);
                 const shouldBeLive = startTime ? new Date(startTime).getTime() <= Date.now() : false;
-                
+                console.log(`[lookupEventSync] Found event ${eventId} in ${key}, shouldBeLive=${shouldBeLive}`);
                 return {
                   found: true,
                   isLive: false,
@@ -173,6 +205,7 @@ export class ApiSportsService {
       }
       
       // Event not found in any cache
+      console.log(`[lookupEventSync] Event ${eventId} NOT FOUND in any cache`);
       return { found: false, isLive: false, cacheAgeMs: Infinity, source: 'none', shouldBeLive: false };
     } catch (error) {
       console.error('[ApiSportsService] Error in lookupEventSync:', error);
