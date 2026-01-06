@@ -193,6 +193,11 @@ export default function HomeReal() {
     }
   });
   
+  // Check if betting is closed for a live match (80+ minutes)
+  const isBettingClosed = (event: any): boolean => {
+    return event.status === 'live' && event.minute !== undefined && event.minute >= 80;
+  };
+  
   // Handle bet selection
   const handleBetSelection = (event: any, market: any, outcome: any) => {
     const betId = `${event.id}-${market.id}-${outcome.id}`;
@@ -205,7 +210,8 @@ export default function HomeReal() {
       odds: outcome.odds,
       stake: 10, // Default stake
       market: market.name,
-      isLive: event.status === 'live'
+      isLive: event.status === 'live',
+      matchMinute: event.minute
     });
   };
   
@@ -256,6 +262,13 @@ export default function HomeReal() {
                         <div className="flex items-center space-x-2">
                           <span className="inline-block w-2 h-2 bg-red-600 rounded-full animate-pulse"></span>
                           <span className="text-xs font-bold text-red-500">LIVE</span>
+                          {event.minute !== undefined && (
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                              event.minute >= 80 ? 'bg-yellow-600/30 text-yellow-400' : 'bg-red-500/20 text-red-300'
+                            }`}>
+                              {event.minute}'
+                            </span>
+                          )}
                         </div>
                         <div className="text-xs text-right text-gray-400">
                           {sports.find((s: any) => s.id === event.sportId)?.name || 'Sport'}
@@ -284,45 +297,51 @@ export default function HomeReal() {
                       
                       {/* Betting options with better visibility and consistent sizing */}
                       <div className="p-0 m-0 bg-[#0a0e14]">
-                        <div className="flex w-full my-0">
-                        {event.markets && event.markets[0]?.outcomes ? (
-                          event.markets[0].outcomes.map((outcome: any, idx: number) => (
-                            <BettingButton
-                              key={outcome.id || idx}
-                              name={outcome.name.length > 8 ? outcome.name.substring(0, 8) + '.' : outcome.name}
-                              odds={outcome.odds}
-                              onClick={() => handleBetSelection(event, event.markets[0], outcome)}
-                            />
-                          ))
+                        {isBettingClosed(event) ? (
+                          <div className="flex w-full justify-center items-center py-3 bg-yellow-900/20 border-t border-yellow-600/30">
+                            <span className="text-yellow-400 text-sm font-semibold">BETTING CLOSED</span>
+                          </div>
                         ) : (
-                          <>
-                            <BettingButton
-                              name="1"
-                              odds={2.10}
-                              onClick={() => {
-                                const fakeOutcome = {id: `home-${event.id}`, name: "1", odds: 2.10};
-                                handleBetSelection(event, {id: event.id, name: "Match Result"}, fakeOutcome);
-                              }}
-                            />
-                            <BettingButton
-                              name="X"
-                              odds={3.25}
-                              onClick={() => {
-                                const fakeOutcome = {id: `draw-${event.id}`, name: "X", odds: 3.25};
-                                handleBetSelection(event, {id: event.id, name: "Match Result"}, fakeOutcome);
-                              }}
-                            />
-                            <BettingButton
-                              name="2"
-                              odds={3.40}
-                              onClick={() => {
-                                const fakeOutcome = {id: `away-${event.id}`, name: "2", odds: 3.40};
-                                handleBetSelection(event, {id: event.id, name: "Match Result"}, fakeOutcome);
-                              }}
-                            />
-                          </>
+                          <div className="flex w-full my-0">
+                          {event.markets && event.markets[0]?.outcomes ? (
+                            event.markets[0].outcomes.map((outcome: any, idx: number) => (
+                              <BettingButton
+                                key={outcome.id || idx}
+                                name={outcome.name.length > 8 ? outcome.name.substring(0, 8) + '.' : outcome.name}
+                                odds={outcome.odds}
+                                onClick={() => handleBetSelection(event, event.markets[0], outcome)}
+                              />
+                            ))
+                          ) : (
+                            <>
+                              <BettingButton
+                                name="1"
+                                odds={2.10}
+                                onClick={() => {
+                                  const fakeOutcome = {id: `home-${event.id}`, name: "1", odds: 2.10};
+                                  handleBetSelection(event, {id: event.id, name: "Match Result"}, fakeOutcome);
+                                }}
+                              />
+                              <BettingButton
+                                name="X"
+                                odds={3.25}
+                                onClick={() => {
+                                  const fakeOutcome = {id: `draw-${event.id}`, name: "X", odds: 3.25};
+                                  handleBetSelection(event, {id: event.id, name: "Match Result"}, fakeOutcome);
+                                }}
+                              />
+                              <BettingButton
+                                name="2"
+                                odds={3.40}
+                                onClick={() => {
+                                  const fakeOutcome = {id: `away-${event.id}`, name: "2", odds: 3.40};
+                                  handleBetSelection(event, {id: event.id, name: "Match Result"}, fakeOutcome);
+                                }}
+                              />
+                            </>
+                          )}
+                          </div>
                         )}
-                        </div>
                       </div>
                     </div>
                   ))}
@@ -340,9 +359,11 @@ export default function HomeReal() {
                 </div>
               ) : upcomingEvents.length > 0 ? (
                 <div className="space-y-6">
-                  {/* Group events by sport */}
+                  {/* Group events by sport - sorted by start time */}
                   {sports.slice(0, 3).map((sport: any) => {
-                    const sportEvents = upcomingEvents.filter((event: any) => event.sportId === sport.id);
+                    const sportEvents = upcomingEvents
+                      .filter((event: any) => event.sportId === sport.id)
+                      .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
                     if (sportEvents.length === 0) return null;
                     
                     return (
@@ -368,11 +389,16 @@ export default function HomeReal() {
                               {/* Header with time and league */}
                               <div className="px-3 py-2 flex justify-between items-center bg-[#061118] border-b border-[#1e3a3f]">
                                 <div className="flex items-center space-x-2">
-                                  <span className="text-xs font-medium text-cyan-300">
-                                    {format(new Date(event.startTime), 'dd MMM HH:mm')}
+                                  <Calendar className="w-3 h-3 text-cyan-400" />
+                                  <span className="text-xs font-semibold text-cyan-300">
+                                    {format(new Date(event.startTime), 'EEE, MMM d')}
+                                  </span>
+                                  <Clock className="w-3 h-3 text-cyan-400 ml-1" />
+                                  <span className="text-xs font-semibold text-cyan-300">
+                                    {format(new Date(event.startTime), 'HH:mm')}
                                   </span>
                                 </div>
-                                <div className="text-xs text-right text-gray-400">
+                                <div className="text-xs text-right text-gray-400 truncate max-w-[120px]">
                                   {event.leagueName || sport.name}
                                 </div>
                               </div>

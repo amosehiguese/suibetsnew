@@ -51,6 +51,116 @@ export class ApiSportsService {
     console.log('[ApiSportsService] Cache cleared');
   }
   
+  /**
+   * Get cached live events synchronously for server-side validation
+   * Returns all cached live events from ALL cached sports for bet validation
+   * Used to verify match time before accepting bets (80-minute cutoff)
+   * 
+   * Iterates over ALL cache entries to find live events, not just a hardcoded list
+   * Returns both events and metadata about cache freshness for security decisions
+   */
+  public getCachedLiveEventsSync(): { events: SportEvent[]; maxAgeMs: number; cacheHit: boolean } {
+    const allLiveEvents: SportEvent[] = [];
+    let oldestTimestamp = Date.now();
+    let cacheHit = false;
+    
+    try {
+      // Iterate over all cache entries to find live event caches
+      // This ensures we don't miss any sport that's been fetched
+      for (const [key, cached] of this.cache.entries()) {
+        // Only process live_events cache entries with matching version
+        if (key.startsWith('live_events_') && key.endsWith(`_${this.cacheVersionKey}`)) {
+          // Type guard: only process if data is actually an array
+          if (cached && cached.data && Array.isArray(cached.data)) {
+            cacheHit = true;
+            allLiveEvents.push(...cached.data);
+            // Track oldest cache entry
+            if (cached.timestamp < oldestTimestamp) {
+              oldestTimestamp = cached.timestamp;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[ApiSportsService] Error iterating cache:', error);
+      return { events: [], maxAgeMs: Infinity, cacheHit: false };
+    }
+    
+    const maxAgeMs = cacheHit ? Date.now() - oldestTimestamp : Infinity;
+    return { events: allLiveEvents, maxAgeMs, cacheHit };
+  }
+  
+  /**
+   * Get ALL cached events (live + upcoming) for unified event validation
+   * Used to verify that an event exists in our system before accepting bets
+   * Returns lookup result with metadata about where the event was found
+   * Also returns startTime to detect events that should be live but aren't in live cache
+   */
+  public lookupEventSync(eventId: string): { 
+    found: boolean; 
+    isLive: boolean; 
+    minute?: number; 
+    cacheAgeMs: number;
+    source: 'live' | 'upcoming' | 'none';
+    startTime?: string; // ISO timestamp of event start time
+    shouldBeLive: boolean; // True if startTime has passed (match should have started)
+  } {
+    try {
+      // First, check live events cache
+      for (const [key, cached] of this.cache.entries()) {
+        if (key.startsWith('live_events_') && key.endsWith(`_${this.cacheVersionKey}`)) {
+          if (cached && cached.data && Array.isArray(cached.data)) {
+            const event = cached.data.find((e: any) => String(e.id) === eventId);
+            if (event) {
+              // Get minute from event data - DO NOT default to 0
+              // Missing minute data should be treated as unverifiable for security
+              const minuteValue = event.minute ?? event.elapsed;
+              return {
+                found: true,
+                isLive: true,
+                minute: minuteValue, // undefined if not available - fail-closed
+                cacheAgeMs: Date.now() - cached.timestamp,
+                source: 'live',
+                startTime: event.startTime,
+                shouldBeLive: true // Already live
+              };
+            }
+          }
+        }
+      }
+      
+      // Second, check upcoming events cache
+      for (const [key, cached] of this.cache.entries()) {
+        if (key.startsWith('upcoming_events_') && key.endsWith(`_${this.cacheVersionKey}`)) {
+          if (cached && cached.data && Array.isArray(cached.data)) {
+            const event = cached.data.find((e: any) => String(e.id) === eventId);
+            if (event) {
+              // Check if the match should have started based on startTime
+              const startTime = event.startTime;
+              const shouldBeLive = startTime ? new Date(startTime).getTime() <= Date.now() : false;
+              
+              return {
+                found: true,
+                isLive: false,
+                minute: undefined,
+                cacheAgeMs: Date.now() - cached.timestamp,
+                source: 'upcoming',
+                startTime,
+                shouldBeLive
+              };
+            }
+          }
+        }
+      }
+      
+      // Event not found in any cache
+      return { found: false, isLive: false, cacheAgeMs: Infinity, source: 'none', shouldBeLive: false };
+    } catch (error) {
+      console.error('[ApiSportsService] Error in lookupEventSync:', error);
+      return { found: false, isLive: false, cacheAgeMs: Infinity, source: 'none', shouldBeLive: false };
+    }
+  }
+  
   // API endpoints for each sport - expanded to include all sports from the API
   // Aligned with sportMap in routes.ts for consistent identifiers
   private sportEndpoints: Record<string, string> = {

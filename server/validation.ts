@@ -34,7 +34,9 @@ export const PlaceBetSchema = z.object({
   paymentMethod: z.enum(['platform', 'wallet']).optional().default('platform'),
   txHash: z.string().optional(), // For wallet/on-chain bets
   onChainBetId: z.string().optional(), // Sui bet object ID
-  status: z.enum(['pending', 'confirmed', 'settled', 'cancelled']).optional().default('pending')
+  status: z.enum(['pending', 'confirmed', 'settled', 'cancelled']).optional().default('pending'),
+  isLive: z.boolean().optional(), // Whether this is a live match
+  matchMinute: z.number().optional() // Current match minute for live matches (betting blocked >= 80)
 });
 
 // Parlay schema

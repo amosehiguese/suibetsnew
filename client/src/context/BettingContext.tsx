@@ -54,6 +54,17 @@ export const BettingProvider: React.FC<{children: ReactNode}> = ({ children }) =
   const addBet = (bet: SelectedBet) => {
     console.log("BettingContext: Adding bet to slip", bet);
     
+    // Block bets on live matches when time reaches 80 minutes
+    if (bet.isLive && bet.matchMinute !== undefined && bet.matchMinute >= 80) {
+      console.log(`BettingContext: Bet blocked - match at ${bet.matchMinute} minutes (>= 80 min cutoff)`);
+      toast({
+        title: "Betting Closed",
+        description: `Betting is closed for this match (${bet.matchMinute}' played)`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Ensure we have the current state by using a callback with setSelectedBets
     setSelectedBets(prevBets => {
       // First, check if this is a duplicate bet with the same selection
@@ -192,6 +203,8 @@ export const BettingProvider: React.FC<{children: ReactNode}> = ({ children }) =
               feeCurrency: betOptions.currency,
               paymentMethod: 'platform',
               status: 'pending',
+              isLive: bet.isLive,
+              matchMinute: bet.matchMinute,
             });
 
             if (response.ok) {

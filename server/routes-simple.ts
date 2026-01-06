@@ -973,7 +973,93 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       // Cast to strings since transform always converts to string
       const userId = String(data.userId);
       const eventId = String(data.eventId);
-      const { eventName, homeTeam, awayTeam, marketId, outcomeId, odds, betAmount, prediction, feeCurrency, paymentMethod, txHash, onChainBetId, status } = data;
+      const { eventName, homeTeam, awayTeam, marketId, outcomeId, odds, betAmount, prediction, feeCurrency, paymentMethod, txHash, onChainBetId, status, isLive, matchMinute } = data;
+      
+      // SERVER-SIDE VALIDATION: Unified event registry lookup
+      // CRITICAL: Server is authoritative about event status - never trust client isLive/matchMinute
+      // Security: FAIL-CLOSED - Event must exist in server cache (live or upcoming) to accept bet
+      const MAX_CACHE_AGE_MS = 60 * 1000; // Reject stale cache (>60 seconds) for live events
+      
+      try {
+        // Unified lookup: checks BOTH live and upcoming event caches
+        const eventLookup = apiSportsService.lookupEventSync(eventId);
+        // Maximum cache age for ANY bet - after this, cache is too stale to trust
+        const MAX_UNIVERSAL_CACHE_AGE_MS = 2 * 60 * 1000; // 2 minutes - reject ALL stale cache bets
+        
+        if (!eventLookup.found) {
+          // FAIL-CLOSED: Event not found in ANY cache - reject bet
+          console.log(`❌ Bet rejected (unknown event): Event ${eventId} not in live or upcoming cache, client isLive: ${isLive}`);
+          return res.status(400).json({ 
+            message: "Event not found - please refresh and try again",
+            code: "EVENT_NOT_FOUND"
+          });
+        }
+        
+        // UNIVERSAL STALE CHECK: Reject ANY bet with stale cache, regardless of source or client claims
+        // This prevents bypass via stale upcoming cache + isLive=false manipulation
+        if (eventLookup.cacheAgeMs > MAX_UNIVERSAL_CACHE_AGE_MS) {
+          console.log(`❌ Bet rejected (stale cache): Cache is ${Math.round(eventLookup.cacheAgeMs/1000)}s old (max ${MAX_UNIVERSAL_CACHE_AGE_MS/1000}s), eventId: ${eventId}, source: ${eventLookup.source}`);
+          return res.status(400).json({ 
+            message: "Event data is stale - please refresh and try again",
+            code: "STALE_EVENT_DATA"
+          });
+        }
+        
+        // Event found with fresh cache - check if it's live (server determines this, not client)
+        if (eventLookup.source === 'live') {
+          // Event is LIVE according to server cache - additional freshness check for live events
+          if (eventLookup.cacheAgeMs > MAX_CACHE_AGE_MS) {
+            console.log(`❌ Bet rejected (stale live cache): Cache is ${Math.round(eventLookup.cacheAgeMs/1000)}s old, eventId: ${eventId}, cached minute: ${eventLookup.minute}`);
+            return res.status(400).json({ 
+              message: "Match data is stale - please refresh and try again",
+              code: "STALE_MATCH_DATA"
+            });
+          }
+          
+          // FAIL-CLOSED: If we have no minute data for a live match, we cannot verify it's under 80 min
+          // API-Sports may omit minute during halftime, glitches, or for non-football sports
+          if (eventLookup.minute === undefined || eventLookup.minute === null) {
+            console.log(`❌ Bet rejected (unverifiable minute): Live match has no minute data, eventId: ${eventId}, cannot verify < 80 min cutoff`);
+            return res.status(400).json({ 
+              message: "Cannot verify match time - please try again shortly",
+              code: "UNVERIFIABLE_MATCH_TIME"
+            });
+          }
+          
+          // Check trusted minute against 80-minute cutoff
+          if (eventLookup.minute >= 80) {
+            console.log(`❌ Bet rejected (server-verified): Live match at ${eventLookup.minute} minutes (>= 80 min cutoff), eventId: ${eventId}, client claimed isLive: ${isLive}`);
+            return res.status(400).json({ 
+              message: "Betting closed for this match (80+ minutes played)",
+              code: "MATCH_TIME_EXCEEDED",
+              serverVerified: true
+            });
+          }
+          // Live match under 80 minutes with fresh cache and verified minute - allow bet to proceed
+          console.log(`✅ Live bet allowed: eventId ${eventId}, minute: ${eventLookup.minute}, cache age: ${Math.round(eventLookup.cacheAgeMs/1000)}s`);
+        } else if (eventLookup.source === 'upcoming') {
+          // Event found in upcoming cache - but check if it SHOULD be live based on start time
+          if (eventLookup.shouldBeLive) {
+            // START TIME HAS PASSED - match should be live but isn't in live cache
+            // This is the critical bypass scenario: match could be at 80+ minutes
+            // FAIL-CLOSED: Reject - we can't verify the match state
+            console.log(`❌ Bet rejected (should be live): Event ${eventId} startTime has passed (${eventLookup.startTime}) but not in live cache, client isLive: ${isLive}`);
+            return res.status(400).json({ 
+              message: "Match may have started - cannot verify status, please refresh",
+              code: "EVENT_STATUS_UNCERTAIN"
+            });
+          }
+          // Event truly upcoming (start time in future) - allow bet
+          console.log(`✅ Upcoming bet allowed: eventId ${eventId}, startTime: ${eventLookup.startTime}, cache age: ${Math.round(eventLookup.cacheAgeMs/1000)}s`);
+        }
+      } catch (lookupError) {
+        // Cache access failed - FAIL-CLOSED: Reject ALL bets
+        console.log(`❌ Bet rejected (cache error): Cannot verify event, eventId: ${eventId}, error: ${lookupError}`);
+        return res.status(400).json({ 
+          message: "Cannot verify event status - please try again",
+          code: "EVENT_VERIFICATION_ERROR"
+        });
+      }
       
       // Determine currency (default to SUI)
       const currency: 'SUI' | 'SBETS' = feeCurrency === 'SBETS' ? 'SBETS' : 'SUI';

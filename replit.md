@@ -134,6 +134,23 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (January 6, 2026)
 
+### 80-Minute Betting Cutoff Security (Server-Authoritative)
+- **Fail-Closed Architecture**: All bet validation paths reject on uncertainty
+- **Unified Event Registry**: Checks both live and upcoming caches via `lookupEventSync()`
+- **Server-Authoritative**: Client flags (isLive, matchMinute) are IGNORED - server determines event status
+- **Security Flow**:
+  1. Event NOT found in ANY cache → REJECT
+  2. Cache age > 2 minutes (universal) → REJECT
+  3. LIVE cache entry: Cache > 60s → REJECT, Minute undefined → REJECT, Minute >= 80 → REJECT
+  4. UPCOMING cache entry: startTime passed (shouldBeLive) → REJECT
+  5. Cache access error → REJECT
+- **Bypass Prevention**:
+  - Stale cache manipulation: Universal 2-min stale check
+  - Client lies about isLive: Server checks live cache first
+  - Fresh upcoming cache but match started: startTime comparison
+  - Missing minute data: Explicitly rejected as unverifiable
+- **Rejection Codes**: `EVENT_NOT_FOUND`, `STALE_EVENT_DATA`, `STALE_MATCH_DATA`, `UNVERIFIABLE_MATCH_TIME`, `MATCH_TIME_EXCEEDED`, `EVENT_STATUS_UNCERTAIN`, `EVENT_VERIFICATION_ERROR`
+
 ### 100% Real Odds Implementation
 - **Background Prefetcher**: Continuously fetches odds every 60 seconds to warm cache
 - **Pre-warmed Cache**: Odds cached per fixture ID with 5-minute TTL for instant responses
