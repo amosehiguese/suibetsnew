@@ -67,9 +67,9 @@ export class ApiSportsService {
     try {
       // Iterate over all cache entries to find live event caches
       // This ensures we don't miss any sport that's been fetched
+      // Cache keys are like: live_events_football (no version suffix for live events)
       for (const [key, cached] of this.cache.entries()) {
-        // Only process live_events cache entries with matching version
-        if (key.startsWith('live_events_') && key.endsWith(`_${this.cacheVersionKey}`)) {
+        if (key.startsWith('live_events_')) {
           // Type guard: only process if data is actually an array
           if (cached && cached.data && Array.isArray(cached.data)) {
             cacheHit = true;
@@ -107,8 +107,9 @@ export class ApiSportsService {
   } {
     try {
       // First, check live events cache
+      // Cache keys are like: live_events_football (no version suffix for live events)
       for (const [key, cached] of this.cache.entries()) {
-        if (key.startsWith('live_events_') && key.endsWith(`_${this.cacheVersionKey}`)) {
+        if (key.startsWith('live_events_')) {
           if (cached && cached.data && Array.isArray(cached.data)) {
             const event = cached.data.find((e: any) => String(e.id) === eventId);
             if (event) {
@@ -130,8 +131,9 @@ export class ApiSportsService {
       }
       
       // Second, check upcoming events cache
+      // Cache keys are like: upcoming_events_football_10 or upcoming_events_football_250
       for (const [key, cached] of this.cache.entries()) {
-        if (key.startsWith('upcoming_events_') && key.endsWith(`_${this.cacheVersionKey}`)) {
+        if (key.startsWith('upcoming_events_')) {
           if (cached && cached.data && Array.isArray(cached.data)) {
             const event = cached.data.find((e: any) => String(e.id) === eventId);
             if (event) {
