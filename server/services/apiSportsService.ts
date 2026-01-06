@@ -2584,9 +2584,9 @@ export class ApiSportsService {
       });
       
       // Delay between batches to respect API rate limits (10 req/sec)
-      // With 20 concurrent requests per batch, wait 2 seconds between batches
+      // With 10 concurrent requests per batch, wait 1 second between batches (faster response)
       if (batchIndex < batches.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
     
@@ -2602,12 +2602,22 @@ export class ApiSportsService {
   async enrichEventsWithOdds(events: SportEvent[], sport: string = 'football'): Promise<SportEvent[]> {
     if (!events || events.length === 0) return events;
     
-    // Get fixture IDs from ALL events - no limit to ensure 100% coverage
+    // Check if we have cached enriched events
+    const cacheKey = `enriched_events_${sport}_${events.length}_${events[0]?.id}`;
+    const cachedEnriched = this.cache.get(cacheKey);
+    if (cachedEnriched) {
+      console.log(`[ApiSportsService] 🎰 Using cached enriched events for ${sport}`);
+      return cachedEnriched as SportEvent[];
+    }
+    
+    // Limit to first 100 fixtures for balance of coverage and speed
+    const MAX_FIXTURES_TO_ENRICH = 100;
     const fixtureIds = events
+      .slice(0, MAX_FIXTURES_TO_ENRICH)
       .map(e => e.id?.toString())
       .filter((id): id is string => !!id);
     
-    console.log(`[ApiSportsService] 🎰 Enriching ${events.length} events with odds (fetching for ${fixtureIds.length} fixtures)`);
+    console.log(`[ApiSportsService] 🎰 Enriching ${events.length} events (fetching odds for first ${fixtureIds.length} fixtures)`);
     
     // Fetch odds by fixture ID
     const allOdds = await this.getOddsForFixtures(fixtureIds, sport);
@@ -2660,6 +2670,9 @@ export class ApiSportsService {
     });
     
     console.log(`[ApiSportsService] 🎰 Enriched ${enrichedCount}/${events.length} events with real API odds`);
+    
+    // Cache the enriched events for 2 minutes
+    this.cache.set(cacheKey, enrichedEvents, 120);
     
     return enrichedEvents;
   }

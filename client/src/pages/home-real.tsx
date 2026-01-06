@@ -19,13 +19,13 @@ export default function HomeReal() {
   const [, setLocation] = useLocation();
   const { addBet } = useBetting();
   
-  // Fetch upcoming events
+  // Fetch upcoming events with optimized caching to prevent flickering
   const { data: upcomingEvents = [], isLoading: upcomingEventsLoading } = useQuery({
     queryKey: ['/api/events', { type: 'upcoming' }],
     queryFn: async () => {
       console.log('Fetching upcoming events from API');
       try {
-        const response = await apiRequest('GET', '/api/events', undefined, { timeout: 15000 });
+        const response = await apiRequest('GET', '/api/events', undefined, { timeout: 20000 });
         if (!response.ok) {
           console.warn(`Server error ${response.status} from ${response.url}`);
           return []; // Return empty array on error
@@ -55,9 +55,12 @@ export default function HomeReal() {
         return []; // Return empty array on error
       }
     },
-    refetchInterval: 30000, // Refetch every 30 seconds for upcoming
-    retry: 3, // Retry up to 3 times if there's an error
-    retryDelay: 2000 // Wait 2 seconds between retries
+    staleTime: 60000, // Data stays fresh for 60 seconds (prevents refetch flicker)
+    gcTime: 300000, // Keep in cache for 5 minutes
+    refetchInterval: 60000, // Refetch every 60 seconds (was 30s)
+    refetchOnWindowFocus: false, // Prevent refetch when switching tabs
+    retry: 2,
+    retryDelay: 1000
   });
   
   // Only fetch authentic live events - no fallback data
@@ -173,8 +176,11 @@ export default function HomeReal() {
         return []; // Return empty array on error to avoid breaking the UI
       }
     },
-    refetchInterval: 15000, // Refresh every 15 seconds for live
-    retry: 2,       // Fewer retries for faster recovery
+    staleTime: 10000, // Data stays fresh for 10 seconds (prevents flicker)
+    gcTime: 120000, // Keep in cache for 2 minutes
+    refetchInterval: 20000, // Refresh every 20 seconds for live (was 15s)
+    refetchOnWindowFocus: false, // Prevent refetch when switching tabs
+    retry: 1,       // Minimal retries for faster recovery
     retryDelay: (attemptIndex) => Math.min(1000 * (attemptIndex + 1), 3000) // Progressive delay
   });
   
