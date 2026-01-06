@@ -816,6 +816,12 @@ export default function AdminPanel() {
                     <p className="text-2xl font-bold text-cyan-400" data-testid="treasury-sui">
                       {platformInfo.treasurySui.toFixed(4)} SUI
                     </p>
+                    <p className="text-xs text-orange-400 mt-1">
+                      Liability: {platformInfo.totalPotentialLiabilitySui.toFixed(4)} SUI
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Available: {(platformInfo.treasurySui - platformInfo.totalPotentialLiabilitySui).toFixed(4)} SUI
+                    </p>
                   </div>
                   <div className="bg-black/40 rounded-lg p-4">
                     <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
@@ -823,6 +829,12 @@ export default function AdminPanel() {
                     </div>
                     <p className="text-2xl font-bold text-purple-400" data-testid="treasury-sbets">
                       {platformInfo.treasurySbets.toFixed(4)} SBETS
+                    </p>
+                    <p className="text-xs text-orange-400 mt-1">
+                      Liability: {platformInfo.totalPotentialLiabilitySbets.toFixed(4)} SBETS
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Available: {(platformInfo.treasurySbets - platformInfo.totalPotentialLiabilitySbets).toFixed(4)} SBETS
                     </p>
                   </div>
                   <div className="bg-black/40 rounded-lg p-4">
