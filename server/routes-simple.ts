@@ -112,17 +112,28 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
 
       // Update bet status directly and handle payouts - ONLY if status update succeeds (prevents double payout)
       const bet = await storage.getBetByStringId(betId);
+      
+      if (!bet) {
+        console.log(`❌ Bet ${betId} not found`);
+        return res.status(404).json({ message: "Bet not found" });
+      }
+      
       const statusUpdated = await storage.updateBetStatus(betId, outcome);
       
-      if (statusUpdated && bet) {
-        const currency = bet.feeCurrency === 'SBETS' ? 'SBETS' : 'SUI';
+      if (statusUpdated) {
+        // Map storage field names correctly: stake, potentialWin, currency
+        const currency = (bet.currency === 'SBETS' || bet.feeCurrency === 'SBETS') ? 'SBETS' : 'SUI';
         const walletId = bet.walletAddress || String(bet.userId);
+        const stake = bet.stake || bet.betAmount || 0;
+        const potentialPayout = bet.potentialWin || bet.potentialPayout || 0;
+        
+        console.log(`🔧 ADMIN SETTLE: Processing bet ${betId} - stake: ${stake}, payout: ${potentialPayout}, currency: ${currency}`);
         
         if (outcome === 'won') {
-          // Calculate and record 1% platform fee on winnings
-          const grossPayout = bet.potentialPayout || 0;
-          const platformFee = grossPayout * 0.01;
-          const netPayout = grossPayout - platformFee;
+          // Calculate and record 1% platform fee on winnings (profit only)
+          const profit = potentialPayout - stake;
+          const platformFee = profit > 0 ? profit * 0.01 : 0;
+          const netPayout = potentialPayout - platformFee;
           
           const winningsAdded = await balanceService.addWinnings(walletId, netPayout, currency);
           if (!winningsAdded) {
@@ -132,23 +143,25 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
             return res.status(500).json({ message: "Failed to credit winnings - settlement reverted" });
           }
           // Record platform fee as revenue
-          await balanceService.addRevenue(platformFee, currency);
+          if (platformFee > 0) {
+            await balanceService.addRevenue(platformFee, currency);
+          }
           console.log(`💰 ADMIN SETTLE: ${walletId} won ${netPayout} ${currency} (fee: ${platformFee} ${currency})`);
         } else if (outcome === 'lost') {
           // Add full stake to platform revenue
-          await balanceService.addRevenue(bet.betAmount || 0, currency);
-          console.log(`📊 ADMIN SETTLE: ${bet.betAmount} ${currency} added to revenue from lost bet`);
+          await balanceService.addRevenue(stake, currency);
+          console.log(`📊 ADMIN SETTLE: ${stake} ${currency} added to revenue from lost bet`);
         } else if (outcome === 'void') {
           // Refund stake on void
-          const refundSuccess = await balanceService.addWinnings(walletId, bet.betAmount || 0, currency);
+          const refundSuccess = await balanceService.addWinnings(walletId, stake, currency);
           if (!refundSuccess) {
             await storage.updateBetStatus(betId, 'pending');
             console.error(`❌ SETTLEMENT REVERTED: Failed to refund stake for voided bet ${betId}`);
             return res.status(500).json({ message: "Failed to refund stake - settlement reverted" });
           }
-          console.log(`🔄 ADMIN SETTLE: ${walletId} refunded ${bet.betAmount} ${currency} (void)`);
+          console.log(`🔄 ADMIN SETTLE: ${walletId} refunded ${stake} ${currency} (void)`);
         }
-      } else if (!statusUpdated) {
+      } else {
         console.log(`⚠️ Bet ${betId} already settled - no payout applied`);
         return res.status(400).json({ message: "Bet already settled" });
       }
@@ -165,7 +178,7 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         settlementId: action.id,
         betId,
         outcome,
-        payout: bet?.potentialPayout || 0,
+        payout: bet?.potentialWin || bet?.potentialPayout || 0,
         timestamp: Date.now(),
         fees: 0
       });
