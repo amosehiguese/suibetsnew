@@ -2510,8 +2510,8 @@ export class ApiSportsService {
     
     console.log(`[ApiSportsService] 🎰 Fetching odds for ${fixtureIds.length} fixtures in ${batches.length} batch(es)`);
     
-    // Process up to 5 batches (100 fixtures) to balance coverage vs API costs
-    for (const batch of batches.slice(0, 5)) {
+    // Process ALL batches to ensure 100% odds coverage
+    for (const batch of batches) {
       const promises = batch.map(async (fixtureId) => {
         const cacheKey = `odds_fixture_${fixtureId}`;
         
@@ -2598,9 +2598,8 @@ export class ApiSportsService {
   async enrichEventsWithOdds(events: SportEvent[], sport: string = 'football'): Promise<SportEvent[]> {
     if (!events || events.length === 0) return events;
     
-    // Get fixture IDs from events (limit to first 100 to balance coverage vs API costs)
+    // Get fixture IDs from ALL events - no limit to ensure 100% coverage
     const fixtureIds = events
-      .slice(0, 100)
       .map(e => e.id?.toString())
       .filter((id): id is string => !!id);
     
