@@ -451,7 +451,9 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       const actualPassword = process.env.ADMIN_PASSWORD || 'change-me-in-production';
       const hasValidPassword = adminPassword === actualPassword;
       
+      // Debug: show password comparison (redacted for security)
       console.log(`[Admin] Auth check: validToken=${hasValidToken}, validPassword=${hasValidPassword}`);
+      console.log(`[Admin] Password debug: providedLen=${adminPassword?.length || 0}, expectedLen=${actualPassword.length}`);
       
       if (!hasValidToken && !hasValidPassword) {
         console.log(`[Admin] Unauthorized - no valid token or password`);
