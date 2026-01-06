@@ -164,15 +164,16 @@ Preferred communication style: Simple, everyday language.
 - Events without odds (smaller leagues without bookmaker coverage) are not displayed
 - This is an API limitation, not a bug - smaller leagues don't have bookmaker odds available
 
-### Auto-Payment Settlement System (January 6, 2026)
-- **Critical Fix**: BetObjectId extraction improved in `useOnChainBet.ts`
-  - Now passes `execute: { showObjectChanges: true }` to signAndExecute
-  - Checks both signAndExecute result and waitForTransaction for objectChanges
-  - Logs all object changes for debugging
-- **Fee Calculation Fixed**: Settlement worker now applies 1% fee to PROFIT only (matching smart contract)
-  - OLD (incorrect): `platformFee = grossPayout * 0.01`
-  - NEW (correct): `platformFee = profit * 0.01` where `profit = grossPayout - stake`
+### Auto-Payment Settlement System (January 6, 2026) - PRODUCTION READY
+- **Status**: WORKING - On-chain settlement verified with real bets
+- **BetObjectId Extraction**: Fixed in `useOnChainBet.ts`
+  - Uses `suiClient.waitForTransaction()` with `showObjectChanges: true`
+  - Successfully extracts Bet object ID from transaction effects
+  - Verified: Bet ID 17 has betObjectId `0x503c030e...`
+- **Fee Calculation**: 1% fee on PROFIT only (matching smart contract)
+  - Formula: `platformFee = profit * 0.01` where `profit = grossPayout - stake`
 - **Settlement Worker Flow**:
-  1. Matches with `betObjectId` in database → On-chain settlement via `settle_bet_admin` / `settle_bet_sbets_admin`
-  2. Matches without `betObjectId` → Off-chain fallback (database balance credits)
-- **Debugging**: Console logs show full transaction details and object extraction process
+  1. Bets WITH `betObjectId` → On-chain settlement via `settle_bet_admin` / `settle_bet_sbets_admin`
+  2. Legacy bets WITHOUT `betObjectId` → Off-chain fallback (database credits - acceptable for transition)
+- **Verified On-Chain Settlements**: 2 SBETS bets settled from treasury with TX hashes logged
+- **Treasury Status**: SUI ~2.95 SUI, SBETS ~5.0M (check `/api/contract/info` for current)
