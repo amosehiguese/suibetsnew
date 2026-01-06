@@ -2,6 +2,10 @@ import axios from 'axios';
 import { OddsData, SportEvent, MarketData, OutcomeData } from '../types/betting';
 import config from '../config';
 
+// Module-level singleton guard to prevent multiple prefetcher intervals on hot reloads
+let globalPrefetcherInterval: NodeJS.Timeout | null = null;
+let globalPrefetcherStarted: boolean = false;
+
 /**
  * Enhanced service for interacting with the API-Sports API
  * Documentation: https://api-sports.io/documentation
@@ -10,6 +14,15 @@ export class ApiSportsService {
   private apiKey: string;
   private cache: Map<string, { data: any; timestamp: number }> = new Map();
   
+  // Background prefetcher state
+  private prefetcherRunning: boolean = false;
+  private lastPrefetchTime: number = 0;
+  private prefetchInterval: number = 60 * 1000; // Refresh odds every 60 seconds
+  
+  // Pre-warmed odds cache - separate from main cache for guaranteed access
+  private oddsCache: Map<string, { homeOdds: number; drawOdds?: number; awayOdds: number; timestamp: number }> = new Map();
+  private oddsCacheTTL: number = 5 * 60 * 1000; // 5 minutes TTL for odds
+  
   // Cache settings - optimized for real-time updates
   private shortCacheExpiry: number = 10 * 1000; // 10 seconds for live events - real-time minute updates
   private mediumCacheExpiry: number = 2 * 60 * 1000; // 2 minutes for medium-priority data
@@ -17,7 +30,7 @@ export class ApiSportsService {
   private cacheExpiry: number = 30 * 1000; // Default cache expiry - 30 seconds for frequent updates
   
   // Cache version to force refresh when code changes
-  private cacheVersionKey: string = "v6"; // Increment this when making changes to force cache refresh
+  private cacheVersionKey: string = "v7"; // Increment this when making changes to force cache refresh
   
   /**
    * Update the API key 
@@ -2610,17 +2623,44 @@ export class ApiSportsService {
       return cachedEnriched as SportEvent[];
     }
     
-    // Limit to first 100 fixtures for balance of coverage and speed
-    const MAX_FIXTURES_TO_ENRICH = 100;
+    // Try to use pre-warmed odds cache first for instant responses
+    const preWarmedOdds = new Map<string, { homeOdds: number; drawOdds?: number; awayOdds: number }>();
+    let cacheHits = 0;
     const fixtureIds = events
-      .slice(0, MAX_FIXTURES_TO_ENRICH)
       .map(e => e.id?.toString())
       .filter((id): id is string => !!id);
     
-    console.log(`[ApiSportsService] 🎰 Enriching ${events.length} events (fetching odds for first ${fixtureIds.length} fixtures)`);
+    // Check pre-warmed cache for each fixture
+    for (const fixtureId of fixtureIds) {
+      const cached = this.getOddsFromCache(fixtureId);
+      if (cached) {
+        preWarmedOdds.set(fixtureId, cached);
+        cacheHits++;
+      }
+    }
     
-    // Fetch odds by fixture ID
-    const allOdds = await this.getOddsForFixtures(fixtureIds, sport);
+    console.log(`[ApiSportsService] 🎰 Pre-warmed cache hits: ${cacheHits}/${fixtureIds.length}`);
+    
+    // If we have good cache coverage (>80%), use cached data for speed
+    // Otherwise fetch fresh odds for ALL fixtures
+    let allOdds: Map<string, { homeOdds: number; drawOdds?: number; awayOdds: number }>;
+    
+    if (cacheHits >= fixtureIds.length * 0.8) {
+      console.log(`[ApiSportsService] 🚀 Using pre-warmed cache for instant response`);
+      allOdds = preWarmedOdds;
+    } else {
+      console.log(`[ApiSportsService] 🎰 Enriching ALL ${events.length} events with real odds`);
+      // Fetch odds by fixture ID
+      allOdds = await this.getOddsForFixtures(fixtureIds, sport);
+      
+      // Update the odds cache with fresh data
+      allOdds.forEach((odds, fixtureId) => {
+        this.oddsCache.set(fixtureId, {
+          ...odds,
+          timestamp: Date.now()
+        });
+      });
+    }
     
     console.log(`[ApiSportsService] 🎰 Total odds available for ${allOdds.size} fixtures`);
     
@@ -2671,10 +2711,115 @@ export class ApiSportsService {
     
     console.log(`[ApiSportsService] 🎰 Enriched ${enrichedCount}/${events.length} events with real API odds`);
     
-    // Cache the enriched events for 2 minutes
-    this.cache.set(cacheKey, enrichedEvents, 120);
+    // Cache the enriched events for 3 minutes (longer since we fetch ALL odds)
+    this.cache.set(cacheKey, enrichedEvents, 180);
     
     return enrichedEvents;
+  }
+  
+  /**
+   * Start background odds prefetcher
+   * Continuously fetches odds for all upcoming events and caches them
+   * Uses module-level singleton guard to prevent interval stacking on hot reloads
+   */
+  startOddsPrefetcher(): void {
+    // Use module-level guard to prevent multiple intervals across hot reloads
+    if (globalPrefetcherStarted) {
+      console.log('[ApiSportsService] 🔄 Odds prefetcher already running (global guard)');
+      return;
+    }
+    
+    // Clear any existing interval before starting new one
+    if (globalPrefetcherInterval) {
+      clearInterval(globalPrefetcherInterval);
+      globalPrefetcherInterval = null;
+    }
+    
+    globalPrefetcherStarted = true;
+    this.prefetcherRunning = true;
+    console.log('[ApiSportsService] 🚀 Starting background odds prefetcher...');
+    
+    // Initial prefetch
+    this.prefetchOdds();
+    
+    // Schedule periodic prefetch with module-level reference
+    globalPrefetcherInterval = setInterval(() => {
+      this.prefetchOdds();
+    }, this.prefetchInterval);
+  }
+  
+  /**
+   * Prefetch odds for all events and warm the cache
+   */
+  private async prefetchOdds(): Promise<void> {
+    try {
+      console.log('[ApiSportsService] 🔄 Prefetching odds for all events...');
+      const startTime = Date.now();
+      
+      // Fetch upcoming events for football (main sport)
+      const events = await this.getUpcomingEvents('football', 250);
+      
+      if (!events || events.length === 0) {
+        console.log('[ApiSportsService] ⚠️ No events to prefetch odds for');
+        return;
+      }
+      
+      const fixtureIds = events
+        .map(e => e.id?.toString())
+        .filter((id): id is string => !!id);
+      
+      console.log(`[ApiSportsService] 🔄 Prefetching odds for ${fixtureIds.length} fixtures...`);
+      
+      // Fetch odds for ALL fixtures
+      const allOdds = await this.getOddsForFixtures(fixtureIds, 'football');
+      
+      // Store in dedicated odds cache
+      allOdds.forEach((odds, fixtureId) => {
+        this.oddsCache.set(fixtureId, {
+          ...odds,
+          timestamp: Date.now()
+        });
+      });
+      
+      const elapsed = Date.now() - startTime;
+      this.lastPrefetchTime = Date.now();
+      
+      console.log(`[ApiSportsService] ✅ Prefetched ${allOdds.size}/${fixtureIds.length} odds in ${elapsed}ms`);
+      console.log(`[ApiSportsService] 📊 Odds cache now has ${this.oddsCache.size} entries`);
+      
+    } catch (error) {
+      console.error('[ApiSportsService] ❌ Odds prefetch failed:', error);
+    }
+  }
+  
+  /**
+   * Get odds from pre-warmed cache (instant access)
+   */
+  getOddsFromCache(fixtureId: string): { homeOdds: number; drawOdds?: number; awayOdds: number } | null {
+    const cached = this.oddsCache.get(fixtureId);
+    if (!cached) return null;
+    
+    // Check if still valid (within TTL)
+    if (Date.now() - cached.timestamp > this.oddsCacheTTL) {
+      this.oddsCache.delete(fixtureId);
+      return null;
+    }
+    
+    return {
+      homeOdds: cached.homeOdds,
+      drawOdds: cached.drawOdds,
+      awayOdds: cached.awayOdds
+    };
+  }
+  
+  /**
+   * Get odds cache stats
+   */
+  getOddsCacheStats(): { size: number; lastPrefetch: number } {
+    return {
+      size: this.oddsCache.size,
+      lastPrefetch: this.lastPrefetchTime
+    };
   }
 }
 

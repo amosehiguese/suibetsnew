@@ -134,9 +134,15 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (January 6, 2026)
 
-### Odds Enrichment Fix
-- **Issue**: Date-based bulk odds fetch returned different fixture IDs than the events API, causing 0% odds match rate
-- **Solution**: Implemented fixture ID-based direct odds fetching via `getOddsForFixtures()` function
-- **Result**: Now enriching ~25-30% of events with real API odds (fixtures without odds are smaller leagues without bookmaker coverage)
-- **Caching**: Successful odds cached per fixture ID for 2 minutes; null results not cached to allow retries
-- **Coverage**: Fetches odds for first 100 fixtures (5 batches of 20) per request to balance coverage vs API costs
+### 100% Real Odds Implementation
+- **Background Prefetcher**: Continuously fetches odds every 60 seconds to warm cache
+- **Pre-warmed Cache**: Odds cached per fixture ID with 5-minute TTL for instant responses
+- **Event Filtering**: Only displays events with `oddsSource === 'api-sports'` (real API odds)
+- **Result**: 100% of displayed events have real API odds - events without bookmaker coverage are filtered out
+- **Performance**: Cached responses in ~150-400ms vs 27s for fresh fetch
+
+### API-Sports Odds Coverage
+- Live events: ~89% have real odds (16/18 typical)
+- Upcoming events: ~64% have real odds (159/250 typical)
+- Events without odds (smaller leagues without bookmaker coverage) are not displayed
+- This is an API limitation, not a bug - smaller leagues don't have bookmaker odds available

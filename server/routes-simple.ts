@@ -29,6 +29,10 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
   // Start the settlement worker for automatic bet settlement
   settlementWorker.start();
   console.log('🔄 Settlement worker started - will automatically settle bets when matches finish');
+  
+  // Start background odds prefetcher for 100% real odds coverage
+  apiSportsService.startOddsPrefetcher();
+  console.log('🎰 Odds prefetcher started - continuously warming odds cache for instant responses');
 
   // Create HTTP server
   const httpServer = createServer(app);
@@ -716,6 +720,11 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
             console.warn(`⚠️ LIVE: Failed to enrich with odds: ${oddsError.message}`);
           }
           
+          // CRITICAL: Filter to only show events with REAL odds from API (100% real odds requirement)
+          const liveBeforeFilter = allLiveEvents.length;
+          allLiveEvents = allLiveEvents.filter(e => e.oddsSource === 'api-sports');
+          console.log(`✅ LIVE: Filtered to ${allLiveEvents.length}/${liveBeforeFilter} events with REAL API odds`);
+          
           // Sort by startTime (earliest first, events without startTime go to end)
           allLiveEvents.sort((a, b) => {
             const timeA = a.startTime ? new Date(a.startTime).getTime() : Infinity;
@@ -772,6 +781,11 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         } catch (oddsError: any) {
           console.warn(`⚠️ UPCOMING: Failed to enrich with odds: ${oddsError.message}`);
         }
+        
+        // CRITICAL: Filter to only show events with REAL odds from API (100% real odds requirement)
+        const upcomingBeforeFilter = allUpcomingEvents.length;
+        allUpcomingEvents = allUpcomingEvents.filter(e => e.oddsSource === 'api-sports');
+        console.log(`✅ UPCOMING: Filtered to ${allUpcomingEvents.length}/${upcomingBeforeFilter} events with REAL API odds`);
         
         // Sort by startTime (earliest first, events without startTime go to end)
         allUpcomingEvents.sort((a, b) => {
