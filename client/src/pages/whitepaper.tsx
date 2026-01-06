@@ -28,10 +28,38 @@ export default function WhitepaperPage() {
       content: 'SuiBets is a decentralized sports betting platform built on the Sui blockchain. Our platform leverages the speed, security, and low transaction costs of the Sui network to provide a seamless betting experience with complete transparency and fairness.'
     },
     {
+      id: 'betting-flow',
+      title: 'Betting Flow (100% On-Chain)',
+      icon: <TrendingUp className="h-5 w-5 text-green-400" />,
+      content: `User Places Bet: Calls place_bet (SUI) or place_bet_sbets (SBETS) smart contract function. Tokens go directly to smart contract treasury. Liability is tracked on-chain: total_potential_liability += potential_payout. A Bet object is created with unique betObjectId stored in PostgreSQL for tracking.
+
+Settlement Worker: Runs every 60 seconds, checks for settled events from API-Sports, then calls settle_bet_admin or settle_bet_sbets_admin on-chain.
+
+If Bet WON: net_payout = potential_payout - (profit x 1%). Payout is sent directly from treasury to user wallet. Fee is added to accrued_fees. Liability is reduced.
+
+If Bet LOST: Full stake is added to accrued_fees (platform revenue). Liability is reduced. No payout is made.
+
+Admin Withdraws Revenue: Calls withdraw_fees or withdraw_fees_sbets to extract accumulated platform revenue.`
+    },
+    {
       id: 'security',
-      title: 'Security & Transparency',
+      title: 'Security Model',
       icon: <Shield className="h-5 w-5 text-red-400" />,
-      content: 'All bets are recorded on the Sui blockchain, ensuring complete transparency and immutability. Smart contracts are audited by leading security firms. Walrus protocol provides decentralized storage for all betting data.'
+      content: `Capability-Based Access Control (OTW Pattern): AdminCap is a single capability minted at deployment, required for all admin operations. OracleCap can be minted by admin for settlement oracles. Private key is stored securely as a Railway secret.
+
+80-Minute Betting Cutoff (Server-Authoritative): Event NOT found in cache results in REJECT. Cache age greater than 2 minutes results in REJECT. Live match minute >= 80 results in REJECT. Event already started (upcoming cache) results in REJECT. Client flags (isLive, matchMinute) are IGNORED - server determines status.
+
+Rejection Codes: EVENT_NOT_FOUND, STALE_EVENT_DATA, STALE_MATCH_DATA, UNVERIFIABLE_MATCH_TIME, MATCH_TIME_EXCEEDED, EVENT_STATUS_UNCERTAIN, EVENT_VERIFICATION_ERROR.`
+    },
+    {
+      id: 'treasury-safety',
+      title: 'Treasury & Liability Safety',
+      icon: <Lock className="h-5 w-5 text-purple-400" />,
+      content: `Smart contract REJECTS bets if treasury cannot cover potential payout. The assertion assert!(treasury >= net_payout) is enforced on-chain before any bet is accepted. Liability is always reduced on settlement (won, lost, or voided). Treasury maintains separate balances for SUI and SBETS tokens with independent liability tracking for each.
+
+Dual Token System: SUI bets range from 0.05 to 400 SUI. SBETS bets range from 1,000 to 50,000,000 SBETS. Each token has dedicated treasury and liability counters.
+
+Fee Structure: 1% fee on profit only (not on stake). Winners receive stake + (profit - 1% fee). Lost stakes are added to platform revenue.`
     },
     {
       id: 'betting',
@@ -129,14 +157,14 @@ export default function WhitepaperPage() {
           </div>
           <p className="text-gray-300 leading-relaxed mb-6">
             SuiBets revolutionizes sports betting by combining the excitement of real-time wagering 
-            with the security and transparency of blockchain technology. Our platform eliminates 
-            traditional intermediaries, offering users 0% platform fees and instant payouts through 
-            smart contract automation.
+            with the security and transparency of blockchain technology. Our platform uses 100% on-chain 
+            settlements with only a 1% fee on profits, ensuring instant payouts directly from the 
+            smart contract treasury to your wallet.
           </p>
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center p-4 bg-black/50 rounded-xl border border-cyan-900/30">
-              <p className="text-3xl font-bold text-cyan-400">0%</p>
-              <p className="text-gray-400 text-sm">Platform Fees</p>
+              <p className="text-3xl font-bold text-cyan-400">1%</p>
+              <p className="text-gray-400 text-sm">Fee on Profit</p>
             </div>
             <div className="text-center p-4 bg-black/50 rounded-xl border border-cyan-900/30">
               <p className="text-3xl font-bold text-cyan-400">30+</p>
