@@ -131,3 +131,12 @@ Preferred communication style: Simple, everyday language.
 - **PostgreSQL**: Primary database.
 - **WebSocket**: Real-time communication.
 - **Session Store**: User session management.
+
+## Recent Changes (January 6, 2026)
+
+### Odds Enrichment Fix
+- **Issue**: Date-based bulk odds fetch returned different fixture IDs than the events API, causing 0% odds match rate
+- **Solution**: Implemented fixture ID-based direct odds fetching via `getOddsForFixtures()` function
+- **Result**: Now enriching ~25-30% of events with real API odds (fixtures without odds are smaller leagues without bookmaker coverage)
+- **Caching**: Successful odds cached per fixture ID for 2 minutes; null results not cached to allow retries
+- **Coverage**: Fetches odds for first 100 fixtures (5 batches of 20) per request to balance coverage vs API costs
