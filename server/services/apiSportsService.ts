@@ -70,13 +70,16 @@ export class ApiSportsService {
       // Cache keys are like: live_events_football (no version suffix for live events)
       for (const [key, cached] of this.cache.entries()) {
         if (key.startsWith('live_events_')) {
-          // Type guard: only process if data is actually an array
-          if (cached && cached.data && Array.isArray(cached.data)) {
-            cacheHit = true;
-            allLiveEvents.push(...cached.data);
-            // Track oldest cache entry
-            if (cached.timestamp < oldestTimestamp) {
-              oldestTimestamp = cached.timestamp;
+          if (cached && cached.data) {
+            // Handle both array format and { events: [...] } object format
+            const events = Array.isArray(cached.data) ? cached.data : (cached.data.events ?? []);
+            if (Array.isArray(events) && events.length > 0) {
+              cacheHit = true;
+              allLiveEvents.push(...events);
+              // Track oldest cache entry
+              if (cached.timestamp < oldestTimestamp) {
+                oldestTimestamp = cached.timestamp;
+              }
             }
           }
         }
@@ -107,24 +110,32 @@ export class ApiSportsService {
   } {
     try {
       // First, check live events cache
-      // Cache keys are like: live_events_football (no version suffix for live events)
+      // Cache keys are like: live_events_football_v7 (with version suffix)
+      const allCacheKeys = Array.from(this.cache.keys());
+      console.log(`[lookupEventSync] Looking for event ${eventId}, cache keys: ${allCacheKeys.join(', ')}`);
+      
       for (const [key, cached] of this.cache.entries()) {
         if (key.startsWith('live_events_')) {
-          if (cached && cached.data && Array.isArray(cached.data)) {
-            const event = cached.data.find((e: any) => String(e.id) === eventId);
-            if (event) {
-              // Get minute from event data - DO NOT default to 0
-              // Missing minute data should be treated as unverifiable for security
-              const minuteValue = event.minute ?? event.elapsed;
-              return {
-                found: true,
-                isLive: true,
-                minute: minuteValue, // undefined if not available - fail-closed
-                cacheAgeMs: Date.now() - cached.timestamp,
-                source: 'live',
-                startTime: event.startTime,
-                shouldBeLive: true // Already live
-              };
+          if (cached && cached.data) {
+            // Handle both array format and { events: [...] } object format
+            const events = Array.isArray(cached.data) ? cached.data : (cached.data.events ?? []);
+            console.log(`[lookupEventSync] Checking ${key}: isArray=${Array.isArray(cached.data)}, events.length=${Array.isArray(events) ? events.length : 'N/A'}`);
+            if (Array.isArray(events)) {
+              const event = events.find((e: any) => String(e.id) === eventId);
+              if (event) {
+                // Get minute from event data - DO NOT default to 0
+                // Missing minute data should be treated as unverifiable for security
+                const minuteValue = event.minute ?? event.elapsed;
+                return {
+                  found: true,
+                  isLive: true,
+                  minute: minuteValue, // undefined if not available - fail-closed
+                  cacheAgeMs: Date.now() - cached.timestamp,
+                  source: 'live',
+                  startTime: event.startTime,
+                  shouldBeLive: true // Already live
+                };
+              }
             }
           }
         }
@@ -134,22 +145,26 @@ export class ApiSportsService {
       // Cache keys are like: upcoming_events_football_10 or upcoming_events_football_250
       for (const [key, cached] of this.cache.entries()) {
         if (key.startsWith('upcoming_events_')) {
-          if (cached && cached.data && Array.isArray(cached.data)) {
-            const event = cached.data.find((e: any) => String(e.id) === eventId);
-            if (event) {
-              // Check if the match should have started based on startTime
-              const startTime = event.startTime;
-              const shouldBeLive = startTime ? new Date(startTime).getTime() <= Date.now() : false;
-              
-              return {
-                found: true,
-                isLive: false,
-                minute: undefined,
-                cacheAgeMs: Date.now() - cached.timestamp,
-                source: 'upcoming',
-                startTime,
-                shouldBeLive
-              };
+          if (cached && cached.data) {
+            // Handle both array format and { events: [...] } object format
+            const events = Array.isArray(cached.data) ? cached.data : (cached.data.events ?? []);
+            if (Array.isArray(events)) {
+              const event = events.find((e: any) => String(e.id) === eventId);
+              if (event) {
+                // Check if the match should have started based on startTime
+                const startTime = event.startTime;
+                const shouldBeLive = startTime ? new Date(startTime).getTime() <= Date.now() : false;
+                
+                return {
+                  found: true,
+                  isLive: false,
+                  minute: undefined,
+                  cacheAgeMs: Date.now() - cached.timestamp,
+                  source: 'upcoming',
+                  startTime,
+                  shouldBeLive
+                };
+              }
             }
           }
         }
