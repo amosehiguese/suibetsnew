@@ -242,7 +242,7 @@ export default function AuditLogPage() {
                     </span>
                     {log.txHash && (
                       <a 
-                        href={`https://explorer.sui.io/tx/${log.txHash}`}
+                        href={`https://suiscan.xyz/mainnet/tx/${log.txHash}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-cyan-400 hover:text-cyan-300"

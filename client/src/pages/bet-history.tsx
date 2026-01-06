@@ -250,7 +250,7 @@ export default function BetHistoryPage() {
                     </p>
                     {bet.txHash && (
                       <a 
-                        href={`https://explorer.sui.io/tx/${bet.txHash}`}
+                        href={`https://suiscan.xyz/mainnet/tx/${bet.txHash}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-cyan-400 hover:text-cyan-300 text-xs flex items-center gap-1 justify-end mt-1"

@@ -515,7 +515,7 @@ export default function DepositsWithdrawalsPage() {
                     {getStatusIcon(tx.status)}
                     {tx.txHash && (
                       <a 
-                        href={`https://explorer.sui.io/tx/${tx.txHash}`}
+                        href={`https://suiscan.xyz/mainnet/tx/${tx.txHash}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-cyan-400 hover:text-cyan-300"

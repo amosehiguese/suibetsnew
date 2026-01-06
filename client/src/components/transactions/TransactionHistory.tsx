@@ -215,7 +215,7 @@ export function TransactionHistory({ className }: TransactionHistoryProps) {
   
   // Open transaction hash in Sui Explorer
   const openInExplorer = (hash: string) => {
-    window.open(`https://explorer.sui.io/txblock/${hash}`, '_blank');
+    window.open(`https://suiscan.xyz/mainnet/tx/${hash}`, '_blank');
   };
   
   if (!currentWallet?.address) {
@@ -389,7 +389,7 @@ export function TransactionHistory({ className }: TransactionHistoryProps) {
           <Button
             variant="outline"
             className="border-[#1e3a3f] text-[#00ffff] hover:bg-[#1e3a3f]"
-            onClick={() => window.open(`https://explorer.sui.io/address/${currentWallet.address}`, '_blank')}
+            onClick={() => window.open(`https://suiscan.xyz/mainnet/account/${currentWallet.address}`, '_blank')}
           >
             <ExternalLink className="h-4 w-4 mr-2" />
             View All Transactions on Explorer

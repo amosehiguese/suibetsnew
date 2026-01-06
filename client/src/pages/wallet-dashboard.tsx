@@ -276,7 +276,7 @@ export default function WalletDashboardPage() {
                         <Copy className="h-4 w-4 text-cyan-400" />
                       </button>
                       <a 
-                        href={`https://explorer.sui.io/address/${walletAddress}`}
+                        href={`https://suiscan.xyz/mainnet/account/${walletAddress}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="p-2 bg-cyan-500/20 rounded-lg hover:bg-cyan-500/30"
