@@ -216,7 +216,10 @@ class SettlementWorkerService {
         }
       }
 
-      return finishedMatches.filter(match => !this.isEventSettled(match.eventId));
+      // NOTE: Don't filter out matches based on settledEventIdsCache here!
+      // Multiple bets can exist on the same match. The settlement logic
+      // will naturally skip matches with no pending bets.
+      return finishedMatches;
     } catch (error) {
       console.error('Error fetching finished matches:', error);
       return [];
