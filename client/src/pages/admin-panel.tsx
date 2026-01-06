@@ -488,7 +488,8 @@ export default function AdminPanel() {
 
   // Trigger auto-settlement manually
   const triggerAutoSettlement = async () => {
-    if (!confirm('Trigger auto-settlement? This will check all finished matches and settle bets.')) {
+    const adminPassword = prompt('Enter admin password to trigger auto-settlement:');
+    if (!adminPassword) {
       return;
     }
 
@@ -501,7 +502,7 @@ export default function AdminPanel() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({})
+        body: JSON.stringify({ adminPassword })
       });
 
       if (response.ok) {
