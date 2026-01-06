@@ -142,12 +142,13 @@ export class ApiSportsService {
       }
       
       // Second, check upcoming events cache
-      // Cache keys are like: upcoming_events_football_10 or upcoming_events_football_250
+      // Cache keys are like: upcoming_events_football_10_v7 or upcoming_events_football_250_v7
       for (const [key, cached] of this.cache.entries()) {
         if (key.startsWith('upcoming_events_')) {
           if (cached && cached.data) {
             // Handle both array format and { events: [...] } object format
             const events = Array.isArray(cached.data) ? cached.data : (cached.data.events ?? []);
+            console.log(`[lookupEventSync] Checking upcoming ${key}: isArray=${Array.isArray(cached.data)}, events.length=${Array.isArray(events) ? events.length : 'N/A'}`);
             if (Array.isArray(events)) {
               const event = events.find((e: any) => String(e.id) === eventId);
               if (event) {
