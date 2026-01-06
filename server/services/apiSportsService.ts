@@ -119,7 +119,8 @@ export class ApiSportsService {
           if (cached && cached.data) {
             // Handle both array format and { events: [...] } object format
             const events = Array.isArray(cached.data) ? cached.data : (cached.data.events ?? []);
-            console.log(`[lookupEventSync] Checking ${key}: isArray=${Array.isArray(cached.data)}, events.length=${Array.isArray(events) ? events.length : 'N/A'}`);
+            const eventIds = Array.isArray(events) ? events.slice(0, 5).map((e: any) => String(e.id)) : [];
+            console.log(`[lookupEventSync] Checking ${key}: isArray=${Array.isArray(cached.data)}, events.length=${Array.isArray(events) ? events.length : 'N/A'}, first5IDs: ${eventIds.join(',')}`);
             if (Array.isArray(events)) {
               const event = events.find((e: any) => String(e.id) === eventId);
               if (event) {
