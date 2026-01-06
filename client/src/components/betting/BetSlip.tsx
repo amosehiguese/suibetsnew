@@ -436,6 +436,13 @@ export function BetSlip() {
                   {selectedBets.reduce((total, bet) => total * bet.odds, 1).toFixed(2)}
                 </span>
               </div>
+              <a 
+                href="/parlay" 
+                className="block text-center text-xs text-purple-400 hover:text-purple-300 mb-2 underline"
+                data-testid="link-parlay-builder"
+              >
+                Open Full Parlay Builder
+              </a>
               <div className="relative mb-2">
                 <input
                   type="text"
