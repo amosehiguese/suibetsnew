@@ -494,11 +494,12 @@ export default function AdminPanel() {
 
     setTriggeringSettlement(true);
     try {
+      const token = getToken();
       const response = await fetch('/api/admin/trigger-settlement', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getToken()}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({})
       });

@@ -644,7 +644,10 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       const actualPassword = process.env.ADMIN_PASSWORD || 'change-me-in-production';
       const hasValidPassword = adminPassword === actualPassword;
       
+      console.log(`[Admin Trigger Settlement] Auth check: tokenPresent=${!!token}, tokenLen=${token?.length || 0}, validToken=${hasValidToken}, passwordProvided=${!!adminPassword}`);
+      
       if (!hasValidToken && !hasValidPassword) {
+        console.log(`[Admin Trigger Settlement] UNAUTHORIZED - token validation failed`);
         return res.status(401).json({ message: "Unauthorized" });
       }
       
