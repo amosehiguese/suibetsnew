@@ -131,28 +131,30 @@ export function useOnChainBet() {
       tx.setGasBudget(20_000_000); // 0.02 SUI should be plenty for this transaction
       
       if (coinType === 'SUI') {
-        // FIX: Fetch SUI coins and use a dedicated coin for the stake (not tx.gas)
-        // This prevents failures when total balance barely covers bet + gas
+        // Validate balance before building transaction
         if (!walletAddress) {
           throw new Error('Wallet address required for SUI bets');
         }
         
         const suiCoins = await getSuiCoins(walletAddress);
-        console.log('[useOnChainBet] Available SUI coins:', suiCoins);
-        
-        // Find a coin with enough balance for bet + gas buffer
+        const totalBalance = suiCoins.reduce((acc, c) => acc + c.balance, 0);
         const requiredSui = betAmount + 0.03; // 0.03 SUI buffer for gas
-        const suitableCoin = suiCoins.find(c => c.balance >= requiredSui);
         
-        if (!suitableCoin) {
-          const totalBalance = suiCoins.reduce((acc, c) => acc + c.balance, 0);
+        console.log('[useOnChainBet] SUI balance check:', {
+          totalBalance,
+          requiredSui,
+          betAmount,
+          hasEnough: totalBalance >= requiredSui
+        });
+        
+        if (totalBalance < requiredSui) {
           throw new Error(`Insufficient SUI balance. Need ${requiredSui.toFixed(4)} SUI (${betAmount} bet + 0.03 gas), but you have ${totalBalance.toFixed(4)} SUI available.`);
         }
         
-        console.log('[useOnChainBet] Using SUI coin:', suitableCoin.objectId, 'balance:', suitableCoin.balance);
-        
-        // Split stake from the dedicated coin (not tx.gas) so gas can be paid separately
-        const [stakeCoin] = tx.splitCoins(tx.object(suitableCoin.objectId), [betAmountMist]);
+        // Use tx.gas for splitting - this is what wallets can simulate properly
+        // The wallet will automatically select and merge coins for gas payment
+        console.log('[useOnChainBet] Using tx.gas for coin split (wallet-compatible)');
+        const [stakeCoin] = tx.splitCoins(tx.gas, [betAmountMist]);
         
         // Convert strings to SerializedBcs with vector<u8> type metadata
         // This preserves type info that Nightly wallet needs to parse the transaction
