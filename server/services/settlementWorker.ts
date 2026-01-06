@@ -347,7 +347,10 @@ class SettlementWorkerService {
         const isWinner = this.determineBetOutcome(bet, match);
         const status = isWinner ? 'won' : 'lost';
         const grossPayout = isWinner ? bet.potentialWin : 0;
-        const platformFee = grossPayout > 0 ? grossPayout * 0.01 : 0;
+        // FEE CALCULATION: 1% of PROFIT only (matching smart contract logic)
+        // Profit = grossPayout - stake = net winnings beyond original bet
+        const profit = isWinner ? (grossPayout - bet.stake) : 0;
+        const platformFee = profit > 0 ? profit * 0.01 : 0; // 1% of profit, NOT gross
         const netPayout = grossPayout - platformFee;
 
         // DUAL SETTLEMENT: On-chain for SUI/SBETS with betObjectId, off-chain fallback

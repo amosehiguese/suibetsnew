@@ -207,27 +207,63 @@ export function useOnChainBet() {
 
       const result = await signAndExecute({
         transaction: tx,
+        execute: {
+          showObjectChanges: true,
+          showEffects: true,
+        },
       });
-      console.log('[useOnChainBet] Transaction signed, result:', result);
+      console.log('[useOnChainBet] Transaction signed, result:', JSON.stringify(result, null, 2));
 
       if (!result.digest) {
         throw new Error('Transaction failed - no digest returned');
       }
 
-      const txDetails = await suiClient.waitForTransaction({
-        digest: result.digest,
-        options: { showEffects: true, showObjectChanges: true },
-      });
-
       let betObjectId: string | undefined;
-      if (txDetails.objectChanges) {
-        const createdBet = txDetails.objectChanges.find(
-          (change) => change.type === 'created' && change.objectType?.includes('::betting::Bet')
-        );
-        if (createdBet && 'objectId' in createdBet) {
-          betObjectId = createdBet.objectId;
+      
+      // FIRST: Try to extract from signAndExecute result directly (some wallets return it here)
+      if ((result as any).objectChanges) {
+        console.log('[useOnChainBet] Checking objectChanges from signAndExecute result');
+        for (const change of (result as any).objectChanges) {
+          console.log('[useOnChainBet] Result objectChange:', change.type, change.objectType);
+          if (change.type === 'created' && change.objectType?.includes('::betting::Bet')) {
+            betObjectId = change.objectId;
+            console.log('[useOnChainBet] Extracted betObjectId from result:', betObjectId);
+          }
         }
       }
+
+      // FALLBACK: Fetch transaction details if not in result
+      if (!betObjectId) {
+        console.log('[useOnChainBet] Fetching transaction details for objectChanges...');
+        const txDetails = await suiClient.waitForTransaction({
+          digest: result.digest,
+          options: { showEffects: true, showObjectChanges: true },
+        });
+
+        console.log('[useOnChainBet] Transaction details objectChanges:', txDetails.objectChanges?.length || 0);
+        
+        if (txDetails.objectChanges) {
+          for (const change of txDetails.objectChanges) {
+            console.log('[useOnChainBet] Object change:', change.type, (change as any).objectType);
+            // Look for Bet object (created and transferred to user)
+            if (change.type === 'created' && (change as any).objectType?.includes('::betting::Bet')) {
+              betObjectId = (change as any).objectId;
+              console.log('[useOnChainBet] Extracted betObjectId from txDetails:', betObjectId);
+            }
+          }
+        }
+        
+        // ALSO check effects.created if objectChanges doesn't have it
+        if (!betObjectId && txDetails.effects?.created) {
+          console.log('[useOnChainBet] Checking effects.created:', txDetails.effects.created.length);
+          // We can't determine the type here, but if there's only one created object, it's likely the Bet
+          for (const ref of txDetails.effects.created) {
+            console.log('[useOnChainBet] Created ref:', ref);
+          }
+        }
+      }
+      
+      console.log('[useOnChainBet] Final betObjectId:', betObjectId);
 
       toast({
         title: `${coinType} Bet Placed On-Chain!`,

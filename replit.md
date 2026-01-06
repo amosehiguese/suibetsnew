@@ -163,3 +163,16 @@ Preferred communication style: Simple, everyday language.
 - Upcoming events: ~64% have real odds (159/250 typical)
 - Events without odds (smaller leagues without bookmaker coverage) are not displayed
 - This is an API limitation, not a bug - smaller leagues don't have bookmaker odds available
+
+### Auto-Payment Settlement System (January 6, 2026)
+- **Critical Fix**: BetObjectId extraction improved in `useOnChainBet.ts`
+  - Now passes `execute: { showObjectChanges: true }` to signAndExecute
+  - Checks both signAndExecute result and waitForTransaction for objectChanges
+  - Logs all object changes for debugging
+- **Fee Calculation Fixed**: Settlement worker now applies 1% fee to PROFIT only (matching smart contract)
+  - OLD (incorrect): `platformFee = grossPayout * 0.01`
+  - NEW (correct): `platformFee = profit * 0.01` where `profit = grossPayout - stake`
+- **Settlement Worker Flow**:
+  1. Matches with `betObjectId` in database → On-chain settlement via `settle_bet_admin` / `settle_bet_sbets_admin`
+  2. Matches without `betObjectId` → Off-chain fallback (database balance credits)
+- **Debugging**: Console logs show full transaction details and object extraction process
