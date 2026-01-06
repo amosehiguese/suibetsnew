@@ -526,6 +526,70 @@ class SettlementWorkerService {
     }
   }
 
+  async forceOnChainSettlement(betId: string, outcome: 'won' | 'lost' | 'void'): Promise<{ success: boolean; txHash?: string; error?: string }> {
+    try {
+      const bet = await storage.getBet(betId);
+      if (!bet) {
+        return { success: false, error: 'Bet not found' };
+      }
+
+      const betObjectId = bet.betObjectId;
+      if (!betObjectId) {
+        return { success: false, error: 'Bet has no on-chain betObjectId - cannot execute on-chain settlement' };
+      }
+
+      if (!blockchainBetService.isAdminKeyConfigured()) {
+        return { success: false, error: 'Admin private key not configured - cannot execute on-chain settlement' };
+      }
+
+      const isWinner = outcome === 'won';
+      const isVoid = outcome === 'void';
+      const currency = bet.feeCurrency || bet.currency || 'SUI';
+
+      console.log(`🔧 FORCE ON-CHAIN SETTLEMENT: Bet ${betId} (${currency}) -> ${outcome}`);
+
+      let result;
+      if (isVoid) {
+        if (currency === 'SBETS') {
+          result = await blockchainBetService.executeVoidBetSbetsOnChain(betObjectId);
+        } else {
+          result = await blockchainBetService.executeVoidBetOnChain(betObjectId);
+        }
+      } else {
+        if (currency === 'SBETS') {
+          result = await blockchainBetService.executeSettleBetSbetsOnChain(betObjectId, isWinner);
+        } else {
+          result = await blockchainBetService.executeSettleBetOnChain(betObjectId, isWinner);
+        }
+      }
+
+      if (result.success) {
+        console.log(`✅ FORCE ON-CHAIN SETTLEMENT SUCCESS: Bet ${betId} -> ${outcome} | TX: ${result.txHash}`);
+        return { success: true, txHash: result.txHash };
+      } else {
+        console.error(`❌ FORCE ON-CHAIN SETTLEMENT FAILED: Bet ${betId} - ${result.error}`);
+        return { success: false, error: result.error };
+      }
+    } catch (error: any) {
+      console.error('Force on-chain settlement error:', error);
+      return { success: false, error: error.message || 'Unknown error' };
+    }
+  }
+
+  async getBetsNeedingOnChainSettlement(): Promise<any[]> {
+    try {
+      const allBets = await storage.getAllBets();
+      return allBets.filter(bet => 
+        bet.betObjectId && 
+        (bet.status === 'won' || bet.status === 'lost' || bet.status === 'void') &&
+        !bet.winningsWithdrawn
+      );
+    } catch (error) {
+      console.error('Error getting bets needing on-chain settlement:', error);
+      return [];
+    }
+  }
+
   getStatus() {
     return {
       isRunning: this._isRunning,

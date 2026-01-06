@@ -174,6 +174,85 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
     }
   });
 
+  // Admin force on-chain settlement endpoint - retry failed blockchain payouts
+  app.post("/api/admin/force-onchain-settlement", async (req: Request, res: Response) => {
+    try {
+      const { betId, outcome, adminPassword } = req.body;
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.replace('Bearer ', '');
+      
+      // Check token-based auth first, then fall back to password auth
+      const hasValidToken = token && isValidAdminSession(token);
+      const actualPassword = process.env.ADMIN_PASSWORD || 'change-me-in-production';
+      const hasValidPassword = adminPassword === actualPassword;
+      
+      if (!hasValidToken && !hasValidPassword) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      if (!betId || !outcome) {
+        return res.status(400).json({ message: "Missing required fields: betId, outcome" });
+      }
+
+      if (!['won', 'lost', 'void'].includes(outcome)) {
+        return res.status(400).json({ message: "Invalid outcome - must be 'won', 'lost', or 'void'" });
+      }
+
+      console.log(`🔧 ADMIN: Force on-chain settlement for bet ${betId} as ${outcome}`);
+      
+      const result = await settlementWorker.forceOnChainSettlement(betId, outcome);
+      
+      if (result.success) {
+        res.json({ 
+          success: true, 
+          message: `On-chain settlement executed successfully`,
+          txHash: result.txHash,
+          betId,
+          outcome
+        });
+      } else {
+        res.status(400).json({ 
+          success: false, 
+          message: result.error || 'On-chain settlement failed',
+          betId,
+          outcome
+        });
+      }
+    } catch (error: any) {
+      console.error("Admin force on-chain settlement error:", error);
+      res.status(500).json({ message: error.message || 'Unknown error' });
+    }
+  });
+
+  // Admin get bets needing on-chain settlement
+  app.get("/api/admin/bets-needing-settlement", async (req: Request, res: Response) => {
+    try {
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.replace('Bearer ', '');
+      
+      if (!token || !isValidAdminSession(token)) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const bets = await settlementWorker.getBetsNeedingOnChainSettlement();
+      res.json({ 
+        success: true, 
+        count: bets.length,
+        bets: bets.map(b => ({
+          id: b.id,
+          betObjectId: b.betObjectId,
+          status: b.status,
+          walletAddress: b.walletAddress,
+          betAmount: b.betAmount,
+          potentialPayout: b.potentialPayout,
+          currency: b.feeCurrency || 'SUI'
+        }))
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Admin cancel-bet endpoint
   app.post("/api/admin/cancel-bet", async (req: Request, res: Response) => {
     try {
