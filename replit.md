@@ -149,9 +149,10 @@ Preferred communication style: Simple, everyday language.
 - **Cache Optimization**: 5-minute cache for odds mapping, fresh fetch for live events
 
 ### Event Statistics (Current)
-- **Upcoming**: 114 events across 27 leagues with real odds
-- **Major League Coverage**: FA Cup (27), Bundesliga (8), Serie A (8), La Liga (6), Premier League (1)
+- **Upcoming**: 254 events across 45 leagues with 100% real odds coverage
+- **Major League Coverage**: FA Cup (31), Premier League (24), Serie A (15), Ligue 1 (11), Bundesliga (9), La Liga (7)
 - **Live**: 6-8 events typically with 75-100% odds coverage
+- **Odds Object Fix**: Events now return `odds: { home, draw, away }` for frontend compatibility
 
 ## Previous Changes (January 6, 2026)
 

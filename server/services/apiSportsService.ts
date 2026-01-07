@@ -3097,6 +3097,11 @@ export class ApiSportsService {
           homeOdds: odds.homeOdds,
           drawOdds: odds.drawOdds,
           awayOdds: odds.awayOdds,
+          odds: {
+            home: odds.homeOdds,
+            draw: odds.drawOdds,
+            away: odds.awayOdds
+          },
           oddsSource: 'api-sports'
         };
       }
