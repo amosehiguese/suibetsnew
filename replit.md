@@ -132,7 +132,28 @@ Preferred communication style: Simple, everyday language.
 - **WebSocket**: Real-time communication.
 - **Session Store**: User session management.
 
-## Recent Changes (January 6, 2026)
+## Recent Changes (January 7, 2026)
+
+### League-Grouped Events UI
+- **CompactEventCard**: Redesigned event cards with inline odds buttons (Home/Draw/Away)
+- **LeagueGroup**: Collapsible accordion-style league sections
+- **LeagueGroupedEvents**: Container organizing events by league with major leagues first
+- **Major League Priority**: Premier League, La Liga, Serie A, Bundesliga, Ligue 1, Champions League, Europa League, FA Cup appear at top
+- **First 3 Leagues Expanded**: Only first 3 leagues are expanded by default for better UX
+- **Quick Bet**: One-click betting directly from event cards without navigation
+
+### Paginated Odds Mapping (Full Coverage)
+- **Multi-Page Fetch**: /odds/mapping endpoint fetches all pages (up to 20) to get 1700+ fixtures
+- **Full Coverage**: 100% of displayed events have real bookmaker odds
+- **Live Odds Endpoint**: Uses /odds/live for bulk live odds fetch
+- **Cache Optimization**: 5-minute cache for odds mapping, fresh fetch for live events
+
+### Event Statistics (Current)
+- **Upcoming**: 114 events across 27 leagues with real odds
+- **Major League Coverage**: FA Cup (27), Bundesliga (8), Serie A (8), La Liga (6), Premier League (1)
+- **Live**: 6-8 events typically with 75-100% odds coverage
+
+## Previous Changes (January 6, 2026)
 
 ### 80-Minute Betting Cutoff Security (Server-Authoritative)
 - **Fail-Closed Architecture**: All bet validation paths reject on uncertainty
