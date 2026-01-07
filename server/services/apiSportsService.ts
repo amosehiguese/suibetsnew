@@ -824,11 +824,22 @@ export class ApiSportsService {
                 .map((event: any) => ({ ...event, sportId: footballSportId, sportName: 'football' }));
               
               if (combinedEvents.length > 0) {
-                // For football, we want 200+ events, so use a minimum of 250 unless explicitly limited
-                const effectiveLimit = limit === 10 ? 250 : Math.min(limit, 250);
-                const limitedEvents = combinedEvents.slice(0, effectiveLimit);
-                console.log(`[ApiSportsService] Found ${combinedEvents.length} upcoming events for football (multi-day fetch), returning ${limitedEvents.length}`);
-                return limitedEvents;
+                // Priority leagues - these should always be included first
+                const majorLeagueIds = new Set([
+                  39, 140, 135, 78, 61, 2, 3, 848, // Premier League, La Liga, Serie A, Bundesliga, Ligue 1, Champions League, Europa League, UEFA Conference
+                  94, 88, 144, 203, 180, 128, 71, 1, 45, 262, 188, 113, // Portugal, Netherlands, Belgium, Turkey, Scotland, Argentina, Brazil WC Quali, FA Cup, MLS
+                ]);
+                
+                // Separate major league and other events
+                const majorLeagueEvents = combinedEvents.filter((e: any) => majorLeagueIds.has(e.league?.id));
+                const otherEvents = combinedEvents.filter((e: any) => !majorLeagueIds.has(e.league?.id));
+                
+                // Take all major league events + fill remaining slots with others
+                const effectiveLimit = limit === 10 ? 400 : Math.min(limit, 400);
+                const combined = [...majorLeagueEvents, ...otherEvents].slice(0, effectiveLimit);
+                
+                console.log(`[ApiSportsService] Found ${combinedEvents.length} upcoming events for football (${majorLeagueEvents.length} major leagues), returning ${combined.length}`);
+                return combined;
               }
             } catch (e: any) {
               console.log(`[ApiSportsService] Multi-day fetch failed for football: ${e.message}, falling back to next=50`);
@@ -2684,23 +2695,42 @@ export class ApiSportsService {
     const fixturesWithOdds = new Set<string>();
     
     try {
-      // The mapping endpoint returns all fixtures that have pre-match odds
-      const response = await axios.get('https://v3.football.api-sports.io/odds/mapping', {
-        headers: {
-          'x-apisports-key': this.apiKey,
-          'Accept': 'application/json'
-        },
-        timeout: 15000
-      });
+      // The mapping endpoint is PAGINATED - we need to fetch ALL pages
+      let currentPage = 1;
+      let totalPages = 1;
       
-      if (response.data?.response && Array.isArray(response.data.response)) {
-        for (const item of response.data.response) {
-          if (item.fixture?.id) {
-            fixturesWithOdds.add(String(item.fixture.id));
+      do {
+        const response = await axios.get('https://v3.football.api-sports.io/odds/mapping', {
+          params: { page: currentPage },
+          headers: {
+            'x-apisports-key': this.apiKey,
+            'Accept': 'application/json'
+          },
+          timeout: 15000
+        });
+        
+        if (response.data?.response && Array.isArray(response.data.response)) {
+          for (const item of response.data.response) {
+            if (item.fixture?.id) {
+              fixturesWithOdds.add(String(item.fixture.id));
+            }
           }
         }
-        console.log(`[ApiSportsService] 🗺️ Loaded odds mapping: ${fixturesWithOdds.size} fixtures have pre-match odds available`);
-      }
+        
+        // Get pagination info
+        if (response.data?.paging) {
+          totalPages = response.data.paging.total || 1;
+        }
+        
+        currentPage++;
+        
+        // Rate limit: don't hammer the API
+        if (currentPage <= totalPages) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      } while (currentPage <= totalPages && currentPage <= 20); // Max 20 pages to avoid excessive API calls
+      
+      console.log(`[ApiSportsService] 🗺️ Loaded odds mapping: ${fixturesWithOdds.size} fixtures have pre-match odds (${totalPages} pages)`);
       
       // Also get live odds mapping
       try {
