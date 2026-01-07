@@ -764,8 +764,9 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
           console.log(`✅ LIVE: Fetched ${allLiveEvents.length} unique events (${allLiveEventsRaw.length} before dedup, ${sportsToFetch.length} sports)`);
           
           // Enrich events with real odds from API-Sports (football only for now)
+          // Pass isLive=true to always fetch fresh odds for live events
           try {
-            allLiveEvents = await apiSportsService.enrichEventsWithOdds(allLiveEvents, 'football');
+            allLiveEvents = await apiSportsService.enrichEventsWithOdds(allLiveEvents, 'football', true);
             console.log(`✅ LIVE: Enriched events with real odds`);
           } catch (oddsError: any) {
             console.warn(`⚠️ LIVE: Failed to enrich with odds: ${oddsError.message}`);
@@ -826,8 +827,9 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         console.log(`✅ UPCOMING: Fetched ${allUpcomingEvents.length} unique events (${allUpcomingEventsRaw.length} before dedup, ${sportsToFetch.length} sports)`);
         
         // Enrich events with real odds from API-Sports (football only for now)
+        // Pass isLive=false to use cache for upcoming events
         try {
-          allUpcomingEvents = await apiSportsService.enrichEventsWithOdds(allUpcomingEvents, 'football');
+          allUpcomingEvents = await apiSportsService.enrichEventsWithOdds(allUpcomingEvents, 'football', false);
           console.log(`✅ UPCOMING: Enriched events with real odds`);
         } catch (oddsError: any) {
           console.warn(`⚠️ UPCOMING: Failed to enrich with odds: ${oddsError.message}`);

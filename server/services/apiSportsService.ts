@@ -2720,10 +2720,9 @@ export class ApiSportsService {
             timeout: 10000
           });
           
-          if (response.data?.response?.[0]?.bookmakers?.[0]) {
-            const bookmaker = response.data.response[0].bookmakers[0];
-            // Accept any bookmaker's win/draw/loss market with common names
-            // Comprehensive list of market aliases used by different bookmakers
+          if (response.data?.response?.[0]?.bookmakers && response.data.response[0].bookmakers.length > 0) {
+            // Check ALL bookmakers (not just first) to find Match Winner market
+            const allBookmakers = response.data.response[0].bookmakers;
             const matchWinnerNames = [
               'Match Winner', 'Winner', 'Home/Away', '1X2', 'Fulltime Result', 
               '3Way', 'To Win', 'Money Line', 'Moneyline', 'Full Time Result',
@@ -2731,26 +2730,74 @@ export class ApiSportsService {
               '1x2 - Full Time', '3-Way Result', 'Match Odds', 'Win/Draw/Win',
               'Home Draw Away', 'Three Way', '3 Way', 'Full-Time Result'
             ];
-            const matchWinner = bookmaker.bets?.find((b: any) => 
-              matchWinnerNames.some(name => b.name?.toLowerCase() === name.toLowerCase())
-            );
             
-            if (matchWinner?.values) {
-              const oddsValues: any = { fixtureId };
-              for (const val of matchWinner.values) {
-                const outcome = val.value?.toLowerCase();
-                const oddValue = parseFloat(val.odd);
-                if (outcome === 'home' || outcome === '1') {
-                  oddsValues.homeOdds = oddValue;
-                } else if (outcome === 'draw' || outcome === 'x') {
-                  oddsValues.drawOdds = oddValue;
-                } else if (outcome === 'away' || outcome === '2') {
-                  oddsValues.awayOdds = oddValue;
+            // Search through ALL bookmakers for the best Match Winner odds
+            for (const bookmaker of allBookmakers) {
+              const matchWinner = bookmaker.bets?.find((b: any) => 
+                matchWinnerNames.some(name => b.name?.toLowerCase() === name.toLowerCase())
+              );
+              
+              if (matchWinner?.values) {
+                const oddsValues: any = { fixtureId, bookmakerName: bookmaker.name };
+                for (const val of matchWinner.values) {
+                  const outcome = val.value?.toLowerCase();
+                  const oddValue = parseFloat(val.odd);
+                  if (outcome === 'home' || outcome === '1') {
+                    oddsValues.homeOdds = oddValue;
+                  } else if (outcome === 'draw' || outcome === 'x') {
+                    oddsValues.drawOdds = oddValue;
+                  } else if (outcome === 'away' || outcome === '2') {
+                    oddsValues.awayOdds = oddValue;
+                  }
+                }
+                // Only cache successful results - short cache for live events
+                this.cache.set(cacheKey, { data: oddsValues, timestamp: Date.now() });
+                console.log(`[ApiSportsService] 🎰 Found odds for fixture ${fixtureId} from ${bookmaker.name}`);
+                return oddsValues;
+              }
+            }
+          }
+          
+          // FALLBACK: Try live in-play odds if pre-match odds not available
+          if (sport === 'football' || sport === 'soccer') {
+            try {
+              const liveResponse = await axios.get('https://v3.football.api-sports.io/odds/live', {
+                params: { fixture: fixtureId },
+                headers: {
+                  'x-apisports-key': this.apiKey,
+                  'Accept': 'application/json'
+                },
+                timeout: 8000
+              });
+              
+              if (liveResponse.data?.response?.[0]?.odds) {
+                const liveOdds = liveResponse.data.response[0].odds;
+                // Look for match winner in live odds
+                const matchWinner = liveOdds.find((o: any) => 
+                  o.name?.toLowerCase().includes('winner') || o.name?.toLowerCase().includes('1x2')
+                );
+                if (matchWinner?.values) {
+                  const oddsValues: any = { fixtureId, source: 'live' };
+                  for (const val of matchWinner.values) {
+                    const outcome = val.value?.toLowerCase();
+                    const oddValue = parseFloat(val.odd);
+                    if (outcome === 'home' || outcome === '1') {
+                      oddsValues.homeOdds = oddValue;
+                    } else if (outcome === 'draw' || outcome === 'x') {
+                      oddsValues.drawOdds = oddValue;
+                    } else if (outcome === 'away' || outcome === '2') {
+                      oddsValues.awayOdds = oddValue;
+                    }
+                  }
+                  if (oddsValues.homeOdds && oddsValues.awayOdds) {
+                    console.log(`[ApiSportsService] 🎰 Found LIVE odds for fixture ${fixtureId}`);
+                    this.cache.set(cacheKey, { data: oddsValues, timestamp: Date.now() });
+                    return oddsValues;
+                  }
                 }
               }
-              // Only cache successful results
-              this.cache.set(cacheKey, { data: oddsValues, timestamp: Date.now() });
-              return oddsValues;
+            } catch (liveError) {
+              // Silently continue if live odds fail
             }
           }
           // Don't cache null results - allows retry on next request
@@ -2783,15 +2830,20 @@ export class ApiSportsService {
    * @param events Array of SportEvents to enrich
    * @param sport Sport slug
    */
-  async enrichEventsWithOdds(events: SportEvent[], sport: string = 'football'): Promise<SportEvent[]> {
+  async enrichEventsWithOdds(events: SportEvent[], sport: string = 'football', isLive: boolean = false): Promise<SportEvent[]> {
     if (!events || events.length === 0) return events;
     
-    // Check if we have cached enriched events
+    // For LIVE events, always fetch fresh odds (no caching) to maximize coverage
+    // For upcoming events, use cache for speed
     const cacheKey = `enriched_events_${sport}_${events.length}_${events[0]?.id}`;
-    const cachedEnriched = this.cache.get(cacheKey);
-    if (cachedEnriched) {
-      console.log(`[ApiSportsService] 🎰 Using cached enriched events for ${sport}`);
-      return cachedEnriched as SportEvent[];
+    if (!isLive) {
+      const cachedEnriched = this.cache.get(cacheKey);
+      if (cachedEnriched) {
+        console.log(`[ApiSportsService] 🎰 Using cached enriched events for ${sport}`);
+        return cachedEnriched as SportEvent[];
+      }
+    } else {
+      console.log(`[ApiSportsService] 🔴 LIVE MODE: Always fetching fresh odds for maximum coverage`);
     }
     
     // Try to use pre-warmed odds cache first for instant responses
