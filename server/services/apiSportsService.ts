@@ -2722,8 +2722,11 @@ export class ApiSportsService {
           
           if (response.data?.response?.[0]?.bookmakers?.[0]) {
             const bookmaker = response.data.response[0].bookmakers[0];
+            // Accept any bookmaker's win/draw/loss market with common names
             const matchWinner = bookmaker.bets?.find((b: any) => 
-              b.name === 'Match Winner' || b.name === 'Home/Away' || b.name === '1X2'
+              b.name === 'Match Winner' || b.name === 'Winner' || b.name === 'Home/Away' || 
+              b.name === '1X2' || b.name === 'Fulltime Result' || b.name === '3Way' ||
+              b.name === 'To Win' || b.name === 'Money Line'
             );
             
             if (matchWinner?.values) {
