@@ -342,7 +342,7 @@ export default function CleanHome() {
           </button>
         </div>
 
-        {/* Events List */}
+        {/* Events List - Grouped by League */}
         <div className="space-y-4">
           {isLoading ? (
             <div className="text-center py-12">
@@ -355,12 +355,7 @@ export default function CleanHome() {
               <p className="text-gray-500 text-sm">Check back later for more events</p>
             </div>
           ) : (
-            events.map((event, index) => (
-              <EventCard 
-                key={`${event.sportId}-${event.id}-${index}`} 
-                event={event} 
-              />
-            ))
+            <LeagueGroupedEvents events={events} />
           )}
         </div>
       </div>
@@ -373,6 +368,248 @@ export default function CleanHome() {
       
       {/* Footer */}
       <Footer />
+    </div>
+  );
+}
+
+// League priority for sorting (major leagues first)
+const LEAGUE_PRIORITY: Record<string, number> = {
+  'Premier League': 1,
+  'La Liga': 2,
+  'Serie A': 3,
+  'Bundesliga': 4,
+  'Ligue 1': 5,
+  'Champions League': 6,
+  'UEFA Champions League': 6,
+  'Europa League': 7,
+  'UEFA Europa League': 7,
+  'FA Cup': 8,
+  'Copa del Rey': 9,
+  'DFB Pokal': 10,
+  'Eredivisie': 11,
+  'Liga Portugal': 12,
+  'MLS': 13,
+};
+
+interface LeagueGroupProps {
+  leagueName: string;
+  events: Event[];
+  defaultExpanded?: boolean;
+}
+
+function LeagueGroup({ leagueName, events, defaultExpanded = false }: LeagueGroupProps) {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  
+  return (
+    <div className="bg-[#0a0a0a] rounded-xl border border-cyan-900/20 overflow-hidden">
+      {/* League Header */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full px-4 py-3 flex items-center justify-between bg-[#111111] hover:bg-[#151515] transition-colors"
+        data-testid={`league-header-${leagueName.replace(/\s+/g, '-').toLowerCase()}`}
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-cyan-400 font-semibold">{leagueName}</span>
+          <span className="bg-cyan-500/20 text-cyan-400 text-xs px-2 py-0.5 rounded-full">
+            {events.length} {events.length === 1 ? 'match' : 'matches'}
+          </span>
+        </div>
+        <span className={`text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
+          ▼
+        </span>
+      </button>
+      
+      {/* Events List */}
+      {isExpanded && (
+        <div className="divide-y divide-cyan-900/20">
+          {events.map((event, index) => (
+            <CompactEventCard key={`${event.sportId}-${event.id}-${index}`} event={event} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface LeagueGroupedEventsProps {
+  events: Event[];
+}
+
+function LeagueGroupedEvents({ events }: LeagueGroupedEventsProps) {
+  // Group events by league
+  const groupedByLeague = events.reduce((acc, event) => {
+    const league = event.leagueName || event.league || 'Other';
+    if (!acc[league]) {
+      acc[league] = [];
+    }
+    acc[league].push(event);
+    return acc;
+  }, {} as Record<string, Event[]>);
+  
+  // Sort leagues by priority (major leagues first)
+  const sortedLeagues = Object.keys(groupedByLeague).sort((a, b) => {
+    const priorityA = LEAGUE_PRIORITY[a] || 100;
+    const priorityB = LEAGUE_PRIORITY[b] || 100;
+    if (priorityA !== priorityB) return priorityA - priorityB;
+    // If same priority, sort by number of matches (more matches first)
+    return groupedByLeague[b].length - groupedByLeague[a].length;
+  });
+  
+  return (
+    <div className="space-y-3">
+      {sortedLeagues.map((league, index) => (
+        <LeagueGroup
+          key={league}
+          leagueName={league}
+          events={groupedByLeague[league]}
+          defaultExpanded={index < 3} // First 3 leagues expanded by default
+        />
+      ))}
+    </div>
+  );
+}
+
+// Compact event card for league-grouped view
+function CompactEventCard({ event }: { event: Event }) {
+  const [selectedOutcome, setSelectedOutcome] = useState<string | null>(null);
+  const { addBet } = useBetting();
+  const { toast } = useToast();
+  
+  const hasRealOdds = (event as any).oddsSource === 'api-sports';
+  const odds = {
+    home: event.homeOdds || 2.00,
+    draw: event.drawOdds || 3.40,
+    away: event.awayOdds || 2.00
+  };
+  
+  const score = {
+    home: event.homeScore ?? (event.score?.split('-')[0]?.trim() || '0'),
+    away: event.awayScore ?? (event.score?.split('-')[1]?.trim() || '0')
+  };
+  
+  const formatTime = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const isToday = date.toDateString() === now.toDateString();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const isTomorrow = date.toDateString() === tomorrow.toDateString();
+      
+      const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      if (isToday) return `Today ${timeStr}`;
+      if (isTomorrow) return `Tomorrow ${timeStr}`;
+      return date.toLocaleDateString([], { weekday: 'short', day: 'numeric' }) + ' ' + timeStr;
+    } catch {
+      return '';
+    }
+  };
+
+  const handleOutcomeClick = (outcome: string) => {
+    setSelectedOutcome(selectedOutcome === outcome ? null : outcome);
+  };
+
+  const handleQuickBet = () => {
+    if (!selectedOutcome) {
+      toast({ title: "Select an outcome", description: "Click Home, Draw, or Away to select" });
+      return;
+    }
+    
+    const selectedOdds = selectedOutcome === 'home' ? odds.home : selectedOutcome === 'draw' ? odds.draw : odds.away;
+    const outcomeName = selectedOutcome === 'home' ? event.homeTeam : selectedOutcome === 'draw' ? 'Draw' : event.awayTeam;
+    
+    addBet({
+      id: `${event.id}-match-winner-${selectedOutcome}`,
+      eventId: String(event.id),
+      eventName: `${event.homeTeam} vs ${event.awayTeam}`,
+      marketId: "match-winner",
+      market: "Match Winner",
+      selectionId: selectedOutcome,
+      selectionName: outcomeName,
+      odds: selectedOdds,
+    });
+    
+    toast({ title: "Added to bet slip", description: `${outcomeName} @ ${selectedOdds.toFixed(2)}` });
+    setSelectedOutcome(null);
+  };
+  
+  return (
+    <div className="px-4 py-3 hover:bg-[#111111] transition-colors" data-testid={`compact-event-${event.id}`}>
+      <div className="flex items-center justify-between gap-4">
+        {/* Time / Live indicator */}
+        <div className="w-20 flex-shrink-0">
+          {event.isLive ? (
+            <div className="flex items-center gap-1">
+              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+              <span className="text-red-400 text-xs font-medium">{event.minute ? `${event.minute}'` : 'LIVE'}</span>
+            </div>
+          ) : (
+            <span className="text-gray-500 text-xs">{formatTime(event.startTime)}</span>
+          )}
+        </div>
+        
+        {/* Teams and Score */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-white text-sm truncate">{event.homeTeam}</span>
+            {event.isLive && <span className="text-cyan-400 font-bold">{score.home}</span>}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400 text-sm truncate">{event.awayTeam}</span>
+            {event.isLive && <span className="text-cyan-400 font-bold">{score.away}</span>}
+          </div>
+        </div>
+        
+        {/* Odds Buttons */}
+        {hasRealOdds ? (
+          <div className="flex gap-1">
+            <button
+              onClick={() => handleOutcomeClick('home')}
+              className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                selectedOutcome === 'home' 
+                  ? 'bg-cyan-500 text-black' 
+                  : 'bg-[#1a1a1a] text-cyan-400 hover:bg-[#222]'
+              }`}
+              data-testid={`compact-odds-home-${event.id}`}
+            >
+              {odds.home.toFixed(2)}
+            </button>
+            <button
+              onClick={() => handleOutcomeClick('draw')}
+              className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                selectedOutcome === 'draw' 
+                  ? 'bg-yellow-500 text-black' 
+                  : 'bg-[#1a1a1a] text-yellow-400 hover:bg-[#222]'
+              }`}
+              data-testid={`compact-odds-draw-${event.id}`}
+            >
+              {odds.draw.toFixed(2)}
+            </button>
+            <button
+              onClick={() => handleOutcomeClick('away')}
+              className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                selectedOutcome === 'away' 
+                  ? 'bg-cyan-500 text-black' 
+                  : 'bg-[#1a1a1a] text-white hover:bg-[#222]'
+              }`}
+              data-testid={`compact-odds-away-${event.id}`}
+            >
+              {odds.away.toFixed(2)}
+            </button>
+            {selectedOutcome && (
+              <button
+                onClick={handleQuickBet}
+                className="px-2 py-1.5 bg-green-500 hover:bg-green-600 text-black rounded text-xs font-bold transition-all"
+                data-testid={`compact-bet-${event.id}`}
+              >
+                +
+              </button>
+            )}
+          </div>
+        ) : (
+          <span className="text-gray-600 text-xs">No odds</span>
+        )}
+      </div>
     </div>
   );
 }
