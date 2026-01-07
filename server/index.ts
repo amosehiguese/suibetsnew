@@ -68,6 +68,27 @@ app.options('*', cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Content Security Policy headers for Railway deployment
+// Allow inline scripts and eval for Vite/React/Sui wallet libraries
+app.use((req, res, next) => {
+  // Only set CSP for HTML pages, not API requests
+  if (!req.path.startsWith('/api')) {
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'self'; " +
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://replit.com https://*.replit.com blob:; " +
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+      "font-src 'self' https://fonts.gstatic.com data:; " +
+      "img-src 'self' data: blob: https: http:; " +
+      "connect-src 'self' https: wss: ws: http:; " +
+      "frame-src 'self' https:; " +
+      "worker-src 'self' blob:; " +
+      "child-src 'self' blob:;"
+    );
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
