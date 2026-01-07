@@ -441,12 +441,36 @@ function EventCard({ event }: EventCardProps) {
     ? (parseFloat(stake) * getOdds(selectedOutcome)).toFixed(2) 
     : "0";
 
+  const formatDateTime = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const isToday = date.toDateString() === now.toDateString();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const isTomorrow = date.toDateString() === tomorrow.toDateString();
+      
+      const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      
+      if (isToday) {
+        return `Today ${timeStr}`;
+      } else if (isTomorrow) {
+        return `Tomorrow ${timeStr}`;
+      } else {
+        const dayStr = date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+        return `${dayStr} ${timeStr}`;
+      }
+    } catch {
+      return '';
+    }
+  };
+
   return (
     <div 
       className="bg-[#111111] rounded-xl border border-cyan-900/30 overflow-hidden hover:border-cyan-500/50 transition-all"
       data-testid={`event-card-${event.id}`}
     >
-      {/* League Header */}
+      {/* League Header with Date/Time */}
       <div 
         className="px-4 py-2 border-b border-cyan-900/30 flex items-center justify-between cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}
@@ -455,9 +479,15 @@ function EventCard({ event }: EventCardProps) {
           {event.isLive && <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>}
           <span className="text-cyan-400 text-sm">{leagueName}</span>
         </div>
-        <div className="flex items-center gap-2">
-          {event.isLive && (
-            <span className="bg-red-500/20 text-red-400 text-xs px-2 py-1 rounded">LIVE</span>
+        <div className="flex items-center gap-3">
+          {event.isLive ? (
+            <span className="bg-red-500/20 text-red-400 text-xs px-2 py-1 rounded font-medium">
+              {event.minute ? `${event.minute}'` : 'LIVE'}
+            </span>
+          ) : (
+            <span className="text-yellow-400 text-xs font-medium bg-yellow-500/10 px-2 py-1 rounded">
+              {formatDateTime(event.startTime)}
+            </span>
           )}
           <span className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>▼</span>
         </div>
@@ -467,30 +497,27 @@ function EventCard({ event }: EventCardProps) {
       <div className="p-4">
         <div className="flex items-start justify-between mb-4">
           <div>
-            {event.isLive && (
-              <span className="inline-block bg-green-500 text-white text-xs px-2 py-1 rounded mb-2">
-                ⏱ LIVE NOW • {event.minute || "45'"}
-              </span>
+            {event.isLive ? (
+              <div className="flex items-center gap-2 mb-2">
+                <span className="inline-block bg-red-500 text-white text-xs px-2 py-1 rounded font-bold">
+                  LIVE {event.minute ? `${event.minute}'` : ''}
+                </span>
+                <span className="text-cyan-400 text-2xl font-bold">
+                  {score.home} - {score.away}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 mb-2">
+                <Clock size={14} className="text-yellow-400" />
+                <span className="text-yellow-400 text-sm font-medium">
+                  {formatDateTime(event.startTime)}
+                </span>
+              </div>
             )}
             <h3 className="text-white font-semibold text-lg mb-1">
               {event.homeTeam} vs {event.awayTeam}
             </h3>
             <p className="text-gray-500 text-sm">{leagueName}</p>
-            {event.isLive && (
-              <div className="mt-2">
-                <span className="text-cyan-400 text-2xl font-bold">
-                  {score.home} - {score.away}
-                </span>
-                <span className="text-green-400 text-xs ml-2 bg-green-500/20 px-2 py-1 rounded">
-                  LIVE SCORE
-                </span>
-              </div>
-            )}
-            {event.isLive && (
-              <p className="text-yellow-400 text-xs mt-2">
-                ⚡ Odds updating live • Result incoming
-              </p>
-            )}
           </div>
 
           {/* Odds Cards */}
