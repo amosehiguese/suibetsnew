@@ -2894,9 +2894,9 @@ export class ApiSportsService {
       return resultMap;
     }
     
-    // Batch fixtures into groups of 5 to avoid rate limiting (API-Sports allows 10 req/sec)
-    // Using smaller batches with longer delays helps avoid 429 errors
-    const batchSize = 5;
+    // Batch fixtures into groups of 10 to maximize throughput (API-Sports allows 10 req/sec)
+    // Increased from 5 to 10 for faster prefetching
+    const batchSize = 10;
     const batches = [];
     for (let i = 0; i < remainingFixtures.length; i += batchSize) {
       batches.push(remainingFixtures.slice(i, i + batchSize));
@@ -3034,9 +3034,9 @@ export class ApiSportsService {
       });
       
       // Delay between batches to respect API rate limits (10 req/sec)
-      // With 5 concurrent requests per batch, wait 1.5 seconds between batches to avoid 429s
+      // With 10 concurrent requests per batch, wait 1.1 seconds between batches
       if (batchIndex < batches.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise(resolve => setTimeout(resolve, 1100));
       }
     }
     
