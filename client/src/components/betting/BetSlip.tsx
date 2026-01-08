@@ -122,8 +122,10 @@ export function BetSlip() {
     
     const numValue = parseFloat(sanitized);
     if (!isNaN(numValue) && numValue >= 0) {
-      selectedBets.forEach(bet => {
-        updateStake(bet.id, numValue / selectedBets.length);
+      // FIXED: For parlay, set FULL stake on first bet only (parlay is one combined bet)
+      // The total stake calculation in BettingContext sums all bet.stakes
+      selectedBets.forEach((bet, index) => {
+        updateStake(bet.id, index === 0 ? numValue : 0);
       });
     } else {
       selectedBets.forEach(bet => updateStake(bet.id, 0));
@@ -132,8 +134,9 @@ export function BetSlip() {
   
   const setQuickParlayStake = (amount: number) => {
     setParlayInput(amount.toString());
-    selectedBets.forEach(bet => {
-      updateStake(bet.id, amount / selectedBets.length);
+    // FIXED: For parlay, set FULL stake on first bet only
+    selectedBets.forEach((bet, index) => {
+      updateStake(bet.id, index === 0 ? amount : 0);
     });
   };
 
