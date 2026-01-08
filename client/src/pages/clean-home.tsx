@@ -97,6 +97,7 @@ export default function CleanHome() {
   const [isBetSlipOpen, setIsBetSlipOpen] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(() => getFavorites());
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [showOddsOnly, setShowOddsOnly] = useState(true); // Default to showing only matches with odds
   const [searchQuery, setSearchQuery] = useState("");
   const matchesSectionRef = useRef<HTMLDivElement>(null);
   
@@ -177,9 +178,16 @@ export default function CleanHome() {
   const rawEvents = activeTab === "live" ? liveEvents : upcomingEvents;
   const isLoading = activeTab === "live" ? liveLoading : upcomingLoading;
   
-  // Filter events based on search query and favorites
+  // Filter events based on search query, favorites, and odds availability
   const events = useMemo(() => {
     let filtered = rawEvents;
+    
+    // Odds filter - only show matches with real bookmaker odds
+    if (showOddsOnly) {
+      filtered = filtered.filter((e: Event) => 
+        e.homeOdds && e.awayOdds && e.homeOdds > 0 && e.awayOdds > 0
+      );
+    }
     
     // Search filter
     if (searchQuery.trim()) {
@@ -199,7 +207,7 @@ export default function CleanHome() {
     }
     
     return filtered;
-  }, [rawEvents, searchQuery, showFavoritesOnly, favorites]);
+  }, [rawEvents, searchQuery, showFavoritesOnly, showOddsOnly, favorites]);
 
   const handleSportClick = (sportId: number) => {
     setSelectedSport(sportId);
@@ -372,6 +380,18 @@ export default function CleanHome() {
                 {favorites.size}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => setShowOddsOnly(!showOddsOnly)}
+            className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-all ${
+              showOddsOnly 
+                ? 'bg-green-500/20 text-green-400 border border-green-500' 
+                : 'bg-[#111111] text-gray-400 border border-cyan-900/30 hover:text-green-400'
+            }`}
+            data-testid="btn-odds-filter"
+          >
+            <TrendingUp size={16} />
+            <span className="hidden md:inline">With Odds</span>
           </button>
         </div>
 
