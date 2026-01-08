@@ -817,7 +817,7 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         // This prevents rate limiting and ensures users always see events
         const existingSnapshot = getUpcomingSnapshot();
         const snapshotAgeMs = Date.now() - existingSnapshot.timestamp;
-        const SNAPSHOT_FRESH_DURATION = 2 * 60 * 1000; // 2 minutes
+        const SNAPSHOT_FRESH_DURATION = 10 * 60 * 1000; // 10 minutes (AGGRESSIVE API SAVING)
         
         if (existingSnapshot.events.length > 0 && snapshotAgeMs < SNAPSHOT_FRESH_DURATION) {
           console.log(`📦 Using fresh snapshot (${existingSnapshot.events.length} events, ${Math.round(snapshotAgeMs/1000)}s old)`);

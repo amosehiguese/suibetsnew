@@ -67,17 +67,17 @@ export class ApiSportsService {
   // Background prefetcher state
   private prefetcherRunning: boolean = false;
   private lastPrefetchTime: number = 0;
-  private prefetchInterval: number = 5 * 60 * 1000; // Refresh odds every 5 minutes (reduced from 60s to save API calls)
+  private prefetchInterval: number = 15 * 60 * 1000; // Refresh odds every 15 minutes (AGGRESSIVE API SAVING)
   
   // Pre-warmed odds cache - separate from main cache for guaranteed access
   private oddsCache: Map<string, { homeOdds: number; drawOdds?: number; awayOdds: number; timestamp: number }> = new Map();
-  private oddsCacheTTL: number = 5 * 60 * 1000; // 5 minutes TTL for odds
+  private oddsCacheTTL: number = 30 * 60 * 1000; // 30 minutes TTL for odds (AGGRESSIVE API SAVING)
   
-  // Cache settings - optimized for real-time updates
-  private shortCacheExpiry: number = 10 * 1000; // 10 seconds for live events - real-time minute updates
-  private mediumCacheExpiry: number = 2 * 60 * 1000; // 2 minutes for medium-priority data
-  private longCacheExpiry: number = 10 * 60 * 1000; // 10 minutes for stable data
-  private cacheExpiry: number = 30 * 1000; // Default cache expiry - 30 seconds for frequent updates
+  // Cache settings - AGGRESSIVE API SAVING to prevent quota exhaustion
+  private shortCacheExpiry: number = 60 * 1000; // 60 seconds for live events (was 10s)
+  private mediumCacheExpiry: number = 10 * 60 * 1000; // 10 minutes for medium-priority data (was 2min)
+  private longCacheExpiry: number = 30 * 60 * 1000; // 30 minutes for stable data (was 10min)
+  private cacheExpiry: number = 5 * 60 * 1000; // 5 minutes default cache (was 30s)
   
   // Cache version to force refresh when code changes
   private cacheVersionKey: string = "v7"; // Increment this when making changes to force cache refresh
