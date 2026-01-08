@@ -67,6 +67,7 @@ export interface SelectedBet {
   outcomeId?: string | number; // Allow string or number for outcome IDs
   currency?: 'SUI' | 'SBETS'; // Added to support multiple currencies
   isLive?: boolean; // Indicates if this is a live event
+  matchMinute?: number; // Current match minute for live events (betting blocked >= 80)
   uniqueId?: string; // Optional unique identifier to prevent duplicates
 }
 
