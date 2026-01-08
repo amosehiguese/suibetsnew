@@ -874,21 +874,45 @@ export class ApiSportsService {
                 .map((event: any) => ({ ...event, sportId: footballSportId, sportName: 'football' }));
               
               if (combinedEvents.length > 0) {
+                // Get odds mapping to prioritize fixtures with bookmaker coverage
+                let fixturesWithOdds: Set<string> = new Set();
+                try {
+                  fixturesWithOdds = await this.getOddsMapping();
+                } catch (e) {
+                  console.log('[ApiSportsService] Could not get odds mapping for prioritization');
+                }
+                
                 // Priority leagues - these should always be included first
                 const majorLeagueIds = new Set([
                   39, 140, 135, 78, 61, 2, 3, 848, // Premier League, La Liga, Serie A, Bundesliga, Ligue 1, Champions League, Europa League, UEFA Conference
                   94, 88, 144, 203, 180, 128, 71, 1, 45, 262, 188, 113, // Portugal, Netherlands, Belgium, Turkey, Scotland, Argentina, Brazil WC Quali, FA Cup, MLS
+                  253, 141, 143, 307, 218, 233, 235, 169, 172, 179, // Copa del Rey, Serie B, Copa Italia, Saudi Pro, Allsvenskan, Swiss Super League, Ukraine, China, Japan J-League, Scotland Prem
                 ]);
                 
-                // Separate major league and other events
-                const majorLeagueEvents = combinedEvents.filter((e: any) => majorLeagueIds.has(e.league?.id));
-                const otherEvents = combinedEvents.filter((e: any) => !majorLeagueIds.has(e.league?.id));
+                // Sort fixtures by priority: 1) Has odds + major league, 2) Has odds, 3) Major league, 4) Other
+                const sortedEvents = [...combinedEvents].sort((a: any, b: any) => {
+                  const aHasOdds = fixturesWithOdds.has(String(a.fixture?.id));
+                  const bHasOdds = fixturesWithOdds.has(String(b.fixture?.id));
+                  const aIsMajor = majorLeagueIds.has(a.league?.id);
+                  const bIsMajor = majorLeagueIds.has(b.league?.id);
+                  
+                  // Priority score: 4 = odds + major, 3 = odds only, 2 = major only, 1 = neither
+                  const aScore = (aHasOdds ? 2 : 0) + (aIsMajor ? 2 : 0);
+                  const bScore = (bHasOdds ? 2 : 0) + (bIsMajor ? 2 : 0);
+                  
+                  if (bScore !== aScore) return bScore - aScore; // Higher score first
+                  
+                  // Tie-breaker: earlier start time
+                  return (a.fixture?.timestamp || 0) - (b.fixture?.timestamp || 0);
+                });
                 
-                // Take all major league events + fill remaining slots with others
                 const effectiveLimit = limit === 10 ? 400 : Math.min(limit, 400);
-                const combined = [...majorLeagueEvents, ...otherEvents].slice(0, effectiveLimit);
+                const combined = sortedEvents.slice(0, effectiveLimit);
                 
-                console.log(`[ApiSportsService] Found ${combinedEvents.length} upcoming events for football (${majorLeagueEvents.length} major leagues), returning ${combined.length}`);
+                const oddsCount = combined.filter((e: any) => fixturesWithOdds.has(String(e.fixture?.id))).length;
+                const majorCount = combined.filter((e: any) => majorLeagueIds.has(e.league?.id)).length;
+                
+                console.log(`[ApiSportsService] Found ${combinedEvents.length} upcoming events for football (${majorCount} major leagues, ${oddsCount} with odds in mapping), returning ${combined.length}`);
                 return combined;
               }
             } catch (e: any) {
