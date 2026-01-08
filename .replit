@@ -54,6 +54,8 @@ ADMIN_CAP_ID = "0xaec276da96bc9fb7781213f3aedb18eacf30af1932dc577abbe55295832518
 VITE_BETTING_PACKAGE_ID = "0xfaf371c3c9fe2544cc1ce9a40b07621503b300bf3a65b8fab0dba134636e8b32"
 VITE_BETTING_PLATFORM_ID = "0xae1b0dfed589c6ce5b7dafdb7477954670f0f73530668b5476e3a429b64099b3"
 SPORTS_LIST = "football,basketball,hockey,mma,tennis,baseball"
+SINGLE_SPORT_MODE = "true"
+CURRENT_SPORT = "football"
 
 [agent]
 integrations = ["javascript_openai_ai_integrations:1.0.0"]

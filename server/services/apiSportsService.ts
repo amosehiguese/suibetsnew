@@ -6,6 +6,56 @@ import config from '../config';
 let globalPrefetcherInterval: NodeJS.Timeout | null = null;
 let globalPrefetcherStarted: boolean = false;
 
+// CRITICAL: Last successful events snapshots - NEVER return empty if we had data before
+let lastSuccessfulUpcomingEvents: SportEvent[] = [];
+let lastSuccessfulLiveEvents: SportEvent[] = [];
+let lastUpcomingTimestamp: number = 0;
+let lastLiveTimestamp: number = 0;
+
+// In-flight request deduplication - prevent concurrent requests from racing
+const inFlightRequests: Map<string, Promise<any>> = new Map();
+
+// Export snapshot management functions for routes to use
+export function saveUpcomingSnapshot(events: SportEvent[]): void {
+  if (events && events.length > 0) {
+    lastSuccessfulUpcomingEvents = [...events];
+    lastUpcomingTimestamp = Date.now();
+    console.log(`[Snapshot] Saved ${events.length} upcoming events snapshot`);
+  }
+}
+
+export function getUpcomingSnapshot(): { events: SportEvent[]; timestamp: number } {
+  return { events: lastSuccessfulUpcomingEvents, timestamp: lastUpcomingTimestamp };
+}
+
+export function saveLiveSnapshot(events: SportEvent[]): void {
+  if (events && events.length > 0) {
+    lastSuccessfulLiveEvents = [...events];
+    lastLiveTimestamp = Date.now();
+    console.log(`[Snapshot] Saved ${events.length} live events snapshot`);
+  }
+}
+
+export function getLiveSnapshot(): { events: SportEvent[]; timestamp: number } {
+  return { events: lastSuccessfulLiveEvents, timestamp: lastLiveTimestamp };
+}
+
+// Single-flight pattern for request deduplication
+export async function withSingleFlight<T>(key: string, fetchFn: () => Promise<T>): Promise<T> {
+  const existing = inFlightRequests.get(key);
+  if (existing) {
+    console.log(`[SingleFlight] Reusing in-flight request for ${key}`);
+    return existing as Promise<T>;
+  }
+  
+  const promise = fetchFn().finally(() => {
+    inFlightRequests.delete(key);
+  });
+  
+  inFlightRequests.set(key, promise);
+  return promise;
+}
+
 /**
  * Enhanced service for interacting with the API-Sports API
  * Documentation: https://api-sports.io/documentation
@@ -3128,6 +3178,81 @@ export class ApiSportsService {
     // Cache the enriched events for 3 minutes (longer since we fetch ALL odds)
     this.cache.set(cacheKey, { data: enrichedEvents, timestamp: Date.now() });
     
+    return enrichedEvents;
+  }
+  
+  /**
+   * FAST PATH: Enrich events with ONLY cached odds - NO API calls
+   * Used for upcoming events to ensure fast response times
+   * The background prefetcher handles warming the cache asynchronously
+   */
+  async enrichEventsWithCachedOddsOnly(events: SportEvent[], sport: string = 'football'): Promise<SportEvent[]> {
+    if (!events || events.length === 0) return events;
+    
+    const fixtureIds = events
+      .map(e => e.id?.toString())
+      .filter((id): id is string => !!id);
+    
+    // Only use pre-warmed cache - NO API calls
+    const cachedOdds = new Map<string, { homeOdds: number; drawOdds?: number; awayOdds: number }>();
+    for (const fixtureId of fixtureIds) {
+      const cached = this.getOddsFromCache(fixtureId);
+      if (cached) {
+        cachedOdds.set(fixtureId, cached);
+      }
+    }
+    
+    console.log(`[ApiSportsService] 🚀 Fast path: ${cachedOdds.size}/${fixtureIds.length} odds from cache`);
+    
+    // Enrich events with cached odds only
+    let enrichedCount = 0;
+    const enrichedEvents = events.map(event => {
+      const eventId = event.id?.toString();
+      const odds = cachedOdds.get(eventId!);
+      
+      if (odds) {
+        enrichedCount++;
+        const updatedMarkets = event.markets?.map(market => {
+          if (market.name === 'Match Result' || market.name === 'Match Winner') {
+            return {
+              ...market,
+              outcomes: market.outcomes?.map(outcome => {
+                if (outcome.name === event.homeTeam || outcome.id?.includes('home')) {
+                  return { ...outcome, odds: odds.homeOdds || outcome.odds };
+                } else if (outcome.name === 'Draw' || outcome.id?.includes('draw')) {
+                  return { ...outcome, odds: odds.drawOdds || outcome.odds };
+                } else if (outcome.name === event.awayTeam || outcome.id?.includes('away')) {
+                  return { ...outcome, odds: odds.awayOdds || outcome.odds };
+                }
+                return outcome;
+              })
+            };
+          }
+          return market;
+        });
+        
+        return {
+          ...event,
+          markets: updatedMarkets,
+          homeOdds: odds.homeOdds,
+          drawOdds: odds.drawOdds,
+          awayOdds: odds.awayOdds,
+          odds: {
+            home: odds.homeOdds,
+            draw: odds.drawOdds,
+            away: odds.awayOdds
+          },
+          oddsSource: 'api-sports'
+        };
+      }
+      
+      return {
+        ...event,
+        oddsSource: 'fallback'
+      };
+    });
+    
+    console.log(`[ApiSportsService] 🚀 Fast enrichment: ${enrichedCount}/${events.length} events with cached odds`);
     return enrichedEvents;
   }
   

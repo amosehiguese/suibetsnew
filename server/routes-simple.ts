@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { ApiSportsService } from "./services/apiSportsService";
+import { ApiSportsService, saveUpcomingSnapshot, getUpcomingSnapshot, saveLiveSnapshot, getLiveSnapshot, withSingleFlight } from "./services/apiSportsService";
 const apiSportsService = new ApiSportsService();
 import { SettlementService } from "./services/settlementService";
 import { AdminService } from "./services/adminService";
@@ -776,6 +776,11 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
           const eventsWithOdds = allLiveEvents.filter(e => e.oddsSource === 'api-sports').length;
           console.log(`✅ LIVE: ${eventsWithOdds}/${allLiveEvents.length} events have real bookmaker odds`);
           
+          // CRITICAL: Save successful results to snapshot (before any filtering)
+          if (allLiveEvents.length > 0) {
+            saveLiveSnapshot(allLiveEvents);
+          }
+          
           // Sort by startTime (earliest first, events without startTime go to end)
           allLiveEvents.sort((a, b) => {
             const timeA = a.startTime ? new Date(a.startTime).getTime() : Infinity;
@@ -794,6 +799,13 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
           return res.json(allLiveEvents);
         } catch (error) {
           console.error(`❌ LIVE API fetch failed:`, error);
+          // CRITICAL: On error, try to return snapshot instead of empty
+          const snapshot = getLiveSnapshot();
+          if (snapshot.events.length > 0) {
+            const ageSeconds = Math.round((Date.now() - snapshot.timestamp) / 1000);
+            console.log(`⚠️ LIVE: Error occurred, using snapshot of ${snapshot.events.length} events (${ageSeconds}s old)`);
+            return res.json(snapshot.events);
+          }
           return res.json([]);
         }
       }
@@ -801,18 +813,55 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       // UPCOMING EVENTS MODE - PAID API ONLY, NO FALLBACKS
       console.log(`📅 UPCOMING EVENTS MODE - Paid API-Sports ONLY (NO fallbacks, NO free alternatives)`);
       try {
-        // Get configurable sports list
-        const sportsToFetch = getSportsToFetch();
+        // CRITICAL: Check for existing snapshot first - if we have data, return it immediately
+        // This prevents rate limiting and ensures users always see events
+        const existingSnapshot = getUpcomingSnapshot();
+        const snapshotAgeMs = Date.now() - existingSnapshot.timestamp;
+        const SNAPSHOT_FRESH_DURATION = 2 * 60 * 1000; // 2 minutes
         
-        const sportPromises = sportsToFetch.map(sport =>
-          apiSportsService.getUpcomingEvents(sport).catch(e => {
-            console.log(`❌ API-Sports failed for ${sport}: ${e.message} - NO FALLBACK, returning empty`);
-            return [];
-          })
-        );
+        if (existingSnapshot.events.length > 0 && snapshotAgeMs < SNAPSHOT_FRESH_DURATION) {
+          console.log(`📦 Using fresh snapshot (${existingSnapshot.events.length} events, ${Math.round(snapshotAgeMs/1000)}s old)`);
+          let allUpcomingEvents = existingSnapshot.events;
+          
+          // CRITICAL: Apply cached odds from prefetcher to snapshot events
+          // This ensures odds are updated as the prefetcher warms the cache
+          try {
+            allUpcomingEvents = await apiSportsService.enrichEventsWithCachedOddsOnly(allUpcomingEvents, 'football');
+            const oddsCount = allUpcomingEvents.filter(e => e.oddsSource === 'api-sports').length;
+            console.log(`📦 Applied cached odds: ${oddsCount}/${allUpcomingEvents.length} events have odds`);
+          } catch (e) {
+            console.log(`📦 Could not apply cached odds`);
+          }
+          
+          // Sort by startTime
+          allUpcomingEvents.sort((a, b) => {
+            const timeA = a.startTime ? new Date(a.startTime).getTime() : Infinity;
+            const timeB = b.startTime ? new Date(b.startTime).getTime() : Infinity;
+            return timeA - timeB;
+          });
+          
+          // Filter by sport if requested
+          if (reqSportId && allUpcomingEvents.length > 0) {
+            const filtered = allUpcomingEvents.filter(e => e.sportId === reqSportId);
+            console.log(`Filtered to ${filtered.length} events for sport ID ${reqSportId}`);
+            return res.json(filtered);
+          }
+          
+          return res.json(allUpcomingEvents);
+        }
         
-        const sportResults = await Promise.all(sportPromises);
-        const allUpcomingEventsRaw = sportResults.flat();
+        // Fetch football FIRST (main source of events) then others sequentially with delays
+        console.log(`📍 Fetching events (football priority, sequential for rate limit protection)`);
+        const allUpcomingEventsRaw: any[] = [];
+        
+        // Football first - this is where 99% of events come from
+        try {
+          const footballEvents = await apiSportsService.getUpcomingEvents('football');
+          allUpcomingEventsRaw.push(...footballEvents);
+          console.log(`✅ Football: ${footballEvents.length} events`);
+        } catch (e: any) {
+          console.log(`❌ Football failed: ${e.message}`);
+        }
         
         // Deduplicate events by ID to prevent repeated matches
         const seenUpcomingIds = new Set<string>();
@@ -823,20 +872,34 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
           return true;
         });
         
-        console.log(`✅ UPCOMING: Fetched ${allUpcomingEvents.length} unique events (${allUpcomingEventsRaw.length} before dedup, ${sportsToFetch.length} sports)`);
+        console.log(`✅ UPCOMING: Fetched ${allUpcomingEvents.length} unique events (${allUpcomingEventsRaw.length} before dedup, football only)`);
         
-        // Enrich events with real odds from API-Sports (football only for now)
-        // Pass isLive=false to use cache for upcoming events
+        // FAST PATH: Only apply pre-warmed odds from cache (no blocking API calls)
+        // The background prefetcher handles warming the odds cache asynchronously
         try {
-          allUpcomingEvents = await apiSportsService.enrichEventsWithOdds(allUpcomingEvents, 'football', false);
-          console.log(`✅ UPCOMING: Enriched events with real odds`);
+          // Use fast mode: only apply odds from cache, don't make new API calls
+          allUpcomingEvents = await apiSportsService.enrichEventsWithCachedOddsOnly(allUpcomingEvents, 'football');
+          console.log(`✅ UPCOMING: Applied cached odds (fast path)`);
         } catch (oddsError: any) {
-          console.warn(`⚠️ UPCOMING: Failed to enrich with odds: ${oddsError.message}`);
+          console.warn(`⚠️ UPCOMING: Failed to apply cached odds: ${oddsError.message}`);
         }
         
         // Log odds coverage stats but DON'T filter - show all events
         const eventsWithOdds = allUpcomingEvents.filter(e => e.oddsSource === 'api-sports').length;
         console.log(`✅ UPCOMING: ${eventsWithOdds}/${allUpcomingEvents.length} events have real bookmaker odds`);
+        
+        // CRITICAL: Save successful results to snapshot (before any filtering)
+        if (allUpcomingEvents.length > 0) {
+          saveUpcomingSnapshot(allUpcomingEvents);
+        } else {
+          // If we got 0 events but have a snapshot, use it instead (NEVER return empty)
+          const snapshot = getUpcomingSnapshot();
+          if (snapshot.events.length > 0) {
+            const ageSeconds = Math.round((Date.now() - snapshot.timestamp) / 1000);
+            console.log(`⚠️ UPCOMING: Got 0 events, using snapshot of ${snapshot.events.length} events (${ageSeconds}s old)`);
+            allUpcomingEvents = snapshot.events;
+          }
+        }
         
         // Sort by startTime (earliest first, events without startTime go to end)
         allUpcomingEvents.sort((a, b) => {
@@ -852,10 +915,17 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
           return res.json(filtered.length > 0 ? filtered : []);
         }
         
-        // Return all upcoming events (may be empty if API-Sports fails)
+        // Return all upcoming events (guaranteed non-empty if we ever had data)
         return res.json(allUpcomingEvents);
       } catch (error) {
         console.error(`❌ UPCOMING API fetch failed:`, error);
+        // CRITICAL: On error, try to return snapshot instead of empty
+        const snapshot = getUpcomingSnapshot();
+        if (snapshot.events.length > 0) {
+          const ageSeconds = Math.round((Date.now() - snapshot.timestamp) / 1000);
+          console.log(`⚠️ UPCOMING: Error occurred, using snapshot of ${snapshot.events.length} events (${ageSeconds}s old)`);
+          return res.json(snapshot.events);
+        }
         return res.json([]);
       }
     } catch (error) {
