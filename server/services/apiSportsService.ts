@@ -3295,8 +3295,8 @@ export class ApiSportsService {
       console.log('[ApiSportsService] 🔄 Prefetching odds for all events...');
       const startTime = Date.now();
       
-      // Fetch upcoming events for football (main sport) - reduced from 250 to 100 to save API calls
-      const events = await this.getUpcomingEvents('football', 100);
+      // Fetch upcoming events for football (main sport) - increased to 400 for full coverage
+      const events = await this.getUpcomingEvents('football', 400);
       
       if (!events || events.length === 0) {
         console.log('[ApiSportsService] ⚠️ No events to prefetch odds for');
