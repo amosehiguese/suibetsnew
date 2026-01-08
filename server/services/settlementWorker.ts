@@ -36,7 +36,9 @@ class SettlementWorkerService {
   private _isRunning = false;
   private intervalId: NodeJS.Timeout | null = null;
   private settledEventIdsCache = new Set<string>(); // In-memory cache, synced from DB
-  private checkInterval = 2 * 60 * 1000; // 2 minutes (reduced from 30s to save API calls)
+  private checkInterval = 5 * 60 * 1000; // 5 minutes (AGGRESSIVE API SAVING - was 2min)
+  private finishedMatchesCache: { data: FinishedMatch[]; timestamp: number } | null = null;
+  private finishedMatchesCacheTTL = 3 * 60 * 1000; // Cache finished matches for 3 minutes
 
   async start() {
     if (this._isRunning) {
@@ -48,7 +50,7 @@ class SettlementWorkerService {
     await this.loadSettledEventsFromDB();
 
     this._isRunning = true;
-    console.log('🚀 SettlementWorker started - checking for finished matches every 2 minutes');
+    console.log('🚀 SettlementWorker started - checking for finished matches every 5 minutes (API SAVING MODE)');
 
     this.intervalId = setInterval(async () => {
       try {
@@ -222,11 +224,19 @@ class SettlementWorkerService {
   }
 
   private async getFinishedMatches(): Promise<FinishedMatch[]> {
+    // AGGRESSIVE API SAVING: Use cache if fresh
+    if (this.finishedMatchesCache && 
+        (Date.now() - this.finishedMatchesCache.timestamp) < this.finishedMatchesCacheTTL) {
+      console.log('📦 SettlementWorker: Using cached finished matches');
+      return this.finishedMatchesCache.data;
+    }
+    
     const finishedMatches: FinishedMatch[] = [];
     
     try {
-      // Only check sports with API endpoints to save API calls
-      const sportsToCheck = ['football', 'basketball', 'baseball', 'hockey'];
+      // AGGRESSIVE API SAVING: Only check football (99% of bets)
+      // Other sports rarely have bets and waste API calls
+      const sportsToCheck = ['football'];
       
       for (const sport of sportsToCheck) {
         try {
@@ -236,6 +246,12 @@ class SettlementWorkerService {
           // Silently skip failed sports
         }
       }
+
+      // Cache the results
+      this.finishedMatchesCache = {
+        data: finishedMatches,
+        timestamp: Date.now()
+      };
 
       // NOTE: Don't filter out matches based on settledEventIdsCache here!
       // Multiple bets can exist on the same match. The settlement logic
