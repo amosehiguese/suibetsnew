@@ -1112,6 +1112,58 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
     }
   });
 
+  // Pre-flight validation for bet placement (checks 80-minute cutoff BEFORE on-chain tx)
+  app.post("/api/bets/validate", async (req: Request, res: Response) => {
+    try {
+      const { eventId, isLive } = req.body;
+      
+      if (!eventId) {
+        return res.status(400).json({ message: "Event ID required", code: "MISSING_EVENT_ID" });
+      }
+      
+      // SERVER-SIDE VALIDATION: Check event status before on-chain transaction
+      const eventLookup = apiSportsService.lookupEventSync(String(eventId));
+      
+      if (!eventLookup.found) {
+        return res.status(400).json({ 
+          message: "Event not found - please refresh and try again",
+          code: "EVENT_NOT_FOUND"
+        });
+      }
+      
+      // Check stale cache
+      const MAX_CACHE_AGE_MS = 2 * 60 * 1000;
+      if (eventLookup.cacheAgeMs > MAX_CACHE_AGE_MS) {
+        return res.status(400).json({ 
+          message: "Event data is stale - please refresh and try again",
+          code: "STALE_EVENT_DATA"
+        });
+      }
+      
+      // CRITICAL: 80-minute cutoff for live matches
+      if (eventLookup.source === 'live' && eventLookup.minute !== undefined) {
+        if (eventLookup.minute >= 80) {
+          console.log(`[validate] Event ${eventId} rejected: ${eventLookup.minute} min >= 80 cutoff`);
+          return res.status(400).json({ 
+            message: `Betting closed for this match (80+ minute cutoff). Match is at ${eventLookup.minute} minutes.`,
+            code: "MATCH_CUTOFF"
+          });
+        }
+      }
+      
+      // Event is valid for betting
+      res.json({ 
+        valid: true, 
+        eventId,
+        matchMinute: eventLookup.minute,
+        source: eventLookup.source
+      });
+    } catch (error: any) {
+      console.error("Error validating bet:", error);
+      res.status(500).json({ message: "Validation failed", code: "SERVER_ERROR" });
+    }
+  });
+
   // Place a single bet
   app.post("/api/bets", async (req: Request, res: Response) => {
     try {

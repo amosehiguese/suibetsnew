@@ -282,6 +282,27 @@ export const BettingProvider: React.FC<{children: ReactNode}> = ({ children }) =
           sbetsCoinObjectId = sbetsCoins[0].objectId;
         }
 
+        // PRE-FLIGHT CHECK: Validate event is still bettable BEFORE on-chain transaction
+        // This prevents money being sent to contract only to have database save fail
+        try {
+          const validationResponse = await apiRequest('POST', '/api/bets/validate', {
+            eventId: String(bet.eventId),
+            isLive: bet.isLive,
+          });
+          if (!validationResponse.ok) {
+            const errorData = await validationResponse.json();
+            toast({
+              title: "Betting Closed",
+              description: errorData.message || "This match is no longer accepting bets",
+              variant: "destructive",
+            });
+            return false;
+          }
+        } catch (validationError: any) {
+          // If validation endpoint doesn't exist, proceed (backwards compatibility)
+          console.log('[BettingContext] Validation check skipped:', validationError.message);
+        }
+
         // Both SUI and SBETS use on-chain smart contract
         const onChainResult = await placeBetOnChain({
           eventId: String(bet.eventId),
