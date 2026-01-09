@@ -19,6 +19,9 @@ const CLOCK_OBJECT_ID = '0x6';
 // SBETS token type from mainnet
 const SBETS_TOKEN_TYPE = '0x6a4d9c0eab7ac40371a7453d1aa6c89b130950e8af6868ba975fdd81371a7285::sbets::SBETS';
 
+// Backend API for treasury checks
+const API_BASE = '';
+
 export interface OnChainBetParams {
   eventId: string;
   marketId: string;
@@ -44,6 +47,55 @@ export function useOnChainBet() {
   const { toast } = useToast();
   const suiClient = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+
+  // Check treasury can cover a potential payout before betting
+  const checkTreasuryCapacity = useCallback(async (
+    coinType: 'SUI' | 'SBETS',
+    potentialPayout: number
+  ): Promise<{ canBet: boolean; available: number; message?: string }> => {
+    try {
+      const response = await fetch('/api/treasury/status');
+      if (!response.ok) {
+        console.warn('[useOnChainBet] Treasury check failed, proceeding anyway');
+        return { canBet: true, available: 0 };
+      }
+      
+      const data = await response.json();
+      if (!data.success) {
+        return { canBet: true, available: 0 };
+      }
+      
+      if (data.paused) {
+        return { 
+          canBet: false, 
+          available: 0, 
+          message: 'Platform is temporarily paused for maintenance' 
+        };
+      }
+      
+      const treasury = coinType === 'SBETS' ? data.sbets : data.sui;
+      if (!treasury.acceptingBets) {
+        return {
+          canBet: false,
+          available: treasury.available,
+          message: `${coinType} betting temporarily unavailable - treasury limit reached`
+        };
+      }
+      
+      if (potentialPayout > treasury.available) {
+        return {
+          canBet: false,
+          available: treasury.available,
+          message: `Bet too large - maximum potential payout is ${treasury.available.toLocaleString()} ${coinType}`
+        };
+      }
+      
+      return { canBet: true, available: treasury.available };
+    } catch (err) {
+      console.warn('[useOnChainBet] Treasury check error:', err);
+      return { canBet: true, available: 0 };
+    }
+  }, []);
 
   // Get user's SBETS coin objects
   const getSbetsCoins = useCallback(async (walletAddress: string): Promise<{objectId: string, balance: number}[]> => {
@@ -105,6 +157,14 @@ export function useOnChainBet() {
       }
       if (betAmount > MAX_BET) {
         throw new Error(`Maximum bet is ${MAX_BET.toLocaleString()} ${coinType}. You tried to bet ${betAmount.toLocaleString()} ${coinType}.`);
+      }
+      
+      // Pre-flight check: verify treasury can cover potential payout
+      const potentialPayout = betAmount * odds;
+      console.log('[useOnChainBet] Checking treasury capacity:', { coinType, potentialPayout });
+      const treasuryCheck = await checkTreasuryCapacity(coinType, potentialPayout);
+      if (!treasuryCheck.canBet) {
+        throw new Error(treasuryCheck.message || `${coinType} bets temporarily unavailable`);
       }
       
       // Convert to smallest units (1 SUI/SBETS = 1_000_000_000)
@@ -235,6 +295,36 @@ export function useOnChainBet() {
         throw new Error('Transaction failed - no digest returned');
       }
 
+      // Wait for transaction and check status - CRITICAL for detecting Move aborts
+      const txDetails = await suiClient.waitForTransaction({
+        digest: result.digest,
+        options: { showEffects: true, showObjectChanges: true },
+      });
+      
+      // Check if transaction failed (Move abort)
+      const status = txDetails.effects?.status;
+      if (status?.status === 'failure') {
+        // Parse Move abort error for user-friendly message
+        const errorMsg = status.error || 'Transaction failed on-chain';
+        console.error('[useOnChainBet] Move abort detected:', errorMsg);
+        
+        // Map common abort codes to user-friendly messages
+        let userMessage = 'Transaction failed on the blockchain. Your funds were NOT deducted.';
+        if (errorMsg.includes('EInsufficientBalance') || errorMsg.includes('7')) {
+          userMessage = 'Bet rejected: Platform treasury cannot cover this payout. Try a smaller bet or different currency.';
+        } else if (errorMsg.includes('EPlatformPaused') || errorMsg.includes('1')) {
+          userMessage = 'Platform is temporarily paused. Please try again later.';
+        } else if (errorMsg.includes('EExceedsMaxBet') || errorMsg.includes('4')) {
+          userMessage = 'Bet amount exceeds maximum allowed. Please reduce your stake.';
+        } else if (errorMsg.includes('EExceedsMinBet') || errorMsg.includes('5')) {
+          userMessage = 'Bet amount below minimum required.';
+        } else if (errorMsg.includes('EInvalidOdds') || errorMsg.includes('3')) {
+          userMessage = 'Invalid odds detected. Please refresh and try again.';
+        }
+        
+        throw new Error(userMessage);
+      }
+
       let betObjectId: string | undefined;
       
       // FIRST: Try to extract from signAndExecute result directly (some wallets return it here)
@@ -249,34 +339,23 @@ export function useOnChainBet() {
         }
       }
 
-      // FALLBACK: Fetch transaction details if not in result
-      if (!betObjectId) {
-        console.log('[useOnChainBet] Fetching transaction details for objectChanges...');
-        const txDetails = await suiClient.waitForTransaction({
-          digest: result.digest,
-          options: { showEffects: true, showObjectChanges: true },
-        });
-
-        console.log('[useOnChainBet] Transaction details objectChanges:', txDetails.objectChanges?.length || 0);
-        
-        if (txDetails.objectChanges) {
-          for (const change of txDetails.objectChanges) {
-            console.log('[useOnChainBet] Object change:', change.type, (change as any).objectType);
-            // Look for Bet object (created and transferred to user)
-            if (change.type === 'created' && (change as any).objectType?.includes('::betting::Bet')) {
-              betObjectId = (change as any).objectId;
-              console.log('[useOnChainBet] Extracted betObjectId from txDetails:', betObjectId);
-            }
+      // Use already-fetched txDetails to find bet object if not in result
+      if (!betObjectId && txDetails.objectChanges) {
+        console.log('[useOnChainBet] Checking txDetails objectChanges:', txDetails.objectChanges.length);
+        for (const change of txDetails.objectChanges) {
+          console.log('[useOnChainBet] Object change:', change.type, (change as any).objectType);
+          if (change.type === 'created' && (change as any).objectType?.includes('::betting::Bet')) {
+            betObjectId = (change as any).objectId;
+            console.log('[useOnChainBet] Extracted betObjectId from txDetails:', betObjectId);
           }
         }
-        
-        // ALSO check effects.created if objectChanges doesn't have it
-        if (!betObjectId && txDetails.effects?.created) {
-          console.log('[useOnChainBet] Checking effects.created:', txDetails.effects.created.length);
-          // We can't determine the type here, but if there's only one created object, it's likely the Bet
-          for (const ref of txDetails.effects.created) {
-            console.log('[useOnChainBet] Created ref:', ref);
-          }
+      }
+      
+      // Fallback: check effects.created
+      if (!betObjectId && txDetails.effects?.created) {
+        console.log('[useOnChainBet] Checking effects.created:', txDetails.effects.created.length);
+        for (const ref of txDetails.effects.created) {
+          console.log('[useOnChainBet] Created ref:', ref);
         }
       }
       
@@ -314,7 +393,7 @@ export function useOnChainBet() {
         error: errorMessage,
       };
     }
-  }, [signAndExecute, suiClient, toast, getSuiCoins]);
+  }, [signAndExecute, suiClient, toast, getSuiCoins, checkTreasuryCapacity]);
 
   return {
     placeBetOnChain,

@@ -716,6 +716,43 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
     }
   });
 
+  // Treasury status endpoint - public check before placing bets
+  app.get("/api/treasury/status", async (req: Request, res: Response) => {
+    try {
+      const platformInfo = await blockchainBetService.getPlatformInfo();
+      if (!platformInfo) {
+        return res.status(503).json({ 
+          success: false, 
+          message: "Unable to fetch treasury status" 
+        });
+      }
+      
+      // Calculate available capacity for each currency
+      const suiAvailable = platformInfo.treasuryBalanceSui - platformInfo.totalLiabilitySui;
+      const sbetsAvailable = platformInfo.treasuryBalanceSbets - platformInfo.totalLiabilitySbets;
+      
+      res.json({
+        success: true,
+        sui: {
+          treasury: platformInfo.treasuryBalanceSui,
+          liability: platformInfo.totalLiabilitySui,
+          available: suiAvailable,
+          acceptingBets: suiAvailable > 0.1 // Need at least 0.1 SUI margin
+        },
+        sbets: {
+          treasury: platformInfo.treasuryBalanceSbets,
+          liability: platformInfo.totalLiabilitySbets,
+          available: sbetsAvailable,
+          acceptingBets: sbetsAvailable > 1000 // Need at least 1000 SBETS margin
+        },
+        paused: platformInfo.paused
+      });
+    } catch (error) {
+      console.error('Treasury status error:', error);
+      res.status(500).json({ success: false, message: "Failed to fetch treasury status" });
+    }
+  });
+
   // Sports routes
   app.get("/api/sports", async (req: Request, res: Response) => {
     try {
@@ -773,7 +810,7 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
           }
           
           // Log odds coverage stats but DON'T filter - show all events
-          const eventsWithOdds = allLiveEvents.filter(e => e.oddsSource === 'api-sports').length;
+          const eventsWithOdds = allLiveEvents.filter(e => (e as any).oddsSource === 'api-sports').length;
           console.log(`✅ LIVE: ${eventsWithOdds}/${allLiveEvents.length} events have real bookmaker odds`);
           
           // CRITICAL: Save successful results to snapshot (before any filtering)
@@ -827,7 +864,7 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
           // This ensures odds are updated as the prefetcher warms the cache
           try {
             allUpcomingEvents = await apiSportsService.enrichEventsWithCachedOddsOnly(allUpcomingEvents, 'football');
-            const oddsCount = allUpcomingEvents.filter(e => e.oddsSource === 'api-sports').length;
+            const oddsCount = allUpcomingEvents.filter(e => (e as any).oddsSource === 'api-sports').length;
             console.log(`📦 Applied cached odds: ${oddsCount}/${allUpcomingEvents.length} events have odds`);
           } catch (e) {
             console.log(`📦 Could not apply cached odds`);
@@ -885,7 +922,7 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         }
         
         // Log odds coverage stats but DON'T filter - show all events
-        const eventsWithOdds = allUpcomingEvents.filter(e => e.oddsSource === 'api-sports').length;
+        const eventsWithOdds = allUpcomingEvents.filter(e => (e as any).oddsSource === 'api-sports').length;
         console.log(`✅ UPCOMING: ${eventsWithOdds}/${allUpcomingEvents.length} events have real bookmaker odds`);
         
         // CRITICAL: Save successful results to snapshot (before any filtering)
