@@ -91,6 +91,54 @@ export default function BetHistoryPage() {
     }
   };
 
+  // Helper to detect if a bet is a parlay (JSON array in eventName or selection)
+  const isParlay = (bet: Bet): boolean => {
+    try {
+      if (typeof bet.eventName === 'string' && bet.eventName.startsWith('[')) {
+        const parsed = JSON.parse(bet.eventName);
+        return Array.isArray(parsed) && parsed.length > 1;
+      }
+      if (typeof bet.selection === 'string' && bet.selection.startsWith('[')) {
+        const parsed = JSON.parse(bet.selection);
+        return Array.isArray(parsed) && parsed.length > 1;
+      }
+    } catch {
+      return false;
+    }
+    return false;
+  };
+
+  // Parse parlay selections from JSON
+  const getParlaySelections = (bet: Bet): { eventName: string; selection: string; odds: number }[] => {
+    try {
+      const jsonStr = bet.eventName?.startsWith('[') ? bet.eventName : bet.selection;
+      if (jsonStr && jsonStr.startsWith('[')) {
+        return JSON.parse(jsonStr);
+      }
+    } catch {
+      return [];
+    }
+    return [];
+  };
+
+  // Get display name for bet
+  const getBetDisplayName = (bet: Bet): string => {
+    if (isParlay(bet)) {
+      const selections = getParlaySelections(bet);
+      return `Parlay (${selections.length} Legs)`;
+    }
+    return bet.eventName || 'Unknown Event';
+  };
+
+  // Get selection display
+  const getSelectionDisplay = (bet: Bet): string => {
+    if (isParlay(bet)) {
+      const selections = getParlaySelections(bet);
+      return selections.map(s => s.selection).join(' + ');
+    }
+    return bet.selection || 'Unknown';
+  };
+
   return (
     <div className="min-h-screen" data-testid="bet-history-page">
       {/* Navigation */}
@@ -226,9 +274,21 @@ export default function BetHistoryPage() {
                     }`}>
                       {getStatusIcon(bet.status)}
                     </div>
-                    <div>
-                      <p className="text-white font-medium">{bet.eventName}</p>
-                      <p className="text-cyan-400 text-sm">{bet.selection}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-medium">{getBetDisplayName(bet)}</p>
+                      <p className="text-cyan-400 text-sm">{getSelectionDisplay(bet)}</p>
+                      {isParlay(bet) && (
+                        <div className="mt-1 space-y-0.5">
+                          {getParlaySelections(bet).slice(0, 3).map((leg, idx) => (
+                            <p key={idx} className="text-gray-400 text-xs truncate">
+                              {leg.eventName}: {leg.selection} @ {leg.odds?.toFixed(2)}
+                            </p>
+                          ))}
+                          {getParlaySelections(bet).length > 3 && (
+                            <p className="text-gray-500 text-xs">+{getParlaySelections(bet).length - 3} more...</p>
+                          )}
+                        </div>
+                      )}
                       <p className="text-gray-500 text-xs mt-1">{new Date(bet.placedAt).toLocaleString()}</p>
                     </div>
                   </div>

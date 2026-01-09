@@ -115,6 +115,54 @@ export function BetHistory() {
     }
   };
 
+  // Helper to detect if a bet is a parlay (JSON array in eventName or prediction)
+  const isParlay = (bet: any): boolean => {
+    try {
+      if (typeof bet.eventName === 'string' && bet.eventName.startsWith('[')) {
+        const parsed = JSON.parse(bet.eventName);
+        return Array.isArray(parsed) && parsed.length > 1;
+      }
+      if (typeof bet.prediction === 'string' && bet.prediction.startsWith('[')) {
+        const parsed = JSON.parse(bet.prediction);
+        return Array.isArray(parsed) && parsed.length > 1;
+      }
+    } catch {
+      return false;
+    }
+    return false;
+  };
+
+  // Parse parlay selections from JSON
+  const getParlaySelections = (bet: any): { eventName: string; selection: string; odds: number }[] => {
+    try {
+      const jsonStr = bet.eventName?.startsWith('[') ? bet.eventName : bet.prediction;
+      if (jsonStr && jsonStr.startsWith('[')) {
+        return JSON.parse(jsonStr);
+      }
+    } catch {
+      return [];
+    }
+    return [];
+  };
+
+  // Get display name for bet
+  const getBetDisplayName = (bet: any): string => {
+    if (isParlay(bet)) {
+      const selections = getParlaySelections(bet);
+      return `Parlay (${selections.length} Legs)`;
+    }
+    return bet.eventName || 'Unknown Event';
+  };
+
+  // Get prediction display
+  const getPredictionDisplay = (bet: any): string => {
+    if (isParlay(bet)) {
+      const selections = getParlaySelections(bet);
+      return selections.map(s => `${s.selection}`).join(' + ');
+    }
+    return bet.prediction || bet.selection || 'Unknown';
+  };
+
   // Get status badge based on bet status
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -224,10 +272,23 @@ export function BetHistory() {
                   <CardHeader className="pb-2">
                     <div className="flex justify-between items-start">
                       <div>
-                        <CardTitle className="text-base">{bet.eventName}</CardTitle>
+                        <CardTitle className="text-base">{getBetDisplayName(bet)}</CardTitle>
                         <CardDescription className="text-cyan-400/80">
-                          {bet.prediction} @ {bet.odds.toFixed(2)}
+                          {getPredictionDisplay(bet)} @ {bet.odds?.toFixed(2) || 'N/A'}
                         </CardDescription>
+                        {isParlay(bet) && (
+                          <div className="mt-2 space-y-1">
+                            {getParlaySelections(bet).map((leg, idx) => (
+                              <div key={idx} className="text-xs text-gray-400 flex items-center gap-2">
+                                <span className="w-4 h-4 bg-cyan-500/20 rounded-full flex items-center justify-center text-cyan-400">
+                                  {idx + 1}
+                                </span>
+                                <span className="truncate">{leg.eventName}</span>
+                                <span className="text-cyan-400 ml-auto">{leg.selection} @ {leg.odds?.toFixed(2)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       {getStatusBadge(bet.status)}
                     </div>

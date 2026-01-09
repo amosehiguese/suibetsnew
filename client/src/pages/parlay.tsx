@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { useBetting } from '@/context/BettingContext';
@@ -27,6 +27,11 @@ interface ParlayLeg {
   eventName: string;
   selection: string;
   odds: number;
+  marketId?: string;
+  outcomeId?: string;
+  homeTeam?: string;
+  awayTeam?: string;
+  isLive?: boolean;
 }
 
 export default function ParlayPage() {
@@ -38,6 +43,15 @@ export default function ParlayPage() {
   const [stake, setStake] = useState('10');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPlacingBet, setIsPlacingBet] = useState(false);
+  
+  // Pick up stake from FloatingBetSlip via sessionStorage
+  useEffect(() => {
+    const savedStake = sessionStorage.getItem('parlayStake');
+    if (savedStake) {
+      setStake(savedStake);
+      sessionStorage.removeItem('parlayStake'); // Clear after use
+    }
+  }, []);
   const [betCurrency, setBetCurrency] = useState<'SUI' | 'SBETS'>('SUI');
   const { placeBetOnChain, isLoading: isOnChainLoading } = useOnChainBet();
 
@@ -75,7 +89,12 @@ export default function ParlayPage() {
     eventId: bet.eventId,
     eventName: bet.eventName || 'Unknown Event',
     selection: bet.selectionName || 'Unknown Selection',
-    odds: bet.odds || 1.5
+    odds: bet.odds || 1.5,
+    marketId: bet.marketId,
+    outcomeId: bet.outcomeId,
+    homeTeam: bet.homeTeam,
+    awayTeam: bet.awayTeam,
+    isLive: bet.isLive
   }));
 
   const totalOdds = parlayLegs.reduce((acc, leg) => acc * leg.odds, 1);
@@ -93,8 +112,8 @@ export default function ParlayPage() {
   };
 
   const handlePlaceParlay = async () => {
-    if (parlayLegs.length < 2) {
-      toast({ title: 'Not Enough Selections', description: 'A parlay requires at least 2 selections', variant: 'destructive' });
+    if (parlayLegs.length < 1) {
+      toast({ title: 'No Selections', description: 'Please add at least one selection to place a bet', variant: 'destructive' });
       return;
     }
     if (!walletAddress) {
@@ -147,27 +166,57 @@ export default function ParlayPage() {
         return;
       }
 
-      // Save parlay to database after successful on-chain transaction
-      const response = await apiRequest('POST', '/api/parlays', {
-        walletAddress: walletAddress,
-        totalOdds,
-        betAmount: stakeAmount,
-        potentialPayout,
-        txHash: onChainResult.txDigest,
-        onChainBetId: onChainResult.betObjectId,
-        status: 'confirmed',
-        legs: parlayLegs.map(leg => ({
-          eventId: leg.eventId,
-          eventName: leg.eventName,
-          selection: leg.selection,
-          odds: leg.odds
-        }))
-      });
+      // Save bet to database after successful on-chain transaction
+      // Use /api/bets for single bets, /api/parlays for multi-leg parlays
+      let response;
+      if (parlayLegs.length === 1) {
+        // Single bet - use the single bet API endpoint
+        const singleLeg = parlayLegs[0];
+        
+        response = await apiRequest('POST', '/api/bets', {
+          userId: walletAddress,
+          walletAddress: walletAddress,
+          eventId: singleLeg.eventId,
+          eventName: singleLeg.eventName,
+          homeTeam: singleLeg.homeTeam,
+          awayTeam: singleLeg.awayTeam,
+          marketId: singleLeg.marketId || 'match_winner',
+          outcomeId: singleLeg.outcomeId || singleLeg.selection,
+          prediction: singleLeg.selection,
+          odds: singleLeg.odds,
+          betAmount: stakeAmount,
+          potentialPayout: potentialPayout,
+          feeCurrency: betCurrency,
+          paymentMethod: 'wallet',
+          txHash: onChainResult.txDigest,
+          onChainBetId: onChainResult.betObjectId,
+          status: 'confirmed',
+          isLive: singleLeg.isLive || false
+        });
+      } else {
+        // Parlay - use the parlay API endpoint
+        response = await apiRequest('POST', '/api/parlays', {
+          walletAddress: walletAddress,
+          totalOdds,
+          betAmount: stakeAmount,
+          potentialPayout,
+          txHash: onChainResult.txDigest,
+          onChainBetId: onChainResult.betObjectId,
+          status: 'confirmed',
+          legs: parlayLegs.map(leg => ({
+            eventId: leg.eventId,
+            eventName: leg.eventName,
+            selection: leg.selection,
+            odds: leg.odds
+          }))
+        });
+      }
 
       if (response.ok) {
+        const betType = parlayLegs.length === 1 ? 'Bet' : 'Parlay';
         toast({ 
-          title: 'Parlay Placed On-Chain!', 
-          description: `TX: ${onChainResult.txDigest?.slice(0, 12)}... - ${parlayLegs.length} legs @ ${totalOdds.toFixed(2)}x` 
+          title: `${betType} Placed On-Chain!`, 
+          description: `TX: ${onChainResult.txDigest?.slice(0, 12)}... - ${parlayLegs.length === 1 ? parlayLegs[0].selection : `${parlayLegs.length} legs`} @ ${totalOdds.toFixed(2)}x` 
         });
         clearBets();
         setStake('10');
@@ -176,8 +225,9 @@ export default function ParlayPage() {
         queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).includes('/api/activity') });
       } else {
         // On-chain succeeded but database failed - still show success since bet is on-chain
+        const betType = parlayLegs.length === 1 ? 'Bet' : 'Parlay';
         toast({ 
-          title: 'Parlay On-Chain!', 
+          title: `${betType} On-Chain!`, 
           description: `TX: ${onChainResult.txDigest?.slice(0, 12)}... (DB save pending)` 
         });
         clearBets();
@@ -414,9 +464,9 @@ export default function ParlayPage() {
 
               <button
                 onClick={handlePlaceParlay}
-                disabled={parlayLegs.length < 2 || isPlacingBet || isOnChainLoading}
+                disabled={parlayLegs.length < 1 || isPlacingBet || isOnChainLoading || stakeAmount <= 0}
                 className={`w-full py-4 rounded-xl font-bold text-lg transition-colors ${
-                  parlayLegs.length < 2 || isPlacingBet || isOnChainLoading
+                  parlayLegs.length < 1 || isPlacingBet || isOnChainLoading || stakeAmount <= 0
                     ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
                     : 'bg-cyan-500 hover:bg-cyan-600 text-black'
                 }`}
@@ -427,7 +477,7 @@ export default function ParlayPage() {
                 ) : (
                   <CheckCircle className="h-5 w-5 inline mr-2" />
                 )}
-                {isPlacingBet || isOnChainLoading ? 'Signing Transaction...' : 'Place Parlay On-Chain'}
+                {isPlacingBet || isOnChainLoading ? 'Signing Transaction...' : parlayLegs.length === 1 ? 'Place Bet On-Chain' : 'Place Parlay On-Chain'}
               </button>
 
               {parlayLegs.length > 0 && (

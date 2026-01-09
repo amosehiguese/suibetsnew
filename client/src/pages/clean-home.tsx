@@ -518,8 +518,31 @@ interface FloatingBetSlipProps {
 }
 
 function FloatingBetSlip({ isOpen, onToggle, bets, onRemoveBet, onClearAll }: FloatingBetSlipProps) {
-  const totalStake = bets.reduce((sum, bet) => sum + (bet.stake || 0), 0);
-  const totalPotentialWin = bets.reduce((sum, bet) => sum + ((bet.stake || 0) * (bet.odds || 1)), 0);
+  const [stake, setStake] = useState<string>('');
+  const [, setLocation] = useLocation();
+  
+  // Calculate combined parlay odds (multiply all individual odds)
+  const combinedOdds = useMemo(() => {
+    if (bets.length === 0) return 0;
+    if (bets.length === 1) return bets[0].odds || 1;
+    return bets.reduce((acc, bet) => acc * (bet.odds || 1), 1);
+  }, [bets]);
+  
+  // Calculate potential winnings based on stake
+  const stakeNum = parseFloat(stake) || 0;
+  const potentialWin = stakeNum * combinedOdds;
+  
+  // Handle place bet - navigates to parlay page with stake pre-filled
+  const handlePlaceBet = () => {
+    if (bets.length === 0) return;
+    // Store stake in session storage for parlay page to pick up
+    if (stake) {
+      sessionStorage.setItem('parlayStake', stake);
+    }
+    setLocation('/parlay');
+  };
+  
+  const isParlay = bets.length > 1;
   
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50">
@@ -533,12 +556,12 @@ function FloatingBetSlip({ isOpen, onToggle, bets, onRemoveBet, onClearAll }: Fl
           <span className="bg-black/20 px-2 py-0.5 rounded-full text-sm">
             {bets.length} {bets.length === 1 ? 'bet' : 'bets'}
           </span>
-          <span>Bet Slip</span>
+          <span>{isParlay ? 'Parlay Slip' : 'Bet Slip'}</span>
         </div>
         <div className="flex items-center gap-4">
           {bets.length > 0 && (
             <span className="text-sm">
-              Potential: {totalPotentialWin.toFixed(2)} SUI
+              {isParlay ? `Combined: ${combinedOdds.toFixed(2)}` : `Odds: ${combinedOdds.toFixed(2)}`}
             </span>
           )}
           {isOpen ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
@@ -555,7 +578,7 @@ function FloatingBetSlip({ isOpen, onToggle, bets, onRemoveBet, onClearAll }: Fl
             transition={{ duration: 0.2 }}
             className="bg-[#0a0a0a] border-t border-cyan-900/30 overflow-hidden"
           >
-            <div className="max-h-64 overflow-y-auto p-4">
+            <div className="max-h-48 overflow-y-auto p-4">
               {bets.length === 0 ? (
                 <p className="text-gray-500 text-center py-4">
                   No bets added yet. Click on odds to add bets.
@@ -584,19 +607,56 @@ function FloatingBetSlip({ isOpen, onToggle, bets, onRemoveBet, onClearAll }: Fl
               )}
             </div>
             {bets.length > 0 && (
-              <div className="p-4 border-t border-cyan-900/30 flex items-center justify-between">
-                <button
-                  onClick={onClearAll}
-                  className="text-red-400 hover:text-red-300 text-sm"
-                  data-testid="btn-clear-bets"
-                >
-                  Clear All
-                </button>
-                <Link href="/parlay">
-                  <span className="bg-cyan-500 hover:bg-cyan-600 text-black font-bold px-6 py-2 rounded-lg text-sm cursor-pointer">
-                    Place Bet
-                  </span>
-                </Link>
+              <div className="p-4 border-t border-cyan-900/30 space-y-3">
+                {/* Stake Input */}
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <label className="text-gray-400 text-xs mb-1 block">Stake (SUI)</label>
+                    <input
+                      type="number"
+                      value={stake}
+                      onChange={(e) => setStake(e.target.value)}
+                      placeholder="Enter stake..."
+                      className="w-full bg-[#111111] border border-cyan-900/30 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"
+                      data-testid="input-stake"
+                      min="0"
+                      step="0.1"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-gray-400 text-xs mb-1 block">Potential Win</label>
+                    <div className="bg-[#111111] border border-cyan-900/30 rounded-lg px-3 py-2 text-green-400 text-sm font-bold">
+                      {potentialWin > 0 ? `${potentialWin.toFixed(2)} SUI` : '-'}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Combined Odds Display for Parlay */}
+                {isParlay && (
+                  <div className="flex items-center justify-between text-sm bg-[#111111] rounded-lg p-2">
+                    <span className="text-gray-400">Combined Odds ({bets.length} legs)</span>
+                    <span className="text-cyan-400 font-bold">{combinedOdds.toFixed(2)}</span>
+                  </div>
+                )}
+                
+                {/* Actions */}
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={onClearAll}
+                    className="text-red-400 hover:text-red-300 text-sm"
+                    data-testid="btn-clear-bets"
+                  >
+                    Clear All
+                  </button>
+                  <button
+                    onClick={handlePlaceBet}
+                    disabled={bets.length === 0}
+                    className="bg-cyan-500 hover:bg-cyan-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-bold px-6 py-2 rounded-lg text-sm"
+                    data-testid="btn-place-bet"
+                  >
+                    {isParlay ? `Place Parlay (${bets.length} legs)` : 'Place Bet'}
+                  </button>
+                </div>
               </div>
             )}
           </motion.div>
@@ -782,9 +842,13 @@ function CompactEventCard({ event, favorites, toggleFavorite }: CompactEventCard
       eventName: `${event.homeTeam} vs ${event.awayTeam}`,
       marketId: "match-winner",
       market: "Match Winner",
+      outcomeId: selectedOutcome,
       selectionId: selectedOutcome,
       selectionName: outcomeName,
       odds: selectedOdds,
+      homeTeam: event.homeTeam,
+      awayTeam: event.awayTeam,
+      isLive: event.isLive || false,
     });
     
     toast({ title: "Added to bet slip", description: `${outcomeName} @ ${selectedOdds.toFixed(2)}` });
@@ -1035,10 +1099,14 @@ function EventCard({ event }: EventCardProps) {
         id: betId,
         eventId: String(event.id),
         eventName: `${event.homeTeam} vs ${event.awayTeam}`,
+        marketId: "match-result",
+        market: "Match Result",
+        outcomeId: selectedOutcome,
         selectionName,
         odds: selectedOdds,
         stake: parseFloat(stake) || 10,
-        market: "Match Result",
+        homeTeam: event.homeTeam,
+        awayTeam: event.awayTeam,
         isLive: event.isLive || false,
       });
       
