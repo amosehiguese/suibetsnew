@@ -143,6 +143,35 @@ export default function ParlayPage() {
     setIsPlacingBet(true);
 
     try {
+      // PRE-FLIGHT VALIDATION: Check all events are still bettable BEFORE on-chain transaction
+      // This prevents money being sent to contract only to have database save fail
+      for (const leg of parlayLegs) {
+        try {
+          const validationResponse = await apiRequest('POST', '/api/bets/validate', {
+            eventId: String(leg.eventId),
+            isLive: leg.isLive,
+          });
+          if (!validationResponse.ok) {
+            const errorData = await validationResponse.json();
+            toast({
+              title: "Betting Closed",
+              description: errorData.message || `${leg.eventName} is no longer accepting bets`,
+              variant: "destructive",
+            });
+            setIsPlacingBet(false);
+            return;
+          }
+        } catch (valError: any) {
+          toast({
+            title: "Validation Error",
+            description: `Could not verify ${leg.eventName} - please try again`,
+            variant: "destructive",
+          });
+          setIsPlacingBet(false);
+          return;
+        }
+      }
+
       // Create a combined parlay event ID from all legs
       const parlayEventId = `parlay_${Date.now()}_${parlayLegs.map(l => l.eventId).join('_')}`;
       const parlayMarketId = 'parlay_combined';
@@ -200,6 +229,7 @@ export default function ParlayPage() {
           totalOdds,
           betAmount: stakeAmount,
           potentialPayout,
+          feeCurrency: betCurrency,
           txHash: onChainResult.txDigest,
           onChainBetId: onChainResult.betObjectId,
           status: 'confirmed',
@@ -207,7 +237,12 @@ export default function ParlayPage() {
             eventId: leg.eventId,
             eventName: leg.eventName,
             selection: leg.selection,
-            odds: leg.odds
+            odds: leg.odds,
+            marketId: leg.marketId,
+            outcomeId: leg.outcomeId,
+            homeTeam: leg.homeTeam,
+            awayTeam: leg.awayTeam,
+            isLive: leg.isLive || false
           }))
         });
       }
