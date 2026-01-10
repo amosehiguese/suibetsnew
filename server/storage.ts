@@ -531,19 +531,25 @@ export class DatabaseStorage implements IStorage {
       }
       
       // NORMAL SETTLEMENT PATH: Only allow transitions from settable states
+      // Support both wurlus_bet_id lookup AND numeric id lookup for legacy bets
+      const isNumericId = /^\d+$/.test(betId);
       const result = await db.execute(sql`
         WITH old_bet AS (
           SELECT id, status as old_status 
           FROM bets 
-          WHERE wurlus_bet_id = ${betId}
+          WHERE wurlus_bet_id = ${betId} 
+             OR (${isNumericId ? sql`id = ${parseInt(betId, 10)}` : sql`FALSE`})
+             OR bet_object_id = ${betId}
         ),
         updated_bet AS (
           UPDATE bets 
           SET status = ${status},
               payout = COALESCE(${payout ?? null}::real, payout),
               settled_at = COALESCE(${settledAt ?? null}, settled_at)
-          WHERE wurlus_bet_id = ${betId}
-            AND status IN ('pending', 'in_play', 'active')
+          WHERE (wurlus_bet_id = ${betId} 
+                 OR (${isNumericId ? sql`id = ${parseInt(betId, 10)}` : sql`FALSE`})
+                 OR bet_object_id = ${betId})
+            AND status IN ('pending', 'in_play', 'active', 'confirmed')
           RETURNING id, status as new_status
         )
         SELECT 

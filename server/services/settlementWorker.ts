@@ -351,8 +351,11 @@ class SettlementWorkerService {
 
   private async getUnsettledBets(): Promise<UnsettledBet[]> {
     try {
-      // Get ALL unsettled bets from all users - not just one user
-      const allBets = await storage.getAllBets('pending');
+      // Get ALL unsettled bets from all users - include both 'pending' and 'confirmed' status
+      // 'confirmed' = on-chain bets that were placed but not yet settled
+      const pendingBets = await storage.getAllBets('pending');
+      const confirmedBets = await storage.getAllBets('confirmed');
+      const allBets = [...pendingBets, ...confirmedBets];
       return allBets
         .filter(bet => !this.settledBetIds.has(bet.id))
         .map(bet => ({
@@ -413,6 +416,9 @@ class SettlementWorkerService {
           // Lost bets stay in contract treasury as accrued fees
           console.log(`🔗 ON-CHAIN SUI SETTLEMENT: Bet ${bet.id} via smart contract`);
           
+          // Small delay between on-chain transactions to prevent object version conflicts
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
           const settlementResult = await blockchainBetService.executeSettleBetOnChain(
             bet.betObjectId!,
             isWinner
@@ -436,6 +442,9 @@ class SettlementWorkerService {
           // ============ ON-CHAIN SETTLEMENT (SBETS via smart contract) ============
           // Contract handles payout directly - winner gets SBETS from contract treasury
           console.log(`🔗 ON-CHAIN SBETS SETTLEMENT: Bet ${bet.id} via smart contract`);
+          
+          // Small delay between on-chain transactions to prevent object version conflicts
+          await new Promise(resolve => setTimeout(resolve, 2000));
           
           const settlementResult = await blockchainBetService.executeSettleBetSbetsOnChain(
             bet.betObjectId!,
