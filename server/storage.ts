@@ -31,7 +31,7 @@ export interface IStorage {
   createParlay(parlay: any): Promise<any>;
   getUserBets(userId: string): Promise<any[]>;
   getAllBets(status?: string): Promise<any[]>;
-  updateBetStatus(betId: string, status: string, payout?: number): Promise<boolean>;
+  updateBetStatus(betId: string, status: string, payout?: number, settlementTxHash?: string): Promise<boolean>;
   markBetWinningsWithdrawn(betId: number, txHash: string): Promise<void>;
   cashOutSingleBet(betId: number): Promise<void>;
   
@@ -483,6 +483,7 @@ export class DatabaseStorage implements IStorage {
         placedAt: bet.createdAt?.toISOString() || new Date().toISOString(),
         settledAt: bet.settledAt?.toISOString(),
         txHash: bet.txHash,
+        settlementTxHash: bet.settlementTxHash, // Transaction hash for bet settlement/payout
         betObjectId: bet.betObjectId || (bet.wurlusBetId?.startsWith('0x') ? bet.wurlusBetId : undefined), // On-chain Sui bet object ID for contract settlement
         currency: bet.feeCurrency || 'SUI',
         betType: bet.betType,
@@ -495,7 +496,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async updateBetStatus(betId: string, status: string, payout?: number): Promise<boolean> {
+  async updateBetStatus(betId: string, status: string, payout?: number, settlementTxHash?: string): Promise<boolean> {
     try {
       // ATOMIC SETTLEMENT with STATE MACHINE VALIDATION
       // 1. Normal settlement: only from settable states (pending, in_play, active) to terminal states
@@ -545,7 +546,8 @@ export class DatabaseStorage implements IStorage {
           UPDATE bets 
           SET status = ${status},
               payout = COALESCE(${payout ?? null}::real, payout),
-              settled_at = COALESCE(${settledAt ?? null}, settled_at)
+              settled_at = COALESCE(${settledAt ?? null}, settled_at),
+              settlement_tx_hash = COALESCE(${settlementTxHash ?? null}, settlement_tx_hash)
           WHERE (wurlus_bet_id = ${betId} 
                  OR (${isNumericId ? sql`id = ${parseInt(betId, 10)}` : sql`FALSE`})
                  OR bet_object_id = ${betId})

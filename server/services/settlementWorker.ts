@@ -428,7 +428,7 @@ class SettlementWorkerService {
             // Update database status to reflect on-chain settlement
             // Use 'paid_out' for winners since payout was sent, 'lost' for losers
             const finalStatus = isWinner ? 'paid_out' : 'lost';
-            const statusUpdated = await storage.updateBetStatus(bet.id, finalStatus, grossPayout);
+            const statusUpdated = await storage.updateBetStatus(bet.id, finalStatus, grossPayout, settlementResult.txHash);
             if (statusUpdated) {
               console.log(`✅ ON-CHAIN SUI SETTLED: ${bet.id} ${finalStatus} | TX: ${settlementResult.txHash}`);
               this.settledBetIds.add(bet.id);
@@ -454,7 +454,7 @@ class SettlementWorkerService {
           if (settlementResult.success) {
             // Use 'paid_out' for winners since payout was sent, 'lost' for losers
             const finalStatus = isWinner ? 'paid_out' : 'lost';
-            const statusUpdated = await storage.updateBetStatus(bet.id, finalStatus, grossPayout);
+            const statusUpdated = await storage.updateBetStatus(bet.id, finalStatus, grossPayout, settlementResult.txHash);
             if (statusUpdated) {
               console.log(`✅ ON-CHAIN SBETS SETTLED: ${bet.id} ${finalStatus} | TX: ${settlementResult.txHash}`);
               this.settledBetIds.add(bet.id);

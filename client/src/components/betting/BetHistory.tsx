@@ -333,7 +333,7 @@ export function BetHistory() {
                       
                       {bet.txHash && (
                         <>
-                          <div className="text-gray-400">Transaction:</div>
+                          <div className="text-gray-400">Bet TX:</div>
                           <div className="text-right">
                             <a 
                               href={`https://suiscan.xyz/mainnet/tx/${bet.txHash}`}
@@ -341,6 +341,23 @@ export function BetHistory() {
                               rel="noopener noreferrer"
                               className="text-cyan-400 hover:underline inline-flex items-center gap-1"
                               data-testid={`link-tx-${bet.id}`}
+                            >
+                              View <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        </>
+                      )}
+                      
+                      {bet.settlementTxHash && (
+                        <>
+                          <div className="text-gray-400">Payout TX:</div>
+                          <div className="text-right">
+                            <a 
+                              href={`https://suiscan.xyz/mainnet/tx/${bet.settlementTxHash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-green-400 hover:underline inline-flex items-center gap-1"
+                              data-testid={`link-payout-tx-${bet.id}`}
                             >
                               View <ExternalLink className="w-3 h-3" />
                             </a>
