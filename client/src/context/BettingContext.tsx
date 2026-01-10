@@ -546,7 +546,7 @@ export const BettingProvider: React.FC<{children: ReactNode}> = ({ children }) =
   };
 
   // Calculate total stake and potential winnings
-  const totalStake = selectedBets.reduce((sum, bet) => sum + (bet.stake || 0), 0);
+  const totalStake = selectedBets.reduce((sum, bet) => sum + (Number.isFinite(bet.stake) ? bet.stake : 0), 0);
   
   // Calculate potential winnings differently for parlays vs. single bets
   const potentialWinnings = selectedBets.length > 1 
@@ -555,7 +555,7 @@ export const BettingProvider: React.FC<{children: ReactNode}> = ({ children }) =
         calculateParlayOdds(selectedBets.map(bet => ({ odds: bet.odds })))
       )
     : selectedBets.reduce(
-        (sum, bet) => sum + calculatePotentialWinnings(bet.stake || 0, bet.odds),
+        (sum, bet) => sum + calculatePotentialWinnings(Number.isFinite(bet.stake) ? bet.stake : 0, bet.odds),
         0
       );
 

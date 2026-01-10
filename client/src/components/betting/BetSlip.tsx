@@ -204,7 +204,7 @@ export function BetSlip() {
     
     setIsLoading(true);
     try {
-      const currentTotal = selectedBets.reduce((sum, bet) => sum + (bet.stake || 0), 0);
+      const currentTotal = selectedBets.reduce((sum, bet) => sum + (Number.isFinite(bet.stake) ? bet.stake : 0), 0);
       const success = await placeBet(currentTotal, {
         betType,
         currency: betCurrency,
@@ -409,7 +409,7 @@ export function BetSlip() {
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs">{betCurrency}</span>
                       </div>
                       <span className="text-gray-400 text-xs whitespace-nowrap">
-                        Win: <span className="text-cyan-400 font-medium">{((bet.stake || 0) * bet.odds).toFixed(2)}</span>
+                        Win: <span className="text-cyan-400 font-medium">{((Number.isFinite(bet.stake) ? bet.stake : 0) * bet.odds).toFixed(2)}</span>
                       </span>
                     </div>
                     <div className="flex gap-1">
