@@ -130,8 +130,9 @@ export const BettingProvider: React.FC<{children: ReactNode}> = ({ children }) =
   };
 
   // Remove a bet from the selection
+  // FIXED: Use functional form to avoid stale closure
   const removeBet = (id: string) => {
-    setSelectedBets(selectedBets.filter((bet) => bet.id !== id));
+    setSelectedBets(prevBets => prevBets.filter((bet) => bet.id !== id));
   };
 
   // Clear all bets
@@ -140,9 +141,10 @@ export const BettingProvider: React.FC<{children: ReactNode}> = ({ children }) =
   };
 
   // Update stake amount for a bet
+  // FIXED: Use functional form to avoid stale closure when called in rapid succession
   const updateStake = (id: string, stake: number) => {
-    setSelectedBets(
-      selectedBets.map((bet) => (bet.id === id ? { ...bet, stake } : bet))
+    setSelectedBets(prevBets =>
+      prevBets.map((bet) => (bet.id === id ? { ...bet, stake } : bet))
     );
   };
 
