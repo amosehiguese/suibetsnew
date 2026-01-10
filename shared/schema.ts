@@ -119,6 +119,7 @@ export const bets = pgTable("bets", {
   marketId: integer("market_id").references(() => markets.id),
   outcomeId: integer("outcome_id").references(() => outcomes.id),
   betAmount: real("bet_amount").notNull(),
+  currency: text("currency").default("SUI"), // "SUI" or "SBETS" - explicit token tracking
   odds: real("odds").notNull(),
   prediction: text("prediction").notNull(),
   potentialPayout: real("potential_payout").notNull(),

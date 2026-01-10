@@ -28,6 +28,7 @@ export const PlaceBetSchema = z.object({
   outcomeId: z.string().optional().default('selection'),
   odds: OddsSchema,
   betAmount: BetAmountSchema,
+  currency: z.enum(['SUI', 'SBETS']).optional().default('SUI'), // Token type for the bet
   prediction: z.string().min(1, 'Prediction required'),
   potentialPayout: z.number().optional(),
   feeCurrency: z.enum(['SUI', 'SBETS']).optional().default('SUI'),

@@ -574,6 +574,115 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
     }
   });
 
+  // Liability reconciliation - compare on-chain vs database liability (admin only)
+  app.get("/api/admin/liability-reconciliation", async (req: Request, res: Response) => {
+    try {
+      // Admin authentication - same as other admin endpoints
+      // Accept password via X-Admin-Password header (secure) or Authorization Bearer token
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.replace('Bearer ', '');
+      const adminPassword = req.headers['x-admin-password'] as string;
+      
+      const hasValidToken = token && isValidAdminSession(token);
+      const actualPassword = process.env.ADMIN_PASSWORD || 'change-me-in-production';
+      const hasValidPassword = adminPassword === actualPassword;
+      
+      if (!hasValidToken && !hasValidPassword) {
+        return res.status(401).json({ success: false, message: "Unauthorized - provide valid X-Admin-Password header or Authorization Bearer token" });
+      }
+
+      // Get on-chain platform info
+      const platformInfo = await blockchainBetService.getPlatformInfo();
+      if (!platformInfo) {
+        return res.status(503).json({ success: false, message: "Unable to fetch on-chain platform info" });
+      }
+
+      // Get all pending bets from database
+      const pendingBets = await storage.getAllBets('pending');
+      const confirmedBets = await storage.getAllBets('confirmed');
+      const allUnsettledBets = [...pendingBets, ...confirmedBets];
+
+      // Calculate expected liability from database (by currency)
+      // IMPORTANT: Only use currency/feeCurrency fields, NOT bet amount heuristics
+      let dbSuiLiability = 0;
+      let dbSbetsLiability = 0;
+      const suiBetsDetails: any[] = [];
+      const sbetsBetsDetails: any[] = [];
+
+      for (const bet of allUnsettledBets) {
+        // Determine currency: feeCurrency is the accurate field indicating payment token
+        // (currency column may have been set incorrectly for old bets)
+        const paymentCurrency = bet.feeCurrency || bet.currency || 'SUI';
+        const potentialPayout = bet.potentialPayout || (bet.betAmount * bet.odds);
+        
+        if (paymentCurrency === 'SBETS') {
+          dbSbetsLiability += potentialPayout;
+          sbetsBetsDetails.push({
+            id: bet.id,
+            amount: bet.betAmount,
+            potentialPayout,
+            currency: 'SBETS',
+            feeCurrency: bet.feeCurrency,
+            hasBetObjectId: !!bet.betObjectId,
+            status: bet.status
+          });
+        } else {
+          // Default to SUI for any non-SBETS currency
+          dbSuiLiability += potentialPayout;
+          suiBetsDetails.push({
+            id: bet.id,
+            amount: bet.betAmount,
+            potentialPayout,
+            currency: 'SUI',
+            feeCurrency: bet.feeCurrency,
+            hasBetObjectId: !!bet.betObjectId,
+            status: bet.status
+          });
+        }
+      }
+
+      // Calculate mismatch
+      const suiMismatch = platformInfo.totalLiabilitySui - dbSuiLiability;
+      const sbetsMismatch = platformInfo.totalLiabilitySbets - dbSbetsLiability;
+
+      res.json({
+        success: true,
+        timestamp: new Date().toISOString(),
+        onChain: {
+          suiLiability: platformInfo.totalLiabilitySui,
+          sbetsLiability: platformInfo.totalLiabilitySbets,
+          suiTreasury: platformInfo.treasuryBalanceSui,
+          sbetsTreasury: platformInfo.treasuryBalanceSbets,
+          totalBets: platformInfo.totalBets
+        },
+        database: {
+          suiLiability: dbSuiLiability,
+          sbetsLiability: dbSbetsLiability,
+          suiBetsCount: suiBetsDetails.length,
+          sbetsBetsCount: sbetsBetsDetails.length,
+          suiBetsWithObjectId: suiBetsDetails.filter(b => b.hasBetObjectId).length,
+          sbetsBetsWithObjectId: sbetsBetsDetails.filter(b => b.hasBetObjectId).length
+        },
+        mismatch: {
+          sui: suiMismatch,
+          sbets: sbetsMismatch,
+          suiOrphaned: suiMismatch > 0.001, // More than 0.001 SUI orphaned
+          sbetsOrphaned: sbetsMismatch > 1 // More than 1 SBETS orphaned
+        },
+        details: {
+          suiBets: suiBetsDetails,
+          sbetsBets: sbetsBetsDetails
+        },
+        recommendation: suiMismatch > 0.001 || sbetsMismatch > 1 
+          ? "On-chain liability is higher than database expects. This may be from old bets without betObjectId that were settled in DB but not on-chain. Contact support to reconcile."
+          : "Liability is in sync. No action needed."
+      });
+    } catch (error: any) {
+      console.error('[Admin] Liability reconciliation error:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
   // Test all blockchain settlement functions
   app.get("/api/admin/test-settlement-functions", async (req: Request, res: Response) => {
     try {
@@ -1215,7 +1324,7 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       // Cast to strings since transform always converts to string
       const userId = String(data.userId);
       const eventId = String(data.eventId);
-      const { eventName, homeTeam, awayTeam, marketId, outcomeId, odds, betAmount, prediction, feeCurrency, paymentMethod, txHash, onChainBetId, status, isLive, matchMinute } = data;
+      const { eventName, homeTeam, awayTeam, marketId, outcomeId, odds, betAmount, currency, prediction, feeCurrency, paymentMethod, txHash, onChainBetId, status, isLive, matchMinute } = data;
       
       // SERVER-SIDE VALIDATION: Unified event registry lookup
       // CRITICAL: Server is authoritative about event status - never trust client isLive/matchMinute
@@ -1297,8 +1406,7 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         });
       }
       
-      // Determine currency (default to SUI)
-      const currency: 'SUI' | 'SBETS' = feeCurrency === 'SBETS' ? 'SBETS' : 'SUI';
+      // Currency already extracted from validation (defaults to SUI)
       const platformFee = betAmount * 0.01; // 1% platform fee
       const totalDebit = betAmount + platformFee;
 

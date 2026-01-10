@@ -284,6 +284,7 @@ export class DatabaseStorage implements IStorage {
         userId: null, // Don't link to users table - wallet-based system
         walletAddress: normalizedWallet, // Store NORMALIZED wallet address for settlement payout
         betAmount: bet.betAmount,
+        currency: bet.currency || 'SUI', // Explicit SUI or SBETS token tracking
         odds: bet.odds,
         prediction: bet.prediction,
         potentialPayout: bet.potentialPayout,
@@ -329,6 +330,7 @@ export class DatabaseStorage implements IStorage {
         userId: null, // Don't link to users table - wallet-based system
         walletAddress: normalizedWallet, // Store NORMALIZED wallet address for bet retrieval and settlement
         betAmount: parlay.totalStake,
+        currency: parlay.currency || 'SUI', // Explicit SUI or SBETS token tracking
         odds: parlay.combinedOdds,
         prediction: JSON.stringify(parlay.selections),
         potentialPayout: parlay.potentialPayout,
@@ -478,14 +480,17 @@ export class DatabaseStorage implements IStorage {
         prediction: bet.prediction, // Include both for compatibility
         odds: bet.odds,
         stake: bet.betAmount,
+        betAmount: bet.betAmount, // Include for liability tracking
         potentialWin: bet.potentialPayout,
+        potentialPayout: bet.potentialPayout, // Include for liability tracking
         status: bet.status,
         placedAt: bet.createdAt?.toISOString() || new Date().toISOString(),
         settledAt: bet.settledAt?.toISOString(),
         txHash: bet.txHash,
         settlementTxHash: bet.settlementTxHash, // Transaction hash for bet settlement/payout
         betObjectId: bet.betObjectId || (bet.wurlusBetId?.startsWith('0x') ? bet.wurlusBetId : undefined), // On-chain Sui bet object ID for contract settlement
-        currency: bet.feeCurrency || 'SUI',
+        currency: bet.currency || bet.feeCurrency || 'SUI', // Prefer explicit currency field over feeCurrency
+        feeCurrency: bet.feeCurrency, // Keep for backwards compatibility
         betType: bet.betType,
         platformFee: bet.platformFee,
         networkFee: bet.networkFee
