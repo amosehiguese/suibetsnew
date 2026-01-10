@@ -130,11 +130,12 @@ export default function BetHistoryPage() {
     return bet.eventName || 'Unknown Event';
   };
 
-  // Get selection display
+  // Get selection display - show team names for parlays
   const getSelectionDisplay = (bet: Bet): string => {
     if (isParlay(bet)) {
       const selections = getParlaySelections(bet);
-      return selections.map(s => s.selection).join(' + ');
+      // Show the team names selected
+      return selections.map(s => s.selection || 'Pick').join(', ');
     }
     return bet.selection || 'Unknown';
   };
@@ -301,13 +302,16 @@ export default function BetHistoryPage() {
                       <span className="text-gray-400 text-sm">Odds:</span>
                       <span className="text-green-400 font-bold">{bet.odds.toFixed(2)}</span>
                     </div>
-                    <p className={`font-bold text-lg ${
-                      bet.status === 'won' ? 'text-green-400' :
-                      bet.status === 'lost' ? 'text-red-400' :
-                      'text-yellow-400'
-                    }`}>
-                      {bet.status === 'won' ? '+' : bet.status === 'pending' ? '' : '-'}{bet.potentialWin.toFixed(2)} {bet.currency || 'SUI'}
-                    </p>
+                    <div className="flex items-center gap-2 justify-end">
+                      <span className="text-gray-400 text-sm">To Win:</span>
+                      <span className={`font-bold text-lg ${
+                        bet.status === 'won' ? 'text-green-400' :
+                        bet.status === 'lost' ? 'text-red-400' :
+                        'text-cyan-400'
+                      }`}>
+                        {bet.status === 'won' ? '+' : bet.status === 'lost' ? '-' : ''}{bet.potentialWin.toFixed(2)} {bet.currency || 'SUI'}
+                      </span>
+                    </div>
                     {bet.txHash && (
                       <a 
                         href={`https://suiscan.xyz/mainnet/tx/${bet.txHash}`}

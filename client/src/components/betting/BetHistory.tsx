@@ -154,13 +154,21 @@ export function BetHistory() {
     return bet.eventName || 'Unknown Event';
   };
 
-  // Get prediction display
+  // Get prediction display - show team names for parlays
   const getPredictionDisplay = (bet: any): string => {
     if (isParlay(bet)) {
       const selections = getParlaySelections(bet);
-      return selections.map(s => `${s.selection}`).join(' + ');
+      // Show the actual selection/team name (e.g., "Real Madrid", "Barcelona") 
+      return selections.map(s => s.selection || s.eventName?.split(' vs ')[0] || 'Pick').join(' + ');
     }
     return bet.prediction || bet.selection || 'Unknown';
+  };
+  
+  // Get parlay team names for display
+  const getParlayTeamNames = (bet: any): string => {
+    const selections = getParlaySelections(bet);
+    if (selections.length === 0) return '';
+    return selections.map(s => s.selection || 'Pick').join(', ');
   };
 
   // Get status badge based on bet status
@@ -273,21 +281,27 @@ export function BetHistory() {
                     <div className="flex justify-between items-start">
                       <div>
                         <CardTitle className="text-base">{getBetDisplayName(bet)}</CardTitle>
-                        <CardDescription className="text-cyan-400/80">
-                          {getPredictionDisplay(bet)} @ {bet.odds?.toFixed(2) || 'N/A'}
-                        </CardDescription>
-                        {isParlay(bet) && (
-                          <div className="mt-2 space-y-1">
-                            {getParlaySelections(bet).map((leg, idx) => (
-                              <div key={idx} className="text-xs text-gray-400 flex items-center gap-2">
-                                <span className="w-4 h-4 bg-cyan-500/20 rounded-full flex items-center justify-center text-cyan-400">
-                                  {idx + 1}
-                                </span>
-                                <span className="truncate">{leg.eventName}</span>
-                                <span className="text-cyan-400 ml-auto">{leg.selection} @ {leg.odds?.toFixed(2)}</span>
-                              </div>
-                            ))}
-                          </div>
+                        {isParlay(bet) ? (
+                          <>
+                            <CardDescription className="text-cyan-400/80 font-medium">
+                              {getParlayTeamNames(bet)}
+                            </CardDescription>
+                            <div className="mt-2 space-y-1">
+                              {getParlaySelections(bet).map((leg, idx) => (
+                                <div key={idx} className="text-xs text-gray-400 flex items-center gap-2">
+                                  <span className="w-4 h-4 bg-cyan-500/20 rounded-full flex items-center justify-center text-cyan-400">
+                                    {idx + 1}
+                                  </span>
+                                  <span className="truncate">{leg.eventName || 'Match'}</span>
+                                  <span className="text-cyan-400 ml-auto">{leg.selection} @ {leg.odds?.toFixed(2)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        ) : (
+                          <CardDescription className="text-cyan-400/80">
+                            {getPredictionDisplay(bet)} @ {bet.odds?.toFixed(2) || 'N/A'}
+                          </CardDescription>
                         )}
                       </div>
                       {getStatusBadge(bet.status)}
@@ -296,10 +310,13 @@ export function BetHistory() {
                   <CardContent className="pb-2">
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div className="text-gray-400">Stake:</div>
-                      <div className="text-right">{bet.stake || bet.betAmount} {bet.currency || bet.feeCurrency || 'SUI'}</div>
+                      <div className="text-right font-medium">{bet.stake || bet.betAmount} {bet.currency || bet.feeCurrency || 'SUI'}</div>
                       
-                      <div className="text-gray-400">Potential Win:</div>
-                      <div className="text-right">{(bet.potentialWin || bet.potentialPayout || 0).toFixed(2)} {bet.currency || bet.feeCurrency || 'SUI'}</div>
+                      <div className="text-gray-400">Odds:</div>
+                      <div className="text-right font-medium text-cyan-400">{bet.odds?.toFixed(2) || 'N/A'}</div>
+                      
+                      <div className="text-gray-400">To Win:</div>
+                      <div className="text-right font-bold text-green-400">{(bet.potentialWin || bet.potentialPayout || ((bet.stake || bet.betAmount || 0) * (bet.odds || 1))).toFixed(2)} {bet.currency || bet.feeCurrency || 'SUI'}</div>
                       
                       <div className="text-gray-400">Placed:</div>
                       <div className="text-right">
