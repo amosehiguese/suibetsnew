@@ -935,11 +935,12 @@ class SettlementWorkerService {
     const results: FinishedMatch[] = [];
     const seenIds = new Set<string>();
     const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const todayStr = today.toISOString().split('T')[0];
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
-    const datesToCheck = [todayStr, yesterdayStr];
+    const datesToCheck: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      datesToCheck.push(d.toISOString().split('T')[0]);
+    }
 
     const sportsToFetch = neededSports
       .filter(s => FREE_SPORTS_SETTLEMENT_CONFIG[s])
@@ -1109,13 +1110,12 @@ class SettlementWorkerService {
     if (!apiKey) return [];
 
     const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    
-    const todayStr = today.toISOString().split('T')[0];
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
-    
-    const datesToCheck = [todayStr, yesterdayStr];
+    const datesToCheck: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      datesToCheck.push(d.toISOString().split('T')[0]);
+    }
     
     const sportEndpoints: Record<string, string> = {
       football: 'https://v3.football.api-sports.io/fixtures',

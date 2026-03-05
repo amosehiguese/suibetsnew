@@ -6485,13 +6485,45 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         });
       }
       
-      await storage.updateUserBalance(walletAddress, 0, claimAmount);
-      console.log(`[STAKING] ✅ User ${walletAddress.slice(0, 10)}... claimed ${claimAmount.toLocaleString()} SBETS rewards - ADDED to DB balance`);
+      let txHash = '';
+      let onChainSuccess = false;
+      
+      if (blockchainBetService.isAdminKeyConfigured()) {
+        try {
+          console.log(`[STAKING] Claim Step 1: Withdrawing ${claimAmount.toLocaleString()} SBETS from treasury...`);
+          const withdrawResult = await blockchainBetService.withdrawTreasurySbetsOnChain(claimAmount);
+          if (!withdrawResult.success) {
+            throw new Error(`Treasury withdrawal failed: ${withdrawResult.error}`);
+          }
+          console.log(`[STAKING] Claim Step 1 ✅: Treasury withdrawal complete | TX: ${withdrawResult.txHash}`);
+          
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          console.log(`[STAKING] Claim Step 2: Sending ${claimAmount.toLocaleString()} SBETS to user ${walletAddress.slice(0, 10)}...`);
+          const payoutResult = await blockchainBetService.sendSbetsToUser(walletAddress, claimAmount);
+          if (payoutResult.success && payoutResult.txHash) {
+            txHash = payoutResult.txHash;
+            onChainSuccess = true;
+            console.log(`[STAKING] Claim Step 2 ✅: On-chain rewards payout complete | TX: ${txHash}`);
+          } else {
+            throw new Error(`Send to user failed: ${payoutResult.error}`);
+          }
+        } catch (payoutError: any) {
+          console.warn('[STAKING] On-chain rewards payout failed, falling back to DB balance:', payoutError.message);
+        }
+      }
+      
+      if (!onChainSuccess) {
+        await storage.updateUserBalance(walletAddress, 0, claimAmount);
+        console.log(`[STAKING] ✅ User ${walletAddress.slice(0, 10)}... claimed ${claimAmount.toLocaleString()} SBETS rewards - ADDED to DB balance (on-chain unavailable)`);
+      }
       
       res.json({ 
         success: true, 
         message: `Successfully claimed ${claimAmount.toLocaleString()} SBETS rewards`,
-        claimedAmount: claimAmount
+        claimedAmount: claimAmount,
+        txHash: txHash || undefined,
+        onChain: onChainSuccess
       });
       } finally {
         stakingLocks.delete(walletAddress);
