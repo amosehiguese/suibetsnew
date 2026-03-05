@@ -9,11 +9,15 @@ import { blockchainStorage } from "./blockchain-storage";
 const app = express();
 
 app.use((req, res, next) => {
+  if (req.headers['x-forwarded-proto'] === 'http' && process.env.NODE_ENV === 'production') {
+    return res.redirect(301, `https://${req.headers.host}${req.url}`);
+  }
   if (req.headers.accept?.includes('text/html')) {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
   }
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   next();
 });
 
