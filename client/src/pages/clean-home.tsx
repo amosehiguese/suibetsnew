@@ -425,13 +425,16 @@ export default function CleanHome() {
         </div>
       )}
 
-      {/* Hero Banner - Full image, edge-to-edge, no cropping */}
-      <div
-        className="relative w-full bg-no-repeat bg-center bg-cover"
-        style={{ backgroundImage: `url(${suibetsHeroImage})`, aspectRatio: '1341 / 400' }}
-        data-testid="hero-banner"
-      >
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#0a0e1a] pointer-events-none"></div>
+      {/* Hero Banner - Full image, no cropping, with top padding for breathing room */}
+      <div className="relative w-full bg-[#0a0e1a] pt-2" data-testid="hero-banner" style={{ lineHeight: 0 }}>
+        <img
+          src={suibetsHeroImage}
+          alt="SuiBets - Sports Betting on Sui Blockchain"
+          className="block"
+          style={{ width: '100%', height: 'auto', verticalAlign: 'top', margin: 0, padding: 0 }}
+          draggable={false}
+        />
+        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#0a0e1a] to-transparent pointer-events-none"></div>
       </div>
 
       {/* Main Content */}
