@@ -1644,21 +1644,40 @@ export class BlockchainBetService {
     }
   }
 
+  private phantomVoidStatus: { running: boolean; voided: number; skipped: number; errors: string[]; liabilityFreed: number; scanned: number; total: number; startedAt: number; completedAt?: number } | null = null;
+
+  getPhantomVoidStatus() {
+    return this.phantomVoidStatus;
+  }
+
+  canStartPhantomVoid(): { canStart: boolean; error?: string } {
+    if (this.phantomVoidStatus?.running) {
+      return { canStart: false, error: 'Void scan already in progress' };
+    }
+    const keypair = this.getAdminKeypair();
+    if (!keypair) {
+      return { canStart: false, error: 'Admin private key not configured' };
+    }
+    return { canStart: true };
+  }
+
   async voidPhantomSbetsBets(): Promise<{ voided: number; errors: string[]; skipped: number; liabilityFreed: number }> {
-    const errors: string[] = [];
-    let voided = 0;
-    let skipped = 0;
-    let liabilityFreed = 0;
+    if (this.phantomVoidStatus?.running) {
+      return { voided: 0, errors: ['Void scan already in progress'], skipped: 0, liabilityFreed: 0 };
+    }
+
+    this.phantomVoidStatus = { running: true, voided: 0, skipped: 0, errors: [], liabilityFreed: 0, scanned: 0, total: 0, startedAt: Date.now() };
 
     const keypair = this.getAdminKeypair();
     if (!keypair) {
+      this.phantomVoidStatus = { ...this.phantomVoidStatus, running: false, errors: ['Admin private key not configured'], completedAt: Date.now() };
       return { voided: 0, errors: ['Admin private key not configured'], skipped: 0, liabilityFreed: 0 };
     }
 
     try {
       console.log('🔍 Scanning for phantom SBETS bets to void...');
 
-      const sbetsBetObjects: { id: string; stake: number; potentialPayout: number; coinType: string }[] = [];
+      const sbetsBetObjects: { id: string; stake: number; potentialPayout: number }[] = [];
       const seenIds = new Set<string>();
       let cursor: any = null;
       let hasMore = true;
@@ -1678,9 +1697,7 @@ export class BlockchainBetService {
         for (const event of eventsResponse.data) {
           const parsed = event.parsedJson as any;
           const betObjectId = parsed.bet_id;
-          const coinType = parsed.coin_type === 0 ? 'SUI' : 'SBETS';
-
-          if (coinType !== 'SBETS') continue;
+          if (parsed.coin_type !== 1) continue;
           if (seenIds.has(betObjectId)) continue;
           seenIds.add(betObjectId);
 
@@ -1688,7 +1705,6 @@ export class BlockchainBetService {
             id: betObjectId,
             stake: parseInt(parsed.stake) / 1e9,
             potentialPayout: parseInt(parsed.potential_payout) / 1e9,
-            coinType,
           });
         }
 
@@ -1698,8 +1714,10 @@ export class BlockchainBetService {
 
       console.log(`📊 Scanned ${totalEvents} BetPlaced events total`);
       console.log(`🎯 Found ${sbetsBetObjects.length} unique SBETS bet objects to check`);
+      this.phantomVoidStatus.total = sbetsBetObjects.length;
 
       for (const betObj of sbetsBetObjects) {
+        this.phantomVoidStatus.scanned++;
         try {
           const obj = await this.client.getObject({
             id: betObj.id,
@@ -1707,7 +1725,7 @@ export class BlockchainBetService {
           });
 
           if (!obj.data?.content || obj.data.content.dataType !== 'moveObject') {
-            skipped++;
+            this.phantomVoidStatus.skipped++;
             continue;
           }
 
@@ -1715,16 +1733,15 @@ export class BlockchainBetService {
           const status = parseInt(fields.status || '0');
 
           if (status !== 0) {
-            skipped++;
+            this.phantomVoidStatus.skipped++;
             continue;
           }
 
           const ownerInfo = obj.data.owner;
-          const isShared = typeof ownerInfo === 'object' && ownerInfo !== null && 'Shared' in ownerInfo;
           const isObjectOwned = typeof ownerInfo === 'object' && ownerInfo !== null && 'AddressOwner' in ownerInfo;
           
           if (isObjectOwned) {
-            skipped++;
+            this.phantomVoidStatus.skipped++;
             continue;
           }
 
@@ -1732,26 +1749,31 @@ export class BlockchainBetService {
 
           const result = await this.executeVoidBetSbetsOnChain(betObj.id);
           if (result.success) {
-            voided++;
-            liabilityFreed += betObj.potentialPayout;
+            this.phantomVoidStatus.voided++;
+            this.phantomVoidStatus.liabilityFreed += betObj.potentialPayout;
             console.log(`✅ Voided: ${betObj.id.slice(0, 12)}... freed ${betObj.potentialPayout.toFixed(2)} SBETS liability | TX: ${result.txHash}`);
           } else {
-            errors.push(`Failed to void ${betObj.id.slice(0, 12)}...: ${result.error}`);
+            this.phantomVoidStatus.errors.push(`Failed to void ${betObj.id.slice(0, 12)}...: ${result.error}`);
             console.warn(`❌ Failed to void ${betObj.id.slice(0, 12)}...: ${result.error}`);
           }
 
-          await new Promise(r => setTimeout(r, 3000));
+          await new Promise(r => setTimeout(r, 2000));
         } catch (err: any) {
-          errors.push(`Error processing ${betObj.id.slice(0, 12)}...: ${err.message}`);
+          this.phantomVoidStatus.errors.push(`Error processing ${betObj.id.slice(0, 12)}...: ${err.message}`);
         }
       }
 
+      const { voided, skipped, errors, liabilityFreed } = this.phantomVoidStatus;
       console.log(`🏁 Phantom void complete: ${voided} voided, ${skipped} skipped, ${errors.length} errors, ${liabilityFreed.toFixed(2)} SBETS freed`);
-      return { voided, errors, skipped, liabilityFreed };
+      this.phantomVoidStatus.running = false;
+      this.phantomVoidStatus.completedAt = Date.now();
+      return { voided, errors: [...errors], skipped, liabilityFreed };
     } catch (error: any) {
       console.error('❌ Phantom void scan failed:', error);
-      errors.push(`Scan failed: ${error.message}`);
-      return { voided, errors, skipped, liabilityFreed };
+      this.phantomVoidStatus.errors.push(`Scan failed: ${error.message}`);
+      this.phantomVoidStatus.running = false;
+      this.phantomVoidStatus.completedAt = Date.now();
+      return { voided: this.phantomVoidStatus.voided, errors: [...this.phantomVoidStatus.errors], skipped: this.phantomVoidStatus.skipped, liabilityFreed: this.phantomVoidStatus.liabilityFreed };
     }
   }
   async depositLiquiditySbets(amount: number): Promise<{ success: boolean; txHash?: string; error?: string; deposited?: number }> {

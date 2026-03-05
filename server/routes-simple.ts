@@ -1473,17 +1473,49 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         return res.status(401).json({ success: false, message: "Unauthorized" });
       }
       
-      console.log('🗑️ Admin triggered phantom SBETS bet void...');
-      const result = await blockchainBetService.voidPhantomSbetsBets();
+      const preCheck = blockchainBetService.canStartPhantomVoid();
+      if (!preCheck.canStart) {
+        const currentStatus = blockchainBetService.getPhantomVoidStatus();
+        if (currentStatus?.running) {
+          return res.json({ success: true, message: 'Void scan already in progress', status: currentStatus });
+        }
+        return res.status(400).json({ success: false, message: preCheck.error });
+      }
+
+      console.log('🗑️ Admin triggered phantom SBETS bet void (background)...');
+      blockchainBetService.voidPhantomSbetsBets().then(result => {
+        console.log(`🏁 Background void finished: ${result.voided} voided, ${result.liabilityFreed.toFixed(2)} SBETS freed`);
+      }).catch(err => {
+        console.error('Background void error:', err);
+      });
       
       res.json({ 
         success: true, 
-        message: `Voided ${result.voided} phantom SBETS bets, freed ${result.liabilityFreed.toFixed(2)} SBETS liability`,
-        ...result,
+        message: 'Phantom void scan started in background. Poll /api/admin/void-phantom-status for progress.',
+        status: blockchainBetService.getPhantomVoidStatus(),
         timestamp: Date.now()
       });
     } catch (error: any) {
       console.error('Phantom SBETS void failed:', error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.get("/api/admin/void-phantom-status", async (req: Request, res: Response) => {
+    try {
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.replace('Bearer ', '');
+      const hasValidToken = token && isValidAdminSession(token);
+      if (!hasValidToken) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      const status = blockchainBetService.getPhantomVoidStatus();
+      if (!status) {
+        return res.json({ success: true, status: null, message: 'No void scan has been run yet' });
+      }
+      res.json({ success: true, status });
+    } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }
   });

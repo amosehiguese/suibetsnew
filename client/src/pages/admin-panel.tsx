@@ -712,6 +712,40 @@ export default function AdminPanel() {
     setLoadingLegacy(false);
   };
 
+  const pollVoidStatus = async () => {
+    try {
+      const response = await fetch('/api/admin/void-phantom-status', {
+        headers: { 'Authorization': `Bearer ${getToken()}` }
+      });
+      if (!response.ok) {
+        setVoidingPhantom(false);
+        toast({ title: 'Poll Failed', description: `Server returned ${response.status}`, variant: 'destructive' });
+        return;
+      }
+      const data = await response.json();
+      if (data.success && data.status) {
+        setVoidResult(data.status);
+        if (data.status.running) {
+          setTimeout(pollVoidStatus, 3000);
+        } else {
+          setVoidingPhantom(false);
+          fetchPlatformInfo();
+          const hasErrors = data.status.errors?.length > 0;
+          toast({
+            title: hasErrors ? 'Phantom Void Completed with Errors' : 'Phantom Void Complete',
+            description: `Voided ${data.status.voided} bets, freed ${(data.status.liabilityFreed || 0).toFixed(2)} SBETS${hasErrors ? ` (${data.status.errors.length} errors)` : ''}`,
+            variant: hasErrors ? 'destructive' : 'default',
+          });
+        }
+      } else {
+        setVoidingPhantom(false);
+      }
+    } catch (err: any) {
+      setVoidingPhantom(false);
+      toast({ title: 'Poll Error', description: err.message || 'Lost connection to server', variant: 'destructive' });
+    }
+  };
+
   const voidPhantomSbets = async () => {
     setVoidingPhantom(true);
     setVoidResult(null);
@@ -724,14 +758,20 @@ export default function AdminPanel() {
         }
       });
       const data = await response.json();
-      setVoidResult(data);
-      toast({
-        title: data.success ? 'Phantom Void Complete' : 'Void Failed',
-        description: data.message || data.error,
-        variant: data.success ? 'default' : 'destructive',
-      });
       if (data.success) {
-        fetchPlatformInfo();
+        setVoidResult(data.status);
+        toast({
+          title: 'Void Scan Started',
+          description: data.message,
+        });
+        setTimeout(pollVoidStatus, 3000);
+      } else {
+        toast({
+          title: 'Void Failed',
+          description: data.message || data.error,
+          variant: 'destructive',
+        });
+        setVoidingPhantom(false);
       }
     } catch (error: any) {
       toast({
@@ -739,8 +779,8 @@ export default function AdminPanel() {
         description: error.message || 'Failed to void phantom bets',
         variant: 'destructive',
       });
+      setVoidingPhantom(false);
     }
-    setVoidingPhantom(false);
   };
 
   const resetOnChainLiability = async (currency: 'SUI' | 'SBETS') => {
@@ -1213,26 +1253,35 @@ export default function AdminPanel() {
                     )}
                   </Button>
                   {voidResult && (
-                    <div className={`mt-4 p-4 rounded-lg ${voidResult.success ? 'bg-green-500/10 border border-green-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
-                      <p className={`text-sm font-medium ${voidResult.success ? 'text-green-400' : 'text-red-400'}`}>
-                        {voidResult.message || voidResult.error}
+                    <div className={`mt-4 p-4 rounded-lg ${voidResult.running ? 'bg-yellow-500/10 border border-yellow-500/30' : 'bg-green-500/10 border border-green-500/30'}`}>
+                      <p className={`text-sm font-medium ${voidResult.running ? 'text-yellow-400' : 'text-green-400'}`}>
+                        {voidResult.running 
+                          ? `Scanning... ${voidResult.scanned || 0}/${voidResult.total || '?'} bets checked`
+                          : `Complete: Voided ${voidResult.voided} bets, freed ${(voidResult.liabilityFreed || 0).toFixed(2)} SBETS`
+                        }
                       </p>
-                      {voidResult.success && (
-                        <div className="mt-2 grid grid-cols-3 gap-3">
-                          <div className="bg-black/40 rounded p-2">
-                            <p className="text-xs text-gray-500">Voided</p>
-                            <p className="text-lg font-bold text-green-400" data-testid="text-voided-count">{voidResult.voided}</p>
-                          </div>
-                          <div className="bg-black/40 rounded p-2">
-                            <p className="text-xs text-gray-500">Skipped</p>
-                            <p className="text-lg font-bold text-gray-400" data-testid="text-skipped-count">{voidResult.skipped}</p>
-                          </div>
-                          <div className="bg-black/40 rounded p-2">
-                            <p className="text-xs text-gray-500">SBETS Freed</p>
-                            <p className="text-lg font-bold text-cyan-400" data-testid="text-liability-freed">{voidResult.liabilityFreed?.toFixed(2) || '0'}</p>
-                          </div>
+                      {voidResult.running && voidResult.total > 0 && (
+                        <div className="mt-2 w-full bg-black/40 rounded-full h-2">
+                          <div 
+                            className="bg-yellow-500 h-2 rounded-full transition-all duration-500" 
+                            style={{ width: `${Math.min(100, (voidResult.scanned / voidResult.total) * 100)}%` }}
+                          />
                         </div>
                       )}
+                      <div className="mt-2 grid grid-cols-3 gap-3">
+                        <div className="bg-black/40 rounded p-2">
+                          <p className="text-xs text-gray-500">Voided</p>
+                          <p className="text-lg font-bold text-green-400" data-testid="text-voided-count">{voidResult.voided || 0}</p>
+                        </div>
+                        <div className="bg-black/40 rounded p-2">
+                          <p className="text-xs text-gray-500">Skipped</p>
+                          <p className="text-lg font-bold text-gray-400" data-testid="text-skipped-count">{voidResult.skipped || 0}</p>
+                        </div>
+                        <div className="bg-black/40 rounded p-2">
+                          <p className="text-xs text-gray-500">SBETS Freed</p>
+                          <p className="text-lg font-bold text-cyan-400" data-testid="text-liability-freed">{(voidResult.liabilityFreed || 0).toFixed(2)}</p>
+                        </div>
+                      </div>
                       {voidResult.errors?.length > 0 && (
                         <div className="mt-2">
                           <p className="text-xs text-red-400">Errors ({voidResult.errors.length}):</p>
