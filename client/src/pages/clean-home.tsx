@@ -426,14 +426,18 @@ export default function CleanHome() {
       )}
 
       {/* Hero Banner */}
-      <div className="relative w-full" data-testid="hero-banner">
-        <img
-          src={suibetsHeroImage}
-          alt="SuiBets - Sports Betting on Sui Blockchain"
-          className="block w-full"
-          style={{ minHeight: '350px', objectFit: 'cover', objectPosition: 'center 0px' }}
-          draggable={false}
-        />
+      <div
+        className="relative w-full"
+        data-testid="hero-banner"
+        style={{
+          backgroundImage: `url(${suibetsHeroImage})`,
+          backgroundSize: '100% auto',
+          backgroundPosition: 'top center',
+          backgroundRepeat: 'no-repeat',
+          paddingBottom: '29.83%',
+          backgroundColor: '#0a0e1a',
+        }}
+      >
         <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#0a0e1a] to-transparent pointer-events-none"></div>
       </div>
 
