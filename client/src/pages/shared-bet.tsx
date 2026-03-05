@@ -105,42 +105,67 @@ export default function SharedBetPage() {
     const isSettled = ['won', 'paid_out', 'lost', 'void'].includes(bet.status);
     const { isParlay, legs: parlayLegs } = tryParseLegs(bet);
 
-    const resolveEventId = (rawId: string | undefined): string => {
-      if (!rawId) return '';
-      if (rawId.startsWith('parlay_')) return '';
-      if (rawId.startsWith('sync_')) {
-        const parts = rawId.split('_');
-        return parts.length >= 3 ? parts[parts.length - 1] : rawId;
+    const resolveEventId = (b: SharedBetData): string => {
+      const extId = b.externalEventId || '';
+      if (extId && !extId.startsWith('parlay_') && !extId.startsWith('sync_')) {
+        return extId;
       }
-      return rawId;
+      const eid = String(b.eventId || '');
+      if (eid && eid !== '0' && eid !== 'null' && eid !== 'undefined') {
+        return eid;
+      }
+      return '';
     };
 
-    const checkEventAvailable = async (eventId: string): Promise<boolean> => {
-      if (!eventId) return false;
+    const extractParlayLegEventIds = (extId: string): string[] => {
+      if (!extId || !extId.startsWith('parlay_')) return [];
+      const parts = extId.split('_');
+      const legIds: string[] = [];
+      let i = 2;
+      while (i < parts.length) {
+        if (/^\d+$/.test(parts[i])) {
+          legIds.push(parts[i]);
+          i++;
+        } else if (i + 1 < parts.length && /^\d+$/.test(parts[i + 1])) {
+          legIds.push(`${parts[i]}_${parts[i + 1]}`);
+          i += 2;
+        } else {
+          i++;
+        }
+      }
+      return legIds;
+    };
+
+    const checkEventAvailable = async (eventId: string): Promise<{ available: boolean; homeTeam?: string; awayTeam?: string }> => {
+      if (!eventId) return { available: false };
       try {
         const resp = await fetch(`/api/events/check/${encodeURIComponent(eventId)}`);
-        if (!resp.ok) return false;
+        if (!resp.ok) return { available: false };
         const data = await resp.json();
-        return data.available === true;
+        return { available: data.available === true, homeTeam: data.homeTeam, awayTeam: data.awayTeam };
       } catch {
-        return false;
+        return { available: false };
       }
     };
 
-    const primaryEventId = resolveEventId(bet.externalEventId || bet.eventId);
-
     if (isParlay) {
+      const parlayExtId = bet.externalEventId || '';
+      const extractedLegIds = extractParlayLegEventIds(parlayExtId);
+      
       let addedCount = 0;
       let unavailableCount = 0;
       for (let idx = 0; idx < parlayLegs.length; idx++) {
         const leg = parlayLegs[idx];
-        const legEventId = resolveEventId(leg.eventId);
+        let legEventId = leg.eventId || leg.externalEventId || '';
+        if ((!legEventId || legEventId.startsWith('sync_')) && extractedLegIds[idx]) {
+          legEventId = extractedLegIds[idx];
+        }
         if (!legEventId) {
           unavailableCount++;
           continue;
         }
-        const available = await checkEventAvailable(legEventId);
-        if (!available) {
+        const check = await checkEventAvailable(legEventId);
+        if (!check.available) {
           unavailableCount++;
           continue;
         }
@@ -153,8 +178,8 @@ export default function SharedBetPage() {
           stake: 0,
           market: leg.marketId || 'match-winner',
           currency: getCurrency(bet) as 'SUI' | 'SBETS',
-          homeTeam: leg.homeTeam,
-          awayTeam: leg.awayTeam,
+          homeTeam: check.homeTeam || leg.homeTeam,
+          awayTeam: check.awayTeam || leg.awayTeam,
         });
         addedCount++;
       }
@@ -181,6 +206,7 @@ export default function SharedBetPage() {
         });
       }
     } else {
+      const primaryEventId = resolveEventId(bet);
       if (!primaryEventId) {
         toast({
           title: 'Cannot Copy This Bet',
@@ -190,8 +216,8 @@ export default function SharedBetPage() {
         setCopyLoading(false);
         return;
       }
-      const available = await checkEventAvailable(primaryEventId);
-      if (!available) {
+      const check = await checkEventAvailable(primaryEventId);
+      if (!check.available) {
         toast({
           title: 'Event No Longer Available',
           description: isSettled
@@ -211,8 +237,8 @@ export default function SharedBetPage() {
         stake: 0,
         market: bet.marketId || 'match-winner',
         currency: getCurrency(bet) as 'SUI' | 'SBETS',
-        homeTeam: bet.homeTeam,
-        awayTeam: bet.awayTeam,
+        homeTeam: check.homeTeam || bet.homeTeam,
+        awayTeam: check.awayTeam || bet.awayTeam,
       });
       toast({
         title: 'Bet Copied!',

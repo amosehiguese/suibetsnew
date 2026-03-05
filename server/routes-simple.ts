@@ -1971,49 +1971,63 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
 
   app.get("/api/events/check/:eventId", async (req: Request, res: Response) => {
     try {
-      const eventId = req.params.eventId;
-      const lookup = apiSportsService.lookupEventSync(eventId);
-      if (lookup.found) {
-        const isAvailable = lookup.source === 'upcoming' || (lookup.isLive && lookup.minute !== undefined && lookup.minute < 45);
-        return res.json({
-          available: isAvailable,
-          isLive: lookup.isLive,
-          source: lookup.source,
-          homeTeam: lookup.homeTeam,
-          awayTeam: lookup.awayTeam,
-          startTime: lookup.startTime,
-          shouldBeLive: lookup.shouldBeLive,
-        });
+      const rawEventId = req.params.eventId;
+      const idsToTry: string[] = [rawEventId];
+      if (rawEventId.startsWith('sync_')) {
+        const cleaned = rawEventId.replace(/^sync_0x[a-fA-F0-9]+_/, '');
+        if (cleaned && cleaned !== rawEventId) idsToTry.push(cleaned);
       }
-      const freeLookup = freeSportsService.lookupEvent(eventId);
-      if (freeLookup.found && freeLookup.event) {
-        const now = new Date();
-        const eventStart = freeLookup.event.startTime ? new Date(freeLookup.event.startTime) : null;
-        const hasStarted = eventStart ? eventStart <= now : false;
-        return res.json({
-          available: !hasStarted,
-          isLive: false,
-          source: 'free',
-          homeTeam: freeLookup.event.homeTeam,
-          awayTeam: freeLookup.event.awayTeam,
-          startTime: freeLookup.event.startTime,
-          shouldBeLive: hasStarted,
-        });
+      if (/^\d+$/.test(rawEventId)) {
+        const sportPrefixes = ['basketball', 'ice-hockey', 'baseball', 'handball', 'rugby', 'volleyball', 'mma', 'american-football', 'afl', 'formula-1', 'boxing', 'esports'];
+        for (const prefix of sportPrefixes) {
+          idsToTry.push(`${prefix}_${rawEventId}`);
+        }
       }
-      const esportsLookup = esportsService.lookupEvent(eventId);
-      if (esportsLookup.found && esportsLookup.event) {
-        const now = new Date();
-        const eventStart = esportsLookup.event.startTime ? new Date(esportsLookup.event.startTime) : null;
-        const hasStarted = eventStart ? eventStart <= now : false;
-        return res.json({
-          available: !hasStarted,
-          isLive: false,
-          source: 'esports',
-          homeTeam: esportsLookup.event.homeTeam,
-          awayTeam: esportsLookup.event.awayTeam,
-          startTime: esportsLookup.event.startTime,
-          shouldBeLive: hasStarted,
-        });
+
+      for (const eventId of idsToTry) {
+        const lookup = apiSportsService.lookupEventSync(eventId);
+        if (lookup.found) {
+          const isAvailable = lookup.source === 'upcoming' || (lookup.isLive && lookup.minute !== undefined && lookup.minute < 45);
+          return res.json({
+            available: isAvailable,
+            isLive: lookup.isLive,
+            source: lookup.source,
+            homeTeam: lookup.homeTeam,
+            awayTeam: lookup.awayTeam,
+            startTime: lookup.startTime,
+            shouldBeLive: lookup.shouldBeLive,
+          });
+        }
+        const freeLookup = freeSportsService.lookupEvent(eventId);
+        if (freeLookup.found && freeLookup.event) {
+          const now = new Date();
+          const eventStart = freeLookup.event.startTime ? new Date(freeLookup.event.startTime) : null;
+          const hasStarted = eventStart ? eventStart <= now : false;
+          return res.json({
+            available: !hasStarted,
+            isLive: false,
+            source: 'free',
+            homeTeam: freeLookup.event.homeTeam,
+            awayTeam: freeLookup.event.awayTeam,
+            startTime: freeLookup.event.startTime,
+            shouldBeLive: hasStarted,
+          });
+        }
+        const esportsLookup = esportsService.lookupEvent(eventId);
+        if (esportsLookup.found && esportsLookup.event) {
+          const now = new Date();
+          const eventStart = esportsLookup.event.startTime ? new Date(esportsLookup.event.startTime) : null;
+          const hasStarted = eventStart ? eventStart <= now : false;
+          return res.json({
+            available: !hasStarted,
+            isLive: false,
+            source: 'esports',
+            homeTeam: esportsLookup.event.homeTeam,
+            awayTeam: esportsLookup.event.awayTeam,
+            startTime: esportsLookup.event.startTime,
+            shouldBeLive: hasStarted,
+          });
+        }
       }
       return res.json({ available: false });
     } catch (error) {
