@@ -30,8 +30,9 @@ interface UnsettledBet {
   potentialWin: number;
   userId: string;
   currency: string;
-  betObjectId?: string; // On-chain Sui bet object ID (for SUI bets placed via contract)
-  status?: string; // 'pending', 'confirmed', or 'won' (won = already determined winner needing payout)
+  betObjectId?: string;
+  status?: string;
+  giftedTo?: string;
 }
 
 const REVENUE_WALLET = 'platform_revenue';
@@ -713,10 +714,11 @@ class SettlementWorkerService {
     const isSbetsOnChainBet = bet.currency === 'SBETS' && hasOnChainBet;
     const isSuiOnChainBet = bet.currency === 'SUI' && hasOnChainBet;
     
-    if (isSuiOnChainBet || isSbetsOnChainBet) {
+    const isGiftParlay = !!bet.giftedTo && bet.giftedTo !== bet.userId;
+    
+    if ((isSuiOnChainBet || isSbetsOnChainBet) && !isGiftParlay) {
       console.log(`🔗 ON-CHAIN PARLAY SETTLEMENT: Bet ${bet.id.slice(0, 10)}... via smart contract`);
       
-      // PRE-CHECK: Verify bet isn't already settled on-chain
       const onChainInfo = await blockchainBetService.getOnChainBetInfo(bet.betObjectId!);
       if (onChainInfo?.settled) {
         console.log(`⚠️ PARLAY ALREADY SETTLED ON-CHAIN: ${bet.betObjectId} - contract handled payout, updating database`);
@@ -733,7 +735,6 @@ class SettlementWorkerService {
         return;
       }
       
-      // Small delay between on-chain transactions
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       const settlementResult = await blockchainBetService.executeSettleBetOnChain(
@@ -1248,8 +1249,9 @@ class SettlementWorkerService {
           potentialWin: bet.potentialWin || bet.potentialPayout,
           userId: bet.walletAddress || bet.userId || 'unknown',
           currency: bet.currency || 'SUI',
-          betObjectId: bet.betObjectId || undefined, // On-chain bet object ID for SUI bets
-          status: bet.status // Include status to identify already-won bets needing payout
+          betObjectId: bet.betObjectId || undefined,
+          status: bet.status,
+          giftedTo: bet.giftedTo || undefined,
         }));
     } catch (error) {
       console.error('Error getting unsettled bets:', error);
@@ -1330,7 +1332,8 @@ class SettlementWorkerService {
         const profit = grossPayout - bet.stake;
         const platformFee = profit > 0 ? profit * 0.01 : 0;
         const netPayout = grossPayout - platformFee;
-        const userWallet = bet.userId;
+        const isGiftBetRetry = !!bet.giftedTo && bet.giftedTo !== bet.userId;
+        const userWallet = isGiftBetRetry ? bet.giftedTo! : bet.userId;
 
         if (!userWallet || !userWallet.startsWith('0x') || userWallet.length < 64) {
           console.log(`ℹ️ PAYOUT SKIP: Bet ${bet.id} has no valid wallet address - internal balance only`);
@@ -1341,34 +1344,53 @@ class SettlementWorkerService {
         if (bet.betObjectId && blockchainBetService.isAdminKeyConfigured()) {
           const onChainInfo = await blockchainBetService.getOnChainBetInfo(bet.betObjectId);
           if (onChainInfo && !onChainInfo.settled) {
-            console.log(`🔗 PAYOUT RETRY ON-CHAIN: Bet ${bet.id} - attempting smart contract settlement`);
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            const settlementResult = bet.currency === 'SBETS' 
-              ? await blockchainBetService.executeSettleBetSbetsOnChain(bet.betObjectId, true)
-              : await blockchainBetService.executeSettleBetOnChain(bet.betObjectId, true);
-            
-            if (settlementResult.success) {
-              await storage.updateBetStatus(bet.id, 'paid_out', grossPayout, settlementResult.txHash);
-              console.log(`✅ PAYOUT RETRY ON-CHAIN SUCCESS: Bet ${bet.id} | TX: ${settlementResult.txHash}`);
-              this.settledBetIds.add(bet.id);
-              continue;
+            if (isGiftBetRetry) {
+              console.log(`🎁 PAYOUT RETRY GIFT: Bet ${bet.id} - voiding on-chain, sending to gift recipient ${userWallet.slice(0,10)}...`);
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              const voidResult = bet.currency === 'SBETS'
+                ? await blockchainBetService.executeVoidBetSbetsOnChain(bet.betObjectId)
+                : await blockchainBetService.executeVoidBetOnChain(bet.betObjectId);
+              if (!voidResult.success) {
+                console.warn(`⚠️ GIFT PAYOUT RETRY VOID FAILED: ${voidResult.error}`);
+              }
+            } else {
+              console.log(`🔗 PAYOUT RETRY ON-CHAIN: Bet ${bet.id} - attempting smart contract settlement`);
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              const settlementResult = bet.currency === 'SBETS' 
+                ? await blockchainBetService.executeSettleBetSbetsOnChain(bet.betObjectId, true)
+                : await blockchainBetService.executeSettleBetOnChain(bet.betObjectId, true);
+              
+              if (settlementResult.success) {
+                await storage.updateBetStatus(bet.id, 'paid_out', grossPayout, settlementResult.txHash);
+                console.log(`✅ PAYOUT RETRY ON-CHAIN SUCCESS: Bet ${bet.id} | TX: ${settlementResult.txHash}`);
+                this.settledBetIds.add(bet.id);
+                continue;
+              }
+              if (settlementResult.error?.includes('cannot settle owned objects')) {
+                console.warn(`🛑 PAYOUT PERMANENTLY SKIPPED: Bet ${bet.id} - ${settlementResult.error}`);
+                this.ownedBetIds.add(bet.id);
+                this.settledBetIds.add(bet.id);
+                continue;
+              }
+              console.warn(`⚠️ PAYOUT RETRY ON-CHAIN FAILED: ${settlementResult.error} - falling back to direct transfer`);
             }
-            if (settlementResult.error?.includes('cannot settle owned objects')) {
-              console.warn(`🛑 PAYOUT PERMANENTLY SKIPPED: Bet ${bet.id} - ${settlementResult.error}`);
-              this.ownedBetIds.add(bet.id);
-              this.settledBetIds.add(bet.id);
-              continue;
-            }
-            console.warn(`⚠️ PAYOUT RETRY ON-CHAIN FAILED: ${settlementResult.error} - falling back to direct transfer`);
           } else if (onChainInfo?.settled) {
-            console.log(`✅ PAYOUT RETRY: Bet ${bet.id} already settled on-chain - marking paid_out`);
-            await storage.updateBetStatus(bet.id, 'paid_out', grossPayout, `verified-on-chain-${bet.betObjectId?.slice(0,16)}`);
-            this.settledBetIds.add(bet.id);
-            continue;
+            if (isGiftBetRetry) {
+              console.log(`🎁 PAYOUT RETRY: Gift bet ${bet.id} settled on-chain to wrong wallet - sending to recipient`);
+            } else {
+              console.log(`✅ PAYOUT RETRY: Bet ${bet.id} already settled on-chain - marking paid_out`);
+              await storage.updateBetStatus(bet.id, 'paid_out', grossPayout, `verified-on-chain-${bet.betObjectId?.slice(0,16)}`);
+              this.settledBetIds.add(bet.id);
+              continue;
+            }
           }
         }
 
-        console.log(`🔄 PAYOUT RETRY DIRECT: Bet ${bet.id} - sending ${netPayout} ${bet.currency} to ${userWallet.slice(0,10)}... (attempt ${retries + 1})`);
+        if (isGiftBetRetry) {
+          console.log(`🎁 GIFT PAYOUT RETRY: Bet ${bet.id} - sending ${netPayout} ${bet.currency} to recipient ${userWallet.slice(0,10)}... (attempt ${retries + 1})`);
+        } else {
+          console.log(`🔄 PAYOUT RETRY DIRECT: Bet ${bet.id} - sending ${netPayout} ${bet.currency} to ${userWallet.slice(0,10)}... (attempt ${retries + 1})`);
+        }
         let payoutResult;
         if (bet.currency === 'SUI') {
           payoutResult = await blockchainBetService.sendSuiToUser(userWallet, netPayout);
@@ -1436,10 +1458,30 @@ class SettlementWorkerService {
           console.warn(`⚠️ ADMIN_PRIVATE_KEY not configured - all settlements will use OFF-CHAIN fallback`);
         }
 
-        if (isSuiOnChainBet) {
+        // GIFT BET FIX: Smart contract pays bet.bettor (the sender). For gift bets where
+        // the payout must go to giftedTo (the recipient), skip on-chain settlement entirely
+        // and fall through to the off-chain path which correctly routes to giftedTo.
+        const isGiftBet = !!bet.giftedTo && bet.giftedTo !== bet.userId;
+        if (isGiftBet && (isSuiOnChainBet || isSbetsOnChainBet)) {
+          console.log(`🎁 GIFT BET DETECTED: ${bet.id} (${bet.currency}) - skipping on-chain settlement, using off-chain path to route payout to ${bet.giftedTo!.slice(0,10)}...`);
+          if (bet.betObjectId) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            const onChainInfo = await blockchainBetService.getOnChainBetInfo(bet.betObjectId);
+            if (onChainInfo && !onChainInfo.settled) {
+              const settleAsLost = bet.currency === 'SBETS'
+                ? await blockchainBetService.executeSettleBetSbetsOnChain(bet.betObjectId, false)
+                : await blockchainBetService.executeSettleBetOnChain(bet.betObjectId, false);
+              if (settleAsLost.success) {
+                console.log(`✅ GIFT BET ON-CHAIN CLEARED (settled as lost to keep stake in treasury): TX ${settleAsLost.txHash}`);
+              } else {
+                console.warn(`⚠️ GIFT BET ON-CHAIN CLEAR FAILED: ${settleAsLost.error} - proceeding with off-chain payout anyway`);
+              }
+            }
+          }
+        }
+
+        if (isSuiOnChainBet && !isGiftBet) {
           // ============ ON-CHAIN SETTLEMENT (SUI via smart contract) ============
-          // Contract handles payout directly - winner gets SUI from contract treasury
-          // Lost bets stay in contract treasury as accrued fees
           console.log(`🔗 ON-CHAIN SUI SETTLEMENT: Bet ${bet.id} via smart contract`);
           
           // PRE-CHECK 1: Verify treasury has enough balance for winners
@@ -1448,7 +1490,6 @@ class SettlementWorkerService {
             if (platformInfo && platformInfo.treasuryBalanceSui < grossPayout) {
               console.warn(`⚠️ INSUFFICIENT TREASURY: Need ${grossPayout} SUI but only ${platformInfo.treasuryBalanceSui} SUI available`);
               console.warn(`   Bet ${bet.id} requires manual admin resolution - marking as won in DB`);
-              // Mark as won but NOT paid_out - admin needs to manually add treasury funds and settle
               await storage.updateBetStatus(bet.id, 'won', grossPayout);
               this.settledBetIds.add(bet.id);
               continue;
@@ -1466,13 +1507,11 @@ class SettlementWorkerService {
           }
           
           if (!onChainInfo) {
-            // Bet object not found on-chain - mark for manual resolution
             console.warn(`⚠️ BET OBJECT NOT FOUND ON-CHAIN: ${bet.betObjectId} - marking for manual resolution`);
             await storage.updateBetStatus(bet.id, isWinner ? 'won' : 'lost', grossPayout);
             this.settledBetIds.add(bet.id);
             continue;
           } else {
-            // Small delay between on-chain transactions to prevent object version conflicts
             await new Promise(resolve => setTimeout(resolve, 2000));
             
             const settlementResult = await blockchainBetService.executeSettleBetOnChain(
@@ -1481,8 +1520,6 @@ class SettlementWorkerService {
             );
 
             if (settlementResult.success) {
-              // Update database status to reflect on-chain settlement
-              // Use 'paid_out' for winners since payout was sent, 'lost' for losers
               const finalStatus = isWinner ? 'paid_out' : 'lost';
               const statusUpdated = await storage.updateBetStatus(bet.id, finalStatus, grossPayout, settlementResult.txHash);
               if (statusUpdated) {
@@ -1535,10 +1572,9 @@ class SettlementWorkerService {
           }
         }
         
-        // Check for SBETS on-chain bets separately
-        if (isSbetsOnChainBet) {
+        // Check for SBETS on-chain bets separately (gift bets already handled above)
+        if (isSbetsOnChainBet && !isGiftBet) {
           // ============ ON-CHAIN SETTLEMENT (SBETS via smart contract) ============
-          // Contract handles payout directly - winner gets SBETS from contract treasury
           console.log(`🔗 ON-CHAIN SBETS SETTLEMENT: Bet ${bet.id} via smart contract`);
           
           // PRE-CHECK 1: Verify treasury has enough SBETS balance for winners
@@ -1547,7 +1583,6 @@ class SettlementWorkerService {
             if (platformInfo && platformInfo.treasuryBalanceSbets < grossPayout) {
               console.warn(`⚠️ INSUFFICIENT SBETS TREASURY: Need ${grossPayout} SBETS but only ${platformInfo.treasuryBalanceSbets} SBETS available`);
               console.warn(`   Bet ${bet.id} requires manual admin resolution - marking as won in DB`);
-              // Mark as won but NOT paid_out - admin needs to manually add treasury funds and settle
               await storage.updateBetStatus(bet.id, 'won', grossPayout);
               this.settledBetIds.add(bet.id);
               continue;
@@ -1565,13 +1600,11 @@ class SettlementWorkerService {
           }
           
           if (!onChainInfo) {
-            // Bet object not found on-chain - mark for manual resolution
             console.warn(`⚠️ SBETS BET OBJECT NOT FOUND ON-CHAIN: ${bet.betObjectId} - marking for manual resolution`);
             await storage.updateBetStatus(bet.id, isWinner ? 'won' : 'lost', grossPayout);
             this.settledBetIds.add(bet.id);
             continue;
           } else {
-            // Small delay between on-chain transactions to prevent object version conflicts
             await new Promise(resolve => setTimeout(resolve, 2000));
             
             const settlementResult = await blockchainBetService.executeSettleBetSbetsOnChain(
@@ -1580,7 +1613,6 @@ class SettlementWorkerService {
             );
 
             if (settlementResult.success) {
-              // Use 'paid_out' for winners since payout was sent, 'lost' for losers
               const finalStatus = isWinner ? 'paid_out' : 'lost';
               const statusUpdated = await storage.updateBetStatus(bet.id, finalStatus, grossPayout, settlementResult.txHash);
               if (statusUpdated) {
