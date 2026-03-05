@@ -17,7 +17,7 @@ import Footer from "@/components/layout/Footer";
 import { useLiveEvents, useUpcomingEvents } from "@/hooks/useEvents";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import suibetsHeroImage from "@assets/image_1772732892909.png";
+import suibetsHeroImage from "@assets/image_1772735379474.png";
 
 // Favorites management using localStorage
 const FAVORITES_KEY = 'suibets_favorites';
@@ -426,12 +426,12 @@ export default function CleanHome() {
       )}
 
       {/* Hero Banner */}
-      <div className="relative w-full mt-6" data-testid="hero-banner">
+      <div className="relative w-full" data-testid="hero-banner">
         <img
           src={suibetsHeroImage}
           alt="SuiBets - Sports Betting on Sui Blockchain"
           draggable={false}
-          style={{ display: 'block', width: '100%', height: 'auto', minHeight: '300px' }}
+          style={{ display: 'block', width: '100%', height: 'auto' }}
         />
         <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#0a0e1a] to-transparent pointer-events-none"></div>
       </div>
