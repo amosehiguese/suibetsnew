@@ -139,7 +139,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
   'horse-racing': {
     endpoint: 'https://the-racing-api1.p.rapidapi.com/v1/racecards/free',
     apiHost: 'the-racing-api1.p.rapidapi.com',
-    sportId: 18,
+    sportId: 17,
     name: 'Horse Racing',
     hasDraws: false,
     daysAhead: 1,
@@ -383,8 +383,15 @@ export class FreeSportsService {
         try {
           const raceName = race.race || race.name || race.race_name || race.title || 'Horse Race';
           const course = race.course || race.venue || race.track || race.course_name || 'Racecourse';
-          const raceId = String(race.id || race.race_id || `hr-${Math.random().toString(36).slice(2,8)}`);
-          const startTime = safeParseDate(race);
+          const raceId = String(race.race_id || race.id || `hr-${Math.random().toString(36).slice(2,8)}`);
+          let startTime: string;
+          if (race.off_dt) {
+            try { startTime = new Date(race.off_dt).toISOString(); } catch { startTime = safeParseDate(race); }
+          } else if (race.off_time && race.date) {
+            try { startTime = new Date(`${race.date}T${race.off_time}:00Z`).toISOString(); } catch { startTime = safeParseDate(race); }
+          } else {
+            startTime = safeParseDate(race);
+          }
 
           let runners = race.runners || race.horses || race.entries || [];
           let homeTeam = raceName;
@@ -405,7 +412,7 @@ export class FreeSportsService {
 
           events.push({
             id: `horse-racing_${raceId}`,
-            sportId: 18,
+            sportId: 17,
             leagueName: course,
             homeTeam,
             awayTeam,
