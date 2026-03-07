@@ -919,21 +919,20 @@ export class FreeSportsService {
           const raceStart = new Date(race.off_dt).getTime();
           if (isNaN(raceStart) || raceStart < now) continue;
 
-          const runners = race.runners.slice(0, 12);
-          const topRunners = runners.slice(0, 6);
+          const runners = race.runners.slice(0, 20);
 
           const fieldSize = runners.length;
-          const rawPowers = topRunners.map((runner: any, idx: number) => {
+          const rawPowers = runners.map((runner: any, idx: number) => {
             const formScore = this.calculateFormScore(runner.form || '');
             const drawAdv = (runner.draw && runner.draw <= 4) ? 0.15 : 0;
             const weightPen = runner.lbs ? Math.max(0, (runner.lbs - 140) * 0.003) : 0;
-            const positionBias = idx * 0.08;
+            const positionBias = idx * 0.05;
             return Math.max(0.05, 1.8 + formScore * 0.7 + drawAdv - weightPen - positionBias);
           });
           const totalPower = rawPowers.reduce((s: number, v: number) => s + v, 0);
-          const RACE_MARGIN = 1.15 + (fieldSize > 8 ? 0.05 : 0);
+          const RACE_MARGIN = 1.15 + (fieldSize > 8 ? 0.05 : 0) + (fieldSize > 14 ? 0.05 : 0);
 
-          const outcomes: OutcomeData[] = topRunners.map((runner: any, idx: number) => {
+          const outcomes: OutcomeData[] = runners.map((runner: any, idx: number) => {
             const prob = rawPowers[idx] / totalPower;
             const jitter = (Math.random() - 0.5) * 0.02;
             const adjProb = Math.max(0.03, Math.min(0.80, prob + jitter));
