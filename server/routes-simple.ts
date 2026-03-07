@@ -2041,7 +2041,7 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       }
       
       // FAST PATH: Free sports (non-football, non-esports) - return from daily cache
-      const FREE_SPORT_IDS = [2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 17];
+      const FREE_SPORT_IDS = [2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 17, 18];
       if (reqSportId && FREE_SPORT_IDS.includes(reqSportId)) {
         const freeSportsEvents = freeSportsService.getUpcomingEvents();
         const now = Date.now();

@@ -132,7 +132,17 @@ async function seedSports() {
     const existingSports = await db.select().from(schema.sports);
     
     if (existingSports.length > 0) {
-      console.log(`Found ${existingSports.length} existing sports, skipping seed`);
+      console.log(`Found ${existingSports.length} existing sports, checking for missing sports...`);
+      const existingSlugs = new Set(existingSports.map((s: any) => s.slug));
+      const missingSports = [
+        { name: 'Horse Racing', slug: 'horse-racing', icon: '🏇', wurlusSportId: 'horse_racing_wurlus_id', isActive: true, providerId: 'sports_provider_1' },
+        { name: 'Cricket', slug: 'cricket', icon: '🏏', wurlusSportId: 'cricket_wurlus_id', isActive: true, providerId: 'sports_provider_1' },
+        { name: 'Boxing', slug: 'boxing', icon: '🥊', wurlusSportId: 'boxing_wurlus_id', isActive: true, providerId: 'sports_provider_1' },
+      ].filter(s => !existingSlugs.has(s.slug));
+      if (missingSports.length > 0) {
+        await db.insert(schema.sports).values(missingSports);
+        console.log(`Added ${missingSports.length} missing sports: ${missingSports.map(s => s.name).join(', ')}`);
+      }
       return;
     }
     
@@ -266,6 +276,14 @@ async function seedSports() {
         slug: 'volleyball',
         icon: '🏐',
         wurlusSportId: 'volleyball_wurlus_id',
+        isActive: true,
+        providerId: 'sports_provider_1'
+      },
+      { 
+        name: 'Horse Racing', 
+        slug: 'horse-racing',
+        icon: '🏇',
+        wurlusSportId: 'horse_racing_wurlus_id',
         isActive: true,
         providerId: 'sports_provider_1'
       }

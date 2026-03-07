@@ -168,6 +168,9 @@ const FREE_SPORTS_CONFIG: Record<string, {
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '';
 const CRICBUZZ_BASE_URL = 'https://free-cricbuzz-cricket-api.p.rapidapi.com';
 const CRICKET_SPORT_ID = 9;
+const HORSE_RACING_SPORT_ID = 18;
+const RACING_API_BASE = 'https://the-racing-api1.p.rapidapi.com';
+const RACING_API_HOST = 'the-racing-api1.p.rapidapi.com';
 
 const MMA_ORGANIZATIONS = new Set([
   'ufc', 'bellator', 'one championship', 'one fc', 'pfl', 'cage warriors',
@@ -350,6 +353,15 @@ export class FreeSportsService {
       }
     } catch (error: any) {
       console.error(`[FreeSports] Cricket fetch error:`, error.message);
+    }
+
+    try {
+      const horseRacingEvents = await this.fetchHorseRacing();
+      if (horseRacingEvents.length > 0) {
+        allEvents.push(...horseRacingEvents);
+      }
+    } catch (error: any) {
+      console.error(`[FreeSports] Horse Racing fetch error:`, error.message);
     }
 
     try {
@@ -913,6 +925,130 @@ export class FreeSportsService {
     }
   }
 
+  private async fetchHorseRacing(): Promise<SportEvent[]> {
+    if (!RAPIDAPI_KEY) {
+      console.warn('[FreeSports] No RAPIDAPI_KEY set, skipping horse racing');
+      return [];
+    }
+
+    try {
+      console.log('[FreeSports] 🏇 Fetching horse racing from The Racing API...');
+      const events: SportEvent[] = [];
+      const now = Date.now();
+
+      for (const day of ['today', 'tomorrow']) {
+        const response = await axios.get(`${RACING_API_BASE}/v1/racecards/free?day=${day}`, {
+          headers: {
+            'x-rapidapi-host': RACING_API_HOST,
+            'x-rapidapi-key': RAPIDAPI_KEY,
+            'Accept': 'application/json'
+          },
+          timeout: 15000
+        });
+
+        const racecards = response.data?.racecards || [];
+
+        for (const race of racecards) {
+          if (!race.race_id || !race.runners || race.runners.length < 2) continue;
+
+          const raceStart = new Date(race.off_dt).getTime();
+          if (isNaN(raceStart) || raceStart < now) continue;
+
+          const runners = race.runners.slice(0, 12);
+          const topRunners = runners.slice(0, 6);
+
+          const outcomes: OutcomeData[] = topRunners.map((runner: any, idx: number) => {
+            const formScore = this.calculateFormScore(runner.form || '');
+            const baseOdds = 2.5 + (idx * 1.2) + (Math.random() * 1.5) - formScore;
+            const odds = Math.max(1.5, parseFloat(baseOdds.toFixed(2)));
+            return {
+              id: `runner_${runner.number || idx}`,
+              name: runner.horse || `Runner ${idx + 1}`,
+              odds,
+              probability: 1 / odds
+            };
+          });
+
+          const markets: MarketData[] = [
+            { id: 'race_winner', name: 'Race Winner', outcomes }
+          ];
+
+          const courseName = race.course || 'Unknown Course';
+          const region = race.region || '';
+          const raceType = race.type || 'Flat';
+          const distance = race.distance_f ? `${race.distance_f}f` : '';
+          const going = race.going || '';
+          const raceClass = race.race_class || '';
+
+          const runnersInfo = runners.map((r: any) => ({
+            name: r.horse,
+            number: r.number,
+            jockey: r.jockey,
+            trainer: r.trainer,
+            form: r.form,
+            age: r.age,
+            weight: r.lbs,
+            draw: r.draw,
+            headgear: r.headgear,
+            sire: r.sire,
+            dam: r.dam,
+          }));
+
+          events.push({
+            id: `horse-racing_${race.race_id}`,
+            sportId: HORSE_RACING_SPORT_ID,
+            leagueName: `${courseName} (${region})`,
+            homeTeam: race.race_name || 'Race',
+            awayTeam: `${raceType} ${distance} - ${going}`.trim(),
+            startTime: new Date(raceStart).toISOString(),
+            status: 'scheduled',
+            isLive: false,
+            markets,
+            homeOdds: outcomes[0]?.odds || 3.0,
+            awayOdds: outcomes[1]?.odds || 4.0,
+            venue: courseName,
+            runnersInfo,
+            raceDetails: {
+              course: courseName,
+              region,
+              raceType,
+              distance,
+              going,
+              surface: race.surface || 'Turf',
+              raceClass,
+              prize: race.prize || '',
+              fieldSize: parseInt(race.field_size) || runners.length,
+              ageBand: race.age_band || '',
+              pattern: race.pattern || '',
+            },
+          } as SportEvent);
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      console.log(`[FreeSports] 🏇 Horse Racing: ${events.length} races fetched (today + tomorrow)`);
+      return events;
+    } catch (error: any) {
+      console.error(`[FreeSports] 🏇 Horse Racing fetch error: ${error.message}`);
+      return [];
+    }
+  }
+
+  private calculateFormScore(form: string): number {
+    if (!form || form === '-') return 0;
+    const recent = form.replace(/[^0-9]/g, '').slice(-3);
+    let score = 0;
+    for (const ch of recent) {
+      const pos = parseInt(ch);
+      if (pos === 1) score += 1.5;
+      else if (pos === 2) score += 1.0;
+      else if (pos === 3) score += 0.5;
+      else if (pos <= 5) score += 0.2;
+    }
+    return score;
+  }
+
   /**
    * Get cached upcoming events for a specific sport
    */
@@ -920,6 +1056,9 @@ export class FreeSportsService {
     if (sportSlug) {
       if (sportSlug === 'cricket') {
         return cachedFreeSportsEvents.filter(e => e.sportId === CRICKET_SPORT_ID);
+      }
+      if (sportSlug === 'horse-racing') {
+        return cachedFreeSportsEvents.filter(e => e.sportId === HORSE_RACING_SPORT_ID);
       }
       const config = FREE_SPORTS_CONFIG[sportSlug];
       if (config) {
@@ -937,6 +1076,7 @@ export class FreeSportsService {
     const sports = Object.keys(FREE_SPORTS_CONFIG);
     if (!sports.includes('boxing')) sports.push('boxing');
     if (!sports.includes('cricket')) sports.push('cricket');
+    if (!sports.includes('horse-racing')) sports.push('horse-racing');
     return sports;
   }
 

@@ -41,7 +41,7 @@ const SPORTS_MAPPING: Record<string, number> = {
   'motorsport': 23,
   'racing': 23,
   'motogp': 23,
-  'horse-racing': 23,
+  'horse-racing': 18,
   'netball': 25,
   'snooker': 26,
   'darts': 27,
@@ -55,7 +55,7 @@ export default function SportPage() {
   const [match, params] = useRoute<{ sport: string }>('/sports-live/:sport');
   const { toast } = useToast();
   const sportSlugLower = match ? params.sport.toLowerCase() : '';
-  const noLiveSports = ['esports', 'afl', 'formula-1', 'handball', 'rugby', 'volleyball', 'boxing', 'netball', 'mma', 'mma-ufc', 'ufc', 'tennis', 'american-football', 'nfl', 'cricket'];
+  const noLiveSports = ['esports', 'afl', 'formula-1', 'handball', 'rugby', 'volleyball', 'boxing', 'netball', 'mma', 'mma-ufc', 'ufc', 'tennis', 'american-football', 'nfl', 'cricket', 'horse-racing'];
   const defaultTab = noLiveSports.includes(sportSlugLower) ? 'upcoming' : 'live';
   const [selectedTab, setSelectedTab] = useState<'live' | 'upcoming'>(defaultTab);
   

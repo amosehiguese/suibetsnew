@@ -250,65 +250,132 @@ export function AuthenticEventsDisplay({ sportId, sportName, selectedTab }: Auth
             </CardHeader>
             
             <CardContent className="pt-6">
-              {/* Match Title */}
-              <div className="text-center mb-6">
-                <h3 className="text-2xl font-bold text-white mb-2">
-                  {event.homeTeam} vs {event.awayTeam}
-                </h3>
-                {event.status && event.status !== 'Scheduled' && (
-                  <Badge variant="outline" className="text-cyan-400 border-cyan-400/50">
-                    {event.status}
-                  </Badge>
-                )}
-              </div>
-              
-              {/* Betting Odds */}
-              {(() => {
-                const homeOdds = (event as any).homeOdds || event.odds?.homeWin || event.odds?.home;
-                const awayOdds = (event as any).awayOdds || event.odds?.awayWin || event.odds?.away;
-                const drawOdds = (event as any).drawOdds || event.odds?.draw;
-                if (!homeOdds && !awayOdds) return null;
-                const hasDraws = !!drawOdds;
-                return (
-                  <div className={`grid ${hasDraws ? 'grid-cols-3' : 'grid-cols-2'} gap-4`}>
-                    <div className="text-center">
-                      <div className="mb-3 bg-[#0b1618] p-3 rounded-lg border border-[#1e3a3f]">
-                        <div className="font-bold text-cyan-300">{event.homeTeam}</div>
-                      </div>
-                      <Button 
-                        variant="outline"
-                        className="w-full border-[#1e3a3f] bg-[#14292e] hover:bg-cyan-400/20 hover:border-cyan-400 hover:text-cyan-400 transition-all duration-200 text-lg font-bold"
-                      >
-                        {formatDecimalOdds(homeOdds)}
-                      </Button>
-                    </div>
-                    {hasDraws && (
-                      <div className="text-center">
-                        <div className="mb-3 bg-[#0b1618] p-3 rounded-lg border border-[#1e3a3f]">
-                          <div className="font-bold text-gray-300">Draw</div>
-                        </div>
-                        <Button 
-                          variant="outline" 
-                          className="w-full border-[#1e3a3f] bg-[#14292e] hover:bg-cyan-400/20 hover:border-cyan-400 hover:text-cyan-400 transition-all duration-200 text-lg font-bold"
-                        >
-                          {formatDecimalOdds(drawOdds)}
-                        </Button>
+              {sportId === 18 ? (
+                <>
+                  <div className="text-center mb-4">
+                    <h3 className="text-xl font-bold text-white mb-1" data-testid={`text-race-name-${event.id}`}>
+                      {event.homeTeam}
+                    </h3>
+                    <p className="text-sm text-gray-400">{event.awayTeam}</p>
+                    {(event as any).raceDetails && (
+                      <div className="flex items-center justify-center gap-3 mt-2 text-xs text-gray-500">
+                        <span>{(event as any).raceDetails.surface}</span>
+                        <span>•</span>
+                        <span>{(event as any).raceDetails.distance}</span>
+                        <span>•</span>
+                        <span>{(event as any).raceDetails.going}</span>
+                        {(event as any).raceDetails.prize && (
+                          <>
+                            <span>•</span>
+                            <span>{(event as any).raceDetails.prize}</span>
+                          </>
+                        )}
+                        <span>•</span>
+                        <span>{(event as any).raceDetails.fieldSize || (event as any).runnersInfo?.length || '?'} runners</span>
                       </div>
                     )}
-                    <div className="text-center">
-                      <div className="mb-3 bg-[#0b1618] p-3 rounded-lg border border-[#1e3a3f]">
-                        <div className="font-bold text-cyan-300">{event.awayTeam}</div>
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        className="w-full border-[#1e3a3f] bg-[#14292e] hover:bg-cyan-400/20 hover:border-cyan-400 hover:text-cyan-400 transition-all duration-200 text-lg font-bold"
-                      >
-                        {formatDecimalOdds(awayOdds)}
-                      </Button>
-                    </div>
                   </div>
-                );
-              })()}
+                  <div className="space-y-2">
+                    {(event as any).markets?.[0]?.outcomes?.map((runner: any, idx: number) => {
+                      const runnerInfo = (event as any).runnersInfo?.[idx];
+                      return (
+                        <div
+                          key={runner.id || idx}
+                          className="flex items-center justify-between bg-[#0b1618] border border-[#1e3a3f] rounded-lg px-4 py-3 hover:border-cyan-400/50 hover:bg-cyan-400/5 transition-all cursor-pointer"
+                          data-testid={`runner-${event.id}-${idx}`}
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <span className="text-cyan-400 font-bold text-sm w-6 text-center">
+                              {runnerInfo?.number || idx + 1}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-bold text-white text-sm truncate">{runner.name}</div>
+                              {runnerInfo && (
+                                <div className="text-xs text-gray-400 truncate">
+                                  J: {runnerInfo.jockey || 'TBA'}
+                                  {runnerInfo.trainer && ` • T: ${runnerInfo.trainer}`}
+                                </div>
+                              )}
+                            </div>
+                            {runnerInfo?.form && (
+                              <span className="text-xs text-yellow-400/70 font-mono bg-yellow-400/5 px-2 py-0.5 rounded">
+                                {runnerInfo.form}
+                              </span>
+                            )}
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="ml-3 border-[#1e3a3f] bg-[#14292e] hover:bg-cyan-400/20 hover:border-cyan-400 hover:text-cyan-400 font-bold text-base min-w-[60px]"
+                            data-testid={`odds-runner-${event.id}-${idx}`}
+                          >
+                            {runner.odds?.toFixed(2) || 'N/A'}
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-center mb-6">
+                    <h3 className="text-2xl font-bold text-white mb-2">
+                      {event.homeTeam} vs {event.awayTeam}
+                    </h3>
+                    {event.status && event.status !== 'Scheduled' && (
+                      <Badge variant="outline" className="text-cyan-400 border-cyan-400/50">
+                        {event.status}
+                      </Badge>
+                    )}
+                  </div>
+                  {(() => {
+                    const homeOdds = (event as any).homeOdds || event.odds?.homeWin || event.odds?.home;
+                    const awayOdds = (event as any).awayOdds || event.odds?.awayWin || event.odds?.away;
+                    const drawOdds = (event as any).drawOdds || event.odds?.draw;
+                    if (!homeOdds && !awayOdds) return null;
+                    const hasDraws = !!drawOdds;
+                    return (
+                      <div className={`grid ${hasDraws ? 'grid-cols-3' : 'grid-cols-2'} gap-4`}>
+                        <div className="text-center">
+                          <div className="mb-3 bg-[#0b1618] p-3 rounded-lg border border-[#1e3a3f]">
+                            <div className="font-bold text-cyan-300">{event.homeTeam}</div>
+                          </div>
+                          <Button 
+                            variant="outline"
+                            className="w-full border-[#1e3a3f] bg-[#14292e] hover:bg-cyan-400/20 hover:border-cyan-400 hover:text-cyan-400 transition-all duration-200 text-lg font-bold"
+                          >
+                            {formatDecimalOdds(homeOdds)}
+                          </Button>
+                        </div>
+                        {hasDraws && (
+                          <div className="text-center">
+                            <div className="mb-3 bg-[#0b1618] p-3 rounded-lg border border-[#1e3a3f]">
+                              <div className="font-bold text-gray-300">Draw</div>
+                            </div>
+                            <Button 
+                              variant="outline" 
+                              className="w-full border-[#1e3a3f] bg-[#14292e] hover:bg-cyan-400/20 hover:border-cyan-400 hover:text-cyan-400 transition-all duration-200 text-lg font-bold"
+                            >
+                              {formatDecimalOdds(drawOdds)}
+                            </Button>
+                          </div>
+                        )}
+                        <div className="text-center">
+                          <div className="mb-3 bg-[#0b1618] p-3 rounded-lg border border-[#1e3a3f]">
+                            <div className="font-bold text-cyan-300">{event.awayTeam}</div>
+                          </div>
+                          <Button 
+                            variant="outline" 
+                            className="w-full border-[#1e3a3f] bg-[#14292e] hover:bg-cyan-400/20 hover:border-cyan-400 hover:text-cyan-400 transition-all duration-200 text-lg font-bold"
+                          >
+                            {formatDecimalOdds(awayOdds)}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
               
               {/* Authentic Event Footer */}
               <div className="mt-6 pt-4 border-t border-[#1e3a3f] text-center">
