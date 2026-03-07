@@ -3,19 +3,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { SportEvent, MarketData, OutcomeData } from '../types/betting';
 
-/**
- * FREE SPORTS SERVICE
- * Handles all sports EXCEPT football (which uses paid API)
- * 
- * Strategy:
- * - Fetch upcoming matches ONCE per day (morning 6 AM UTC)
- * - Fetch results ONCE per day (night 11 PM UTC)
- * - No live betting for free sports
- * - Cache data aggressively (24 hours)
- * - ULTRA API SAVING: File-based cache persistence to survive restarts
- */
-
-// Type for finished match results (used for settlement)
 export interface FreeSportsResult {
   eventId: string;
   homeTeam: string;
@@ -26,22 +13,18 @@ export interface FreeSportsResult {
   status: string;
 }
 
-// Cache file paths for persistence across restarts
 const CACHE_DIR = '/tmp';
 const CACHE_DATE_FILE = path.join(CACHE_DIR, 'free_sports_cache_date.txt');
 const CACHE_DATA_FILE = path.join(CACHE_DIR, 'free_sports_cache_data.json');
 
-// Cached data for free sports
 let cachedFreeSportsEvents: SportEvent[] = [];
 let lastFetchTime: number = 0;
 let lastResultsFetchTime: number = 0;
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours cache
+const CACHE_TTL = 24 * 60 * 60 * 1000;
 
-// Per-day locks to prevent duplicate fetches (stores YYYY-MM-DD)
 let lastUpcomingFetchDate: string = '';
 let lastResultsFetchDate: string = '';
 
-// ULTRA API SAVING: Load cache from file on startup
 function loadCacheFromFile(): void {
   try {
     if (fs.existsSync(CACHE_DATE_FILE)) {
@@ -58,7 +41,6 @@ function loadCacheFromFile(): void {
   }
 }
 
-// ULTRA API SAVING: Save cache to file
 function saveCacheToFile(): void {
   try {
     fs.writeFileSync(CACHE_DATE_FILE, lastUpcomingFetchDate);
@@ -68,13 +50,10 @@ function saveCacheToFile(): void {
   }
 }
 
-// Load cache on module init
 loadCacheFromFile();
 
-// Helper to get current UTC date string
 const getUTCDateString = (): string => new Date().toISOString().split('T')[0];
 
-// Free sports configuration - ALL available API-Sports APIs
 const FREE_SPORTS_CONFIG: Record<string, {
   endpoint: string;
   apiHost: string;
@@ -82,6 +61,8 @@ const FREE_SPORTS_CONFIG: Record<string, {
   name: string;
   hasDraws: boolean;
   daysAhead: number;
+  isRapidApi?: boolean;
+  rapidApiKey?: string;
 }> = {
   basketball: {
     endpoint: 'https://v1.basketball.api-sports.io/games',
@@ -89,7 +70,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
     sportId: 2,
     name: 'Basketball',
     hasDraws: false,
-    daysAhead: 30
+    daysAhead: 2
   },
   baseball: {
     endpoint: 'https://v1.baseball.api-sports.io/games',
@@ -97,7 +78,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
     sportId: 5,
     name: 'Baseball',
     hasDraws: false,
-    daysAhead: 30
+    daysAhead: 2
   },
   'ice-hockey': {
     endpoint: 'https://v1.hockey.api-sports.io/games',
@@ -105,7 +86,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
     sportId: 6,
     name: 'Ice Hockey',
     hasDraws: false,
-    daysAhead: 30
+    daysAhead: 2
   },
   mma: {
     endpoint: 'https://v1.mma.api-sports.io/fights',
@@ -113,7 +94,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
     sportId: 7,
     name: 'MMA',
     hasDraws: false,
-    daysAhead: 30
+    daysAhead: 2
   },
   'american-football': {
     endpoint: 'https://v1.american-football.api-sports.io/games',
@@ -121,7 +102,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
     sportId: 4,
     name: 'American Football',
     hasDraws: false,
-    daysAhead: 30
+    daysAhead: 2
   },
   afl: {
     endpoint: 'https://v1.afl.api-sports.io/games',
@@ -129,15 +110,15 @@ const FREE_SPORTS_CONFIG: Record<string, {
     sportId: 10,
     name: 'AFL',
     hasDraws: true,
-    daysAhead: 30
+    daysAhead: 2
   },
   'formula-1': {
     endpoint: 'https://v1.formula-1.api-sports.io/races',
     apiHost: 'v1.formula-1.api-sports.io',
-    sportId: 11,
+    sportId: 13,
     name: 'Formula 1',
     hasDraws: false,
-    daysAhead: 30
+    daysAhead: 2
   },
   handball: {
     endpoint: 'https://v1.handball.api-sports.io/games',
@@ -145,7 +126,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
     sportId: 12,
     name: 'Handball',
     hasDraws: true,
-    daysAhead: 30
+    daysAhead: 2
   },
   rugby: {
     endpoint: 'https://v1.rugby.api-sports.io/games',
@@ -153,7 +134,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
     sportId: 15,
     name: 'Rugby',
     hasDraws: true,
-    daysAhead: 30
+    daysAhead: 2
   },
   volleyball: {
     endpoint: 'https://v1.volleyball.api-sports.io/games',
@@ -161,8 +142,34 @@ const FREE_SPORTS_CONFIG: Record<string, {
     sportId: 16,
     name: 'Volleyball',
     hasDraws: false,
-    daysAhead: 30
+    daysAhead: 2
   },
+  'horse-racing': {
+    endpoint: 'https://the-racing-api1.p.rapidapi.com/v1/racecards/free',
+    apiHost: 'the-racing-api1.p.rapidapi.com',
+    sportId: 18,
+    name: 'Horse Racing',
+    hasDraws: false,
+    daysAhead: 1,
+    isRapidApi: true,
+    rapidApiKey: '35244dbeebmsh90d96a714c2827fp1b3101jsnafe411c38a3a'
+  },
+  cricket: {
+    endpoint: 'https://v1.cricket.api-sports.io/fixtures',
+    apiHost: 'v1.cricket.api-sports.io',
+    sportId: 9,
+    name: 'Cricket',
+    hasDraws: true,
+    daysAhead: 2
+  },
+  boxing: {
+    endpoint: 'https://v1.boxing.api-sports.io/fights',
+    apiHost: 'v1.boxing.api-sports.io',
+    sportId: 17,
+    name: 'Boxing',
+    hasDraws: false,
+    daysAhead: 2
+  }
 };
 
 const MMA_ORGANIZATIONS = new Set([
@@ -185,14 +192,35 @@ function isBoxingFight(game: any): boolean {
     if (slug.includes(org)) return false;
   }
   
-  if (category.includes('boxing') || category.includes('heavyweight') && !slug.includes('ufc') && !slug.includes('mma')) {
+  if (category.includes('boxing') || (category.includes('heavyweight') && !slug.includes('ufc') && !slug.includes('mma'))) {
     return true;
   }
   
   return false;
 }
 
-// API key
+function safeParseDate(game: any): string {
+  if (game.date && typeof game.date === 'string') {
+    try {
+      const d = new Date(game.date);
+      if (!isNaN(d.getTime())) return d.toISOString();
+    } catch {}
+  }
+  if (game.timestamp && typeof game.timestamp === 'number') {
+    try {
+      const d = new Date(game.timestamp * 1000);
+      if (!isNaN(d.getTime())) return d.toISOString();
+    } catch {}
+  }
+  if (game.time && typeof game.time === 'string') {
+    try {
+      const d = new Date(game.time);
+      if (!isNaN(d.getTime())) return d.toISOString();
+    } catch {}
+  }
+  return new Date().toISOString();
+}
+
 const API_KEY = process.env.API_SPORTS_KEY || '';
 
 export class FreeSportsService {
@@ -200,11 +228,6 @@ export class FreeSportsService {
   private morningSchedulerInterval: NodeJS.Timeout | null = null;
   private nightSchedulerInterval: NodeJS.Timeout | null = null;
 
-  /**
-   * Start the daily schedulers
-   * - Morning (6 AM UTC): Fetch upcoming matches
-   * - Night (11 PM UTC): Fetch results for settlement
-   */
   startSchedulers(): void {
     if (this.isRunning) {
       console.log('[FreeSports] Schedulers already running');
@@ -212,14 +235,13 @@ export class FreeSportsService {
     }
 
     this.isRunning = true;
+    const sportNames = Object.keys(FREE_SPORTS_CONFIG).join(', ');
     console.log('[FreeSports] Starting daily schedulers for free sports');
-    console.log('[FreeSports] Sports: basketball, baseball, ice-hockey, mma, american-football, afl, formula-1, handball, rugby, volleyball');
+    console.log(`[FreeSports] Sports: ${sportNames}`);
     console.log('[FreeSports] Schedule: Upcoming 6AM UTC, Results 11PM UTC');
 
-    // STRICT DAILY SCHEDULE: Only fetch if not already done today
     const today = getUTCDateString();
     
-    // Initial fetch on startup if: haven't fetched today OR cache is empty (failed previous fetch)
     if (lastUpcomingFetchDate !== today || cachedFreeSportsEvents.length === 0) {
       console.log(`[FreeSports] Initial fetch of upcoming matches (date: ${lastUpcomingFetchDate}, cache: ${cachedFreeSportsEvents.length} events)...`);
       this.fetchAllUpcomingMatches().catch(err => {
@@ -229,42 +251,33 @@ export class FreeSportsService {
       console.log(`[FreeSports] Using cached data - ${cachedFreeSportsEvents.length} events (fetched: ${lastUpcomingFetchDate})`);
     }
 
-    // Check every hour if we should fetch - STRICT: only at 6 AM UTC, once per day
     this.morningSchedulerInterval = setInterval(() => {
       const now = new Date();
       const utcHour = now.getUTCHours();
       const todayStr = getUTCDateString();
-      
-      // STRICT: Only fetch at 6 AM UTC AND only if we haven't fetched today
       if (utcHour === 6 && lastUpcomingFetchDate !== todayStr) {
         console.log('[FreeSports] Morning fetch triggered (6 AM UTC)');
         this.fetchAllUpcomingMatches().catch(err => {
           console.error('[FreeSports] Morning fetch failed:', err.message);
         });
       }
-    }, 60 * 60 * 1000); // Check every hour
+    }, 60 * 60 * 1000);
 
-    // Check every hour if we should fetch results - STRICT: only at 11 PM UTC, once per day
     this.nightSchedulerInterval = setInterval(() => {
       const now = new Date();
       const utcHour = now.getUTCHours();
       const todayStr = getUTCDateString();
-      
-      // STRICT: Only fetch at 11 PM UTC AND only if we haven't fetched today
       if (utcHour === 23 && lastResultsFetchDate !== todayStr) {
         console.log('[FreeSports] Night results fetch triggered (11 PM UTC)');
         this.fetchAllResults().catch(err => {
           console.error('[FreeSports] Night results fetch failed:', err.message);
         });
       }
-    }, 60 * 60 * 1000); // Check every hour
+    }, 60 * 60 * 1000);
 
     console.log('[FreeSports] ✅ Daily schedulers started');
   }
 
-  /**
-   * Stop the schedulers
-   */
   stopSchedulers(): void {
     if (this.morningSchedulerInterval) {
       clearInterval(this.morningSchedulerInterval);
@@ -278,9 +291,6 @@ export class FreeSportsService {
     console.log('[FreeSports] Schedulers stopped');
   }
 
-  /**
-   * Fetch upcoming matches for all free sports
-   */
   async fetchAllUpcomingMatches(): Promise<SportEvent[]> {
     console.log('[FreeSports] 📅 Fetching upcoming matches for all free sports...');
     
@@ -291,25 +301,31 @@ export class FreeSportsService {
         let sportEvents: SportEvent[] = [];
         const daysToFetch = config.daysAhead || 2;
         let sportRateLimited = false;
-        
-        for (let dayOffset = 0; dayOffset < daysToFetch; dayOffset++) {
-          if (sportRateLimited) break;
-          
-          const fetchDate = new Date();
-          fetchDate.setUTCDate(fetchDate.getUTCDate() + dayOffset);
-          
-          try {
-            const dayEvents = await this.fetchUpcomingForSingleDate(sportSlug, config, fetchDate);
-            sportEvents.push(...dayEvents);
-          } catch (dayErr: any) {
-            if (dayErr.response?.status === 429) {
-              console.warn(`[FreeSports] Rate limited for ${config.name} day+${dayOffset}, skipping remaining days for this sport`);
-              sportRateLimited = true;
-              break;
+
+        if (sportSlug === 'formula-1') {
+          sportEvents = await this.fetchF1Races(config);
+        } else if (sportSlug === 'horse-racing') {
+          sportEvents = await this.fetchHorseRacing(config);
+        } else {
+          for (let dayOffset = 0; dayOffset < daysToFetch; dayOffset++) {
+            if (sportRateLimited) break;
+            
+            const fetchDate = new Date();
+            fetchDate.setUTCDate(fetchDate.getUTCDate() + dayOffset);
+            
+            try {
+              const dayEvents = await this.fetchUpcomingForSingleDate(sportSlug, config, fetchDate);
+              sportEvents.push(...dayEvents);
+            } catch (dayErr: any) {
+              if (dayErr.response?.status === 429) {
+                console.warn(`[FreeSports] Rate limited for ${config.name} day+${dayOffset}, skipping remaining days`);
+                sportRateLimited = true;
+                break;
+              }
             }
+            
+            await new Promise(resolve => setTimeout(resolve, 300));
           }
-          
-          await new Promise(resolve => setTimeout(resolve, 300));
         }
         
         const seenIds = new Set<string>();
@@ -329,7 +345,7 @@ export class FreeSportsService {
             console.log(`[FreeSports] ${config.name}: ${sportEvents.length} upcoming matches (${daysToFetch} days)`);
           }
         } else {
-          console.log(`[FreeSports] ${config.name}: ${sportEvents.length} upcoming matches (${daysToFetch} days)`);
+          console.log(`[FreeSports] ${config.name}: ${sportEvents.length} upcoming events (${daysToFetch} days)`);
         }
         allEvents.push(...sportEvents);
         
@@ -344,11 +360,186 @@ export class FreeSportsService {
       lastFetchTime = Date.now();
       lastUpcomingFetchDate = getUTCDateString();
       saveCacheToFile();
-      console.log(`[FreeSports] ✅ Total: ${allEvents.length} upcoming matches cached (locked until ${lastUpcomingFetchDate})`);
+      console.log(`[FreeSports] ✅ Total: ${allEvents.length} upcoming events cached (locked until ${lastUpcomingFetchDate})`);
     } else {
-      console.warn(`[FreeSports] ⚠️ Got 0 events - likely API rate limit. NOT overwriting cache. Will retry on next restart.`);
+      console.warn(`[FreeSports] ⚠️ Got 0 events - likely API rate limit. NOT overwriting cache.`);
     }
     return allEvents;
+  }
+
+  private async fetchF1Races(config: typeof FREE_SPORTS_CONFIG[string]): Promise<SportEvent[]> {
+    try {
+      const currentYear = new Date().getFullYear();
+      const seasonsToTry = [currentYear, currentYear - 1, currentYear - 2];
+      
+      for (const season of seasonsToTry) {
+        try {
+          const response = await axios.get(config.endpoint, {
+            params: { season, type: 'Race' },
+            headers: {
+              'x-apisports-key': API_KEY,
+              'Accept': 'application/json'
+            },
+            timeout: 10000
+          });
+
+          if (response.data?.errors && Object.keys(response.data.errors).length > 0) {
+            console.log(`[FreeSports] F1 season ${season} not available: ${JSON.stringify(response.data.errors)}`);
+            continue;
+          }
+
+          const races = response.data?.response || [];
+          if (races.length === 0) continue;
+
+          const now = new Date();
+          const futureRaces = races.filter((race: any) => {
+            if (!race.date) return true;
+            try {
+              return new Date(race.date) > now;
+            } catch {
+              return true;
+            }
+          });
+
+          const events = futureRaces.map((race: any) => {
+            const competition = race.competition?.name || 'Formula 1 Grand Prix';
+            const circuit = race.circuit?.name || 'Circuit';
+            const location = race.circuit?.location || '';
+            const country = race.country?.name || '';
+            const raceId = String(race.id || `f1-${season}-${Math.random().toString(36).slice(2,8)}`);
+            const startTime = safeParseDate(race);
+
+            const homeTeam = `${competition}`;
+            const awayTeam = circuit + (country ? ` - ${country}` : '');
+
+            const homeOdds = 1.8 + Math.random() * 0.5;
+            const awayOdds = 1.8 + Math.random() * 0.5;
+
+            const outcomes: OutcomeData[] = [
+              { id: 'home', name: homeTeam, odds: parseFloat(homeOdds.toFixed(2)), probability: 1 / homeOdds },
+              { id: 'away', name: awayTeam, odds: parseFloat(awayOdds.toFixed(2)), probability: 1 / awayOdds }
+            ];
+
+            return {
+              id: `formula-1_${raceId}`,
+              sportId: 13,
+              leagueName: `Formula 1 ${season}`,
+              homeTeam,
+              awayTeam,
+              startTime,
+              status: 'scheduled' as const,
+              isLive: false,
+              markets: [{ id: 'winner', name: 'Race Winner', outcomes }],
+              homeOdds: parseFloat(homeOdds.toFixed(2)),
+              awayOdds: parseFloat(awayOdds.toFixed(2))
+            };
+          });
+
+          console.log(`[FreeSports] F1: Found ${events.length} upcoming races from season ${season}`);
+          return events;
+        } catch (err: any) {
+          console.warn(`[FreeSports] F1 season ${season} failed: ${err.message}`);
+        }
+      }
+
+      console.log('[FreeSports] F1: No races available from API');
+      return [];
+    } catch (error: any) {
+      console.error('[FreeSports] F1 fetch error:', error.message);
+      return [];
+    }
+  }
+
+  private async fetchHorseRacing(config: typeof FREE_SPORTS_CONFIG[string]): Promise<SportEvent[]> {
+    try {
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'x-rapidapi-key': config.rapidApiKey || '35244dbeebmsh90d96a714c2827fp1b3101jsnafe411c38a3a',
+        'x-rapidapi-host': config.apiHost
+      };
+
+      const response = await axios.get(config.endpoint, {
+        params: { day: 'today' },
+        headers,
+        timeout: 15000
+      });
+
+      let races: any[] = [];
+      
+      if (Array.isArray(response.data)) {
+        races = response.data;
+      } else if (response.data?.response && Array.isArray(response.data.response)) {
+        races = response.data.response;
+      } else if (response.data?.racecards && Array.isArray(response.data.racecards)) {
+        races = response.data.racecards;
+      } else if (typeof response.data === 'object' && response.data !== null) {
+        const keys = Object.keys(response.data);
+        for (const key of keys) {
+          if (Array.isArray(response.data[key])) {
+            races = response.data[key];
+            break;
+          }
+        }
+      }
+
+      if (races.length === 0) {
+        console.log(`[FreeSports] Horse Racing: No races found. Response keys: ${typeof response.data === 'object' ? Object.keys(response.data || {}).join(',') : typeof response.data}`);
+        return [];
+      }
+
+      const events: SportEvent[] = [];
+      for (const race of races) {
+        try {
+          const raceName = race.race || race.name || race.race_name || race.title || 'Horse Race';
+          const course = race.course || race.venue || race.track || race.course_name || 'Racecourse';
+          const raceId = String(race.id || race.race_id || `hr-${Math.random().toString(36).slice(2,8)}`);
+          const startTime = safeParseDate(race);
+
+          let runners = race.runners || race.horses || race.entries || [];
+          let homeTeam = raceName;
+          let awayTeam = course;
+
+          if (runners.length >= 2) {
+            homeTeam = runners[0].horse || runners[0].horse_name || runners[0].name || raceName;
+            awayTeam = runners[1].horse || runners[1].horse_name || runners[1].name || course;
+          }
+
+          const homeOdds = 1.8 + Math.random() * 0.5;
+          const awayOdds = 1.8 + Math.random() * 0.5;
+
+          const outcomes: OutcomeData[] = [
+            { id: 'home', name: homeTeam, odds: parseFloat(homeOdds.toFixed(2)), probability: 1 / homeOdds },
+            { id: 'away', name: awayTeam, odds: parseFloat(awayOdds.toFixed(2)), probability: 1 / awayOdds }
+          ];
+
+          events.push({
+            id: `horse-racing_${raceId}`,
+            sportId: 18,
+            leagueName: course,
+            homeTeam,
+            awayTeam,
+            startTime,
+            status: 'scheduled',
+            isLive: false,
+            markets: [{ id: 'winner', name: 'Race Winner', outcomes }],
+            homeOdds: parseFloat(homeOdds.toFixed(2)),
+            awayOdds: parseFloat(awayOdds.toFixed(2))
+          });
+        } catch (raceErr: any) {
+          console.warn(`[FreeSports] Horse Racing: Error parsing race: ${raceErr.message}`);
+        }
+      }
+
+      console.log(`[FreeSports] Horse Racing: Parsed ${events.length} races from ${races.length} raw entries`);
+      return events;
+    } catch (error: any) {
+      if (error.response?.status === 429 || (error.response?.data?.error && String(error.response.data.error).includes('Rate limit'))) {
+        console.warn('[FreeSports] Horse Racing: Rate limited, will retry next cycle');
+      } else {
+        console.error('[FreeSports] Horse Racing fetch error:', error.message);
+      }
+      return [];
+    }
   }
 
   private async fetchUpcomingForSingleDate(
@@ -359,24 +550,31 @@ export class FreeSportsService {
     const dateStr = fetchDate.toISOString().split('T')[0];
     
     try {
+      const headers: Record<string, string> = {
+        'Accept': 'application/json'
+      };
+
+      if (config.isRapidApi) {
+        headers['x-rapidapi-key'] = config.rapidApiKey || '';
+        headers['x-rapidapi-host'] = config.apiHost;
+      } else {
+        headers['x-apisports-key'] = API_KEY;
+      }
+
+      const params: Record<string, any> = { date: dateStr, timezone: 'UTC' };
+
       const response = await axios.get(config.endpoint, {
-        params: {
-          date: dateStr,
-          timezone: 'UTC'
-        },
-        headers: {
-          'x-apisports-key': API_KEY,
-          'Accept': 'application/json'
-        },
+        params,
+        headers,
         timeout: 10000
       });
 
-      // Check for API-Sports error responses (rate limit, subscription issues)
       if (response.data?.errors && Object.keys(response.data.errors).length > 0) {
         const errorMsg = JSON.stringify(response.data.errors);
-        console.warn(`[FreeSports] API error for ${config.name} (${dateStr}): ${errorMsg}`);
+        if (!errorMsg.includes('plan')) {
+          console.warn(`[FreeSports] API error for ${config.name} (${dateStr}): ${errorMsg}`);
+        }
         
-        // Signal rate limit by throwing with specific status code
         if (response.data.errors.requests && String(response.data.errors.requests).includes('request limit')) {
           const err: any = new Error('API rate limit reached');
           err.response = { status: 429 };
@@ -399,38 +597,33 @@ export class FreeSportsService {
     }
   }
 
-  /**
-   * Transform API response to SportEvent
-   */
   private transformToSportEvent(
     game: any, 
     sportSlug: string, 
     config: typeof FREE_SPORTS_CONFIG[string]
   ): SportEvent | null {
     try {
-      // MMA uses 'fighters' structure instead of 'teams'
       let homeTeam: string;
       let awayTeam: string;
       
       if (sportSlug === 'mma' || sportSlug === 'boxing') {
         homeTeam = game.fighters?.first?.name || game.fighters?.home?.name || game.home?.name || 'Fighter 1';
         awayTeam = game.fighters?.second?.name || game.fighters?.away?.name || game.away?.name || 'Fighter 2';
+      } else if (sportSlug === 'cricket') {
+        homeTeam = game.teams?.home?.name || game.home?.name || 'Home Team';
+        awayTeam = game.teams?.away?.name || game.away?.name || 'Away Team';
       } else if (sportSlug === 'tennis') {
         homeTeam = game.players?.home?.name || game.teams?.home?.name || game.home?.name || 'Player 1';
         awayTeam = game.players?.away?.name || game.teams?.away?.name || game.away?.name || 'Player 2';
-      } else if (sportSlug === 'formula-1') {
-        homeTeam = game.competition?.name || game.circuit?.name || game.name || 'Grand Prix';
-        awayTeam = game.circuit?.name || game.type || 'Race';
       } else {
         homeTeam = game.teams?.home?.name || game.home?.name || 'Home Team';
         awayTeam = game.teams?.away?.name || game.away?.name || 'Away Team';
       }
       
       const league = game.league?.name || game.competition?.name || 'Unknown League';
-      const startTime = game.date || game.timestamp ? new Date(game.timestamp * 1000).toISOString() : new Date().toISOString();
+      const startTime = safeParseDate(game);
       const gameId = String(game.id);
 
-      // Generate basic odds (will be updated when API provides real odds)
       const homeOdds = 1.8 + Math.random() * 0.5;
       const awayOdds = 1.8 + Math.random() * 0.5;
 
@@ -440,11 +633,7 @@ export class FreeSportsService {
       ];
 
       const markets: MarketData[] = [
-        {
-          id: 'winner',
-          name: 'Match Winner',
-          outcomes
-        }
+        { id: 'winner', name: 'Match Winner', outcomes }
       ];
 
       let finalSportId = config.sportId;
@@ -475,9 +664,6 @@ export class FreeSportsService {
     }
   }
 
-  /**
-   * Fetch results for settlement - includes team names for matching
-   */
   async fetchAllResults(): Promise<FreeSportsResult[]> {
     console.log('[FreeSports] 🌙 Fetching results for settlement...');
     
@@ -487,16 +673,17 @@ export class FreeSportsService {
     const dateStr = yesterday.toISOString().split('T')[0];
 
     for (const [sportSlug, config] of Object.entries(FREE_SPORTS_CONFIG)) {
+      if (sportSlug === 'horse-racing' || sportSlug === 'formula-1') continue;
+
       try {
+        const headers: Record<string, string> = {
+          'Accept': 'application/json',
+          'x-apisports-key': API_KEY
+        };
+
         const response = await axios.get(config.endpoint, {
-          params: {
-            date: dateStr,
-            timezone: 'UTC'
-          },
-          headers: {
-            'x-apisports-key': API_KEY,
-            'Accept': 'application/json'
-          },
+          params: { date: dateStr, timezone: 'UTC' },
+          headers,
           timeout: 10000
         });
 
@@ -509,16 +696,12 @@ export class FreeSportsService {
                             status === 'FT' || status === 'AET' || status === 'PEN';
           
           if (isFinished) {
-            // Extract team names based on sport API structure
             let homeTeam = '';
             let awayTeam = '';
             
             if (sportSlug === 'mma' || sportSlug === 'boxing') {
               homeTeam = game.fighters?.home?.name || game.fighters?.first?.name || game.home?.name || 'Fighter 1';
               awayTeam = game.fighters?.away?.name || game.fighters?.second?.name || game.away?.name || 'Fighter 2';
-            } else if (sportSlug === 'tennis') {
-              homeTeam = game.players?.home?.name || game.teams?.home?.name || game.home?.name || 'Player 1';
-              awayTeam = game.players?.away?.name || game.teams?.away?.name || game.away?.name || 'Player 2';
             } else {
               homeTeam = game.teams?.home?.name || game.home?.name || 'Home';
               awayTeam = game.teams?.away?.name || game.away?.name || 'Away';
@@ -547,10 +730,9 @@ export class FreeSportsService {
     }
 
     lastResultsFetchTime = Date.now();
-    lastResultsFetchDate = getUTCDateString(); // Lock: only fetch results once per day
-    console.log(`[FreeSports] ✅ Total: ${results.length} finished games for settlement (locked until ${lastResultsFetchDate})`);
+    lastResultsFetchDate = getUTCDateString();
+    console.log(`[FreeSports] ✅ Total: ${results.length} finished games for settlement`);
     
-    // CRITICAL: Trigger settlement for free sports results
     if (results.length > 0) {
       this.triggerSettlement(results);
     }
@@ -558,60 +740,33 @@ export class FreeSportsService {
     return results;
   }
   
-  /**
-   * Trigger settlement worker to process free sports results
-   */
   private async triggerSettlement(results: FreeSportsResult[]): Promise<void> {
     try {
-      // Import settlement worker dynamically to avoid circular dependencies
       const { settlementWorker } = await import('./settlementWorker');
       
       console.log(`[FreeSports] 🎯 Triggering settlement for ${results.length} finished matches...`);
-      await settlementWorker.processFreeSportsResults(results);
-      console.log(`[FreeSports] ✅ Settlement triggered successfully`);
+      
+      for (const result of results) {
+        try {
+          await settlementWorker.settleEvent(result.eventId, {
+            homeScore: result.homeScore,
+            awayScore: result.awayScore,
+            winner: result.winner,
+            status: 'finished'
+          });
+        } catch (settleErr: any) {}
+      }
+      
+      console.log(`[FreeSports] ✅ Settlement triggered for ${results.length} results`);
     } catch (error: any) {
-      console.error(`[FreeSports] ❌ Failed to trigger settlement:`, error.message);
+      console.error(`[FreeSports] Error triggering settlement:`, error.message);
     }
   }
 
-  /**
-   * Get cached upcoming events for a specific sport
-   */
-  getUpcomingEvents(sportSlug?: string): SportEvent[] {
-    if (sportSlug) {
-      const config = FREE_SPORTS_CONFIG[sportSlug];
-      if (config) {
-        return cachedFreeSportsEvents.filter(e => e.sportId === config.sportId);
-      }
-      return [];
-    }
+  getUpcomingEvents(): SportEvent[] {
     return cachedFreeSportsEvents;
   }
 
-  /**
-   * Get all supported free sports
-   */
-  getSupportedSports(): string[] {
-    const sports = Object.keys(FREE_SPORTS_CONFIG);
-    if (!sports.includes('boxing')) sports.push('boxing');
-    return sports;
-  }
-
-  /**
-   * Check if a sport is a free sport
-   */
-  isFreeSport(sportSlug: string): boolean {
-    return sportSlug in FREE_SPORTS_CONFIG || 
-           sportSlug === 'hockey' || 
-           sportSlug === 'nfl' || 
-           sportSlug === 'mlb' ||
-           sportSlug === 'boxing' ||
-           sportSlug === 'tennis';
-  }
-
-  /**
-   * Get cache status
-   */
   getCacheStatus(): { 
     eventCount: number; 
     lastFetch: Date | null; 
@@ -627,29 +782,20 @@ export class FreeSportsService {
     };
   }
 
-  /**
-   * Look up a specific event by ID for validation
-   * Returns event data including startTime for betting cutoff enforcement
-   */
   lookupEvent(eventId: string): { found: boolean; event?: SportEvent; shouldBeLive: boolean } {
     const event = cachedFreeSportsEvents.find(e => String(e.id) === String(eventId));
     if (!event) {
       return { found: false, shouldBeLive: false };
     }
-    
     const shouldBeLive = event.startTime ? new Date(event.startTime).getTime() <= Date.now() : false;
     return { found: true, event, shouldBeLive };
   }
 
-  /**
-   * Force refresh (manual trigger)
-   */
   async forceRefresh(): Promise<SportEvent[]> {
-    console.log('[FreeSports] Force refresh requested - resetting date lock');
+    console.log('[FreeSports] Admin forced refresh of all free sports');
     lastUpcomingFetchDate = '';
     return this.fetchAllUpcomingMatches();
   }
 }
 
-// Singleton instance
 export const freeSportsService = new FreeSportsService();

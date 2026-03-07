@@ -268,6 +268,22 @@ async function seedSports() {
         wurlusSportId: 'volleyball_wurlus_id',
         isActive: true,
         providerId: 'sports_provider_1'
+      },
+      { 
+        name: 'Horse Racing', 
+        slug: 'horse-racing',
+        icon: '🏇',
+        wurlusSportId: 'horse_racing_wurlus_id',
+        isActive: true,
+        providerId: 'sports_provider_1'
+      },
+      { 
+        name: 'Cricket', 
+        slug: 'cricket',
+        icon: '🏏',
+        wurlusSportId: 'cricket_wurlus_id',
+        isActive: true,
+        providerId: 'sports_provider_1'
       }
     ];
     
