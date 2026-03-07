@@ -1386,20 +1386,22 @@ export class FreeSportsService {
           const runners = race.runners.slice(0, 20);
 
           const fieldSize = runners.length;
-          const rawPowers = runners.map((runner: any, idx: number) => {
+          const rawScores = runners.map((runner: any, idx: number) => {
             const formScore = this.calculateFormScore(runner.form || '');
-            const drawAdv = (runner.draw && runner.draw <= 4) ? 0.15 : 0;
-            const weightPen = runner.lbs ? Math.max(0, (runner.lbs - 140) * 0.003) : 0;
-            const positionBias = idx * 0.05;
-            return Math.max(0.05, 1.8 + formScore * 0.7 + drawAdv - weightPen - positionBias);
+            const drawAdv = (runner.draw && runner.draw <= 4) ? 0.2 : 0;
+            const weightPen = runner.lbs ? Math.max(0, (runner.lbs - 140) * 0.005) : 0;
+            const positionBias = idx * 0.08;
+            return Math.max(0.1, 1.0 + formScore * 1.5 + drawAdv - weightPen - positionBias);
           });
+
+          const rawPowers = rawScores.map(s => Math.pow(s, 3.0));
           const totalPower = rawPowers.reduce((s: number, v: number) => s + v, 0);
           const OVERROUND = 1.15 + (fieldSize > 8 ? 0.05 : 0) + (fieldSize > 14 ? 0.05 : 0);
 
           const winOutcomes: OutcomeData[] = runners.map((runner: any, idx: number) => {
             const fairProb = rawPowers[idx] / totalPower;
-            const jitter = (Math.random() - 0.5) * 0.015;
-            const adjProb = Math.max(0.02, Math.min(0.60, fairProb + jitter));
+            const jitter = (Math.random() - 0.5) * 0.01;
+            const adjProb = Math.max(0.015, Math.min(0.65, fairProb + jitter));
             const bookedProb = adjProb * OVERROUND;
             const odds = parseFloat(Math.max(1.20, 1 / bookedProb).toFixed(2));
             return {
