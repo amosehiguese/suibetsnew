@@ -393,36 +393,60 @@ export class FreeSportsService {
             startTime = safeParseDate(race);
           }
 
-          let runners = race.runners || race.horses || race.entries || [];
-          let homeTeam = raceName;
-          let awayTeam = course;
+          const raceRunners = race.runners || race.horses || race.entries || [];
+          const runnerCount = raceRunners.length;
+          const distance = race.distance_f ? `${race.distance_f}f` : '';
+          const going = race.going || '';
+          const raceClass = race.race_class || race.pattern || '';
+          const prize = race.prize || '';
 
-          if (runners.length >= 2) {
-            homeTeam = runners[0].horse || runners[0].horse_name || runners[0].name || raceName;
-            awayTeam = runners[1].horse || runners[1].horse_name || runners[1].name || course;
-          }
+          const outcomes: OutcomeData[] = raceRunners.map((runner: any, idx: number) => {
+            const horseName = runner.horse || runner.horse_name || runner.name || `Runner ${idx + 1}`;
+            const jockey = runner.jockey || '';
+            const trainer = runner.trainer || '';
+            const number = runner.number || (idx + 1);
+            const form = runner.form || '';
 
-          const homeOdds = 1.8 + Math.random() * 0.5;
-          const awayOdds = 1.8 + Math.random() * 0.5;
+            const baseOdds = 2.0 + (Math.random() * (runnerCount * 1.5));
+            const odds = parseFloat(baseOdds.toFixed(2));
 
-          const outcomes: OutcomeData[] = [
-            { id: 'home', name: homeTeam, odds: parseFloat(homeOdds.toFixed(2)), probability: 1 / homeOdds },
-            { id: 'away', name: awayTeam, odds: parseFloat(awayOdds.toFixed(2)), probability: 1 / awayOdds }
-          ];
+            return {
+              id: `runner_${number}`,
+              name: `#${number} ${horseName}`,
+              odds,
+              probability: 1 / odds,
+              jockey,
+              trainer,
+              form
+            };
+          });
+
+          const homeTeam = raceName;
+          const awayTeam = `${course}${distance ? ' | ' + distance : ''}${going ? ' | ' + going : ''}`;
+          const topOdds = outcomes.length > 0 ? outcomes[0].odds : 2.0;
+          const secondOdds = outcomes.length > 1 ? outcomes[1].odds : 3.0;
 
           events.push({
             id: `horse-racing_${raceId}`,
             sportId: 17,
-            leagueName: course,
+            leagueName: `${course}${raceClass ? ' - ' + raceClass : ''}`,
             homeTeam,
             awayTeam,
             startTime,
             status: 'scheduled',
             isLive: false,
-            markets: [{ id: 'winner', name: 'Race Winner', outcomes }],
-            homeOdds: parseFloat(homeOdds.toFixed(2)),
-            awayOdds: parseFloat(awayOdds.toFixed(2))
-          });
+            markets: [{ id: 'winner', name: `Race Winner (${runnerCount} runners)`, outcomes }],
+            homeOdds: parseFloat(topOdds.toFixed(2)),
+            awayOdds: parseFloat(secondOdds.toFixed(2)),
+            metadata: {
+              runnerCount,
+              distance,
+              going,
+              raceClass,
+              prize,
+              surface: race.surface || ''
+            }
+          } as any);
         } catch (raceErr: any) {
           console.warn(`[FreeSports] Horse Racing: Error parsing race: ${raceErr.message}`);
         }
