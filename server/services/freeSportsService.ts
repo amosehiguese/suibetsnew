@@ -466,13 +466,42 @@ export class FreeSportsService {
       if (!league) league = 'Unknown League';
       const startTime = game.date ? game.date : (game.timestamp ? new Date(game.timestamp * 1000).toISOString() : new Date().toISOString());
 
-      // Generate basic odds (will be updated when API provides real odds)
-      const homeOdds = 1.8 + Math.random() * 0.5;
-      const awayOdds = 1.8 + Math.random() * 0.5;
+      const gameHash = gameId.split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
+      const seededRand = (seed: number) => {
+        const x = Math.sin(seed) * 10000;
+        return x - Math.floor(x);
+      };
+
+      let homeProb: number;
+      let targetOverround: number;
+
+      if (sportSlug === 'mma' || sportSlug === 'boxing') {
+        targetOverround = 1.07;
+        const r = seededRand(gameHash);
+        homeProb = r < 0.15 ? 0.25 + seededRand(gameHash + 1) * 0.1
+                 : r < 0.30 ? 0.65 + seededRand(gameHash + 2) * 0.1
+                 : 0.35 + seededRand(gameHash + 3) * 0.30;
+      } else if (sportSlug === 'basketball') {
+        targetOverround = 1.05;
+        homeProb = 0.35 + seededRand(gameHash) * 0.30;
+      } else if (sportSlug === 'ice-hockey') {
+        targetOverround = 1.05;
+        homeProb = 0.38 + seededRand(gameHash) * 0.24;
+      } else if (sportSlug === 'baseball') {
+        targetOverround = 1.05;
+        homeProb = 0.36 + seededRand(gameHash) * 0.28;
+      } else {
+        targetOverround = 1.06;
+        homeProb = 0.35 + seededRand(gameHash) * 0.30;
+      }
+
+      const awayProb = 1 - homeProb;
+      const homeOdds = parseFloat(Math.max(1.12, 1 / (homeProb * targetOverround)).toFixed(2));
+      const awayOdds = parseFloat(Math.max(1.12, 1 / (awayProb * targetOverround)).toFixed(2));
 
       const outcomes: OutcomeData[] = [
-        { id: 'home', name: homeTeam, odds: parseFloat(homeOdds.toFixed(2)), probability: 1 / homeOdds },
-        { id: 'away', name: awayTeam, odds: parseFloat(awayOdds.toFixed(2)), probability: 1 / awayOdds }
+        { id: 'home', name: homeTeam, odds: homeOdds, probability: 1 / homeOdds },
+        { id: 'away', name: awayTeam, odds: awayOdds, probability: 1 / awayOdds }
       ];
 
       const markets: MarketData[] = [
@@ -503,7 +532,15 @@ export class FreeSportsService {
         markets,
         homeOdds: parseFloat(homeOdds.toFixed(2)),
         awayOdds: parseFloat(awayOdds.toFixed(2)),
-        drawOdds: config.hasDraws ? parseFloat((2.5 + Math.random() * 0.5).toFixed(2)) : undefined
+        drawOdds: config.hasDraws ? (() => {
+          const drawProb = 0.12 + seededRand(gameHash + 7) * 0.08;
+          const scale = targetOverround / (1 + drawProb * targetOverround);
+          outcomes[0].odds = parseFloat(Math.max(1.12, 1 / (homeProb * scale)).toFixed(2));
+          outcomes[0].probability = 1 / outcomes[0].odds;
+          outcomes[1].odds = parseFloat(Math.max(1.12, 1 / (awayProb * scale)).toFixed(2));
+          outcomes[1].probability = 1 / outcomes[1].odds;
+          return parseFloat(Math.max(2.80, 1 / (drawProb * targetOverround)).toFixed(2));
+        })() : undefined
       };
     } catch (error) {
       console.error('[FreeSports] Error transforming game:', error);
