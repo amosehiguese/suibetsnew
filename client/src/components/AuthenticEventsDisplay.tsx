@@ -266,30 +266,45 @@ export function AuthenticEventsDisplay({ sportId, sportName, selectedTab }: Auth
               </div>
               
               {/* Horse Racing - Show all runners */}
-              {sportId === 17 && event.markets?.[0]?.outcomes ? (
+              {sportId === 17 && event.markets?.[0]?.outcomes ? (() => {
+                const hasStarted = event.startTime ? new Date(event.startTime).getTime() <= Date.now() : false;
+                return (
                 <div className="space-y-1">
-                  <div className="text-xs text-gray-400 font-medium mb-3 text-center">
-                    {event.markets[0].outcomes.length} Runners - Click odds to bet
-                  </div>
-                  {event.markets[0].outcomes.map((runner, idx) => (
+                  {hasStarted ? (
+                    <div className="flex items-center justify-center gap-2 px-3 py-2 mb-3 bg-red-900/20 border border-red-800/30 rounded text-red-400 text-sm">
+                      <Clock className="w-4 h-4" />
+                      Betting closed — this race has already started
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-400 font-medium mb-3 text-center">
+                      {event.markets![0].outcomes.length} Runners - Click odds to bet
+                    </div>
+                  )}
+                  {event.markets![0].outcomes.map((runner, idx) => (
                     <div
                       key={runner.id}
                       className="flex items-center justify-between py-2 px-3 rounded hover:bg-[#0b1618] transition-colors"
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         <span className="text-gray-500 text-xs w-6 text-right flex-shrink-0">{idx + 1}.</span>
-                        <span className="text-white text-sm truncate">{runner.name}</span>
+                        <span className={`text-sm truncate ${hasStarted ? 'text-gray-500' : 'text-white'}`}>{runner.name}</span>
                       </div>
                       <Button
                         variant="outline"
-                        className="border-[#1e3a3f] bg-[#14292e] hover:bg-cyan-400/20 hover:border-cyan-400 hover:text-cyan-400 transition-all duration-200 font-bold px-4"
+                        disabled={hasStarted}
+                        className={`transition-all duration-200 font-bold px-4 ${
+                          hasStarted
+                            ? 'border-gray-700 bg-gray-800/50 text-gray-600 cursor-not-allowed'
+                            : 'border-[#1e3a3f] bg-[#14292e] hover:bg-cyan-400/20 hover:border-cyan-400 hover:text-cyan-400'
+                        }`}
                       >
                         {runner.odds.toFixed(2)}
                       </Button>
                     </div>
                   ))}
                 </div>
-              ) : (
+                );
+              })() : (
               /* Regular Sports Betting Odds */
               (() => {
                 const homeOdds = (event as any).homeOdds || event.odds?.homeWin || event.odds?.home;

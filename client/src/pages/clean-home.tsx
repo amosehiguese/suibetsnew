@@ -892,6 +892,11 @@ function HorseRacingCard({ event }: { event: Event }) {
   const runners = event.markets?.[0]?.outcomes || [];
   const raceName = event.homeTeam || 'Race';
 
+  const raceStarted = useMemo(() => {
+    if (!event.startTime) return false;
+    return new Date(event.startTime).getTime() <= Date.now();
+  }, [event.startTime]);
+
   const formatTime = (dateStr: string) => {
     try {
       const date = new Date(dateStr);
@@ -908,6 +913,10 @@ function HorseRacingCard({ event }: { event: Event }) {
   };
 
   const handleRunnerBet = (runner: Outcome) => {
+    if (raceStarted) {
+      toast({ title: "Betting closed", description: "This race has already started", variant: "destructive" });
+      return;
+    }
     addBet({
       id: `${event.id}-race-winner-${runner.id}`,
       eventId: String(event.id),
@@ -926,17 +935,24 @@ function HorseRacingCard({ event }: { event: Event }) {
   };
 
   return (
-    <div className="border-b border-cyan-900/20">
+    <div className={`border-b border-cyan-900/20 ${raceStarted ? 'opacity-60' : ''}`}>
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full px-4 py-3 flex items-center justify-between hover:bg-[#111111] transition-colors"
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <span className="text-gray-500 text-xs w-20 flex-shrink-0">{formatTime(event.startTime)}</span>
-          <span className="text-white text-sm truncate">{raceName}</span>
-          <span className="bg-cyan-500/20 text-cyan-400 text-xs px-2 py-0.5 rounded-full flex-shrink-0">
-            {runners.length} runners
-          </span>
+          <span className={`text-sm truncate ${raceStarted ? 'text-gray-500' : 'text-white'}`}>{raceName}</span>
+          {raceStarted ? (
+            <span className="bg-red-900/30 text-red-400 text-xs px-2 py-0.5 rounded-full flex-shrink-0 flex items-center gap-1">
+              <Clock size={10} />
+              Race started
+            </span>
+          ) : (
+            <span className="bg-cyan-500/20 text-cyan-400 text-xs px-2 py-0.5 rounded-full flex-shrink-0">
+              {runners.length} runners
+            </span>
+          )}
         </div>
         <span className={`text-gray-400 transition-transform duration-200 text-sm ${isExpanded ? 'rotate-180' : ''}`}>
           ▼
@@ -945,6 +961,12 @@ function HorseRacingCard({ event }: { event: Event }) {
 
       {isExpanded && runners.length > 0 && (
         <div className="px-4 pb-3 bg-[#0a0a0a]">
+          {raceStarted && (
+            <div className="flex items-center gap-2 px-3 py-2 mb-2 bg-red-900/20 border border-red-800/30 rounded text-red-400 text-xs">
+              <Clock size={12} />
+              Betting closed — this race has already started
+            </div>
+          )}
           <div className="grid gap-1">
             {runners.map((runner, idx) => (
               <div
@@ -955,11 +977,16 @@ function HorseRacingCard({ event }: { event: Event }) {
                   <span className="text-gray-500 text-xs w-6 text-right flex-shrink-0">
                     {idx + 1}.
                   </span>
-                  <span className="text-white text-sm truncate">{runner.name}</span>
+                  <span className={`text-sm truncate ${raceStarted ? 'text-gray-500' : 'text-white'}`}>{runner.name}</span>
                 </div>
                 <button
                   onClick={() => handleRunnerBet(runner)}
-                  className="px-3 py-1.5 rounded text-xs font-medium bg-[#1a1a1a] text-cyan-400 hover:bg-cyan-500 hover:text-black transition-all flex-shrink-0"
+                  disabled={raceStarted}
+                  className={`px-3 py-1.5 rounded text-xs font-medium transition-all flex-shrink-0 ${
+                    raceStarted
+                      ? 'bg-[#1a1a1a] text-gray-600 cursor-not-allowed'
+                      : 'bg-[#1a1a1a] text-cyan-400 hover:bg-cyan-500 hover:text-black'
+                  }`}
                 >
                   {runner.odds.toFixed(2)}
                 </button>
