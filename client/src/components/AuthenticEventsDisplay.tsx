@@ -37,14 +37,15 @@ interface AuthenticEventsDisplayProps {
 function formatDecimalOdds(odds: string | number): string {
   if (!odds) return 'N/A';
   
-  // If it's already a decimal format (like "2.50"), return as is
   if (typeof odds === 'string' && odds.includes('.')) {
     return odds;
   }
   
-  // If it's a number, treat as American odds and convert
   if (typeof odds === 'number') {
-    if (odds > 0) {
+    if (odds >= 1 && odds <= 100) {
+      return odds.toFixed(2);
+    }
+    if (odds > 100) {
       return (odds / 100 + 1).toFixed(2);
     } else {
       return (100 / Math.abs(odds) + 1).toFixed(2);

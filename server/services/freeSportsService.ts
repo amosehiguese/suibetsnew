@@ -441,14 +441,14 @@ export class FreeSportsService {
             }
 
             const leagueName = `${seriesName}${format ? ' (' + format + ')' : ''}`;
-            const awayLabel = `${team2}${venue ? ' @ ' + venue : ''}${city ? ', ' + city : ''}`;
+            const venueStr = [venue, city].filter(Boolean).join(', ');
 
             events.push({
               id: `cricket_${matchId}`,
               sportId: 18,
-              leagueName,
+              leagueName: venueStr ? `${leagueName} — ${venueStr}` : leagueName,
               homeTeam: team1,
-              awayTeam: awayLabel,
+              awayTeam: team2,
               startTime,
               status: 'scheduled',
               isLive: false,
