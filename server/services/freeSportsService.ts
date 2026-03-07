@@ -959,7 +959,7 @@ export class FreeSportsService {
           const totalPower = rawPowers.reduce((s: number, v: number) => s + v, 0);
           const OVERROUND = 1.15 + (fieldSize > 8 ? 0.05 : 0) + (fieldSize > 14 ? 0.05 : 0);
 
-          const outcomes: OutcomeData[] = runners.map((runner: any, idx: number) => {
+          const winOutcomes: OutcomeData[] = runners.map((runner: any, idx: number) => {
             const fairProb = rawPowers[idx] / totalPower;
             const jitter = (Math.random() - 0.5) * 0.015;
             const adjProb = Math.max(0.02, Math.min(0.60, fairProb + jitter));
@@ -973,8 +973,22 @@ export class FreeSportsService {
             };
           });
 
+          const placeOutcomes: OutcomeData[] = winOutcomes.map(w => {
+            const placeFactor = fieldSize >= 8 ? 3.0 : fieldSize >= 5 ? 2.5 : 2.0;
+            const placeOdds = parseFloat(Math.max(1.10, ((w.odds - 1) / placeFactor) + 1).toFixed(2));
+            return { id: w.id, name: w.name, odds: placeOdds, probability: 1 / placeOdds };
+          });
+
+          const showOutcomes: OutcomeData[] = winOutcomes.map(w => {
+            const showFactor = fieldSize >= 8 ? 5.0 : fieldSize >= 5 ? 4.0 : 3.0;
+            const showOdds = parseFloat(Math.max(1.05, ((w.odds - 1) / showFactor) + 1).toFixed(2));
+            return { id: w.id, name: w.name, odds: showOdds, probability: 1 / showOdds };
+          });
+
           const markets: MarketData[] = [
-            { id: 'race_winner', name: 'Race Winner', outcomes }
+            { id: 'race_winner', name: 'Win', outcomes: winOutcomes },
+            { id: 'race_place', name: 'Place', outcomes: placeOutcomes },
+            { id: 'race_show', name: 'Show', outcomes: showOutcomes },
           ];
 
           const courseName = race.course || 'Unknown Course';
@@ -1008,8 +1022,8 @@ export class FreeSportsService {
             status: 'scheduled',
             isLive: false,
             markets,
-            homeOdds: outcomes[0]?.odds || 3.0,
-            awayOdds: outcomes[1]?.odds || 4.0,
+            homeOdds: winOutcomes[0]?.odds || 3.0,
+            awayOdds: winOutcomes[1]?.odds || 4.0,
             venue: courseName,
             runnersInfo,
             raceDetails: {

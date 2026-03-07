@@ -778,9 +778,15 @@ function FloatingBetSlip({ isOpen, onToggle, bets, onRemoveBet, onClearAll }: Fl
 function RaceEventCard({ event }: { event: Event }) {
   const { addBet } = useBetting();
   const { toast } = useToast();
-  const runners = (event as any).markets?.[0]?.outcomes || [];
+  const allMarkets = (event as any).markets || [];
+  const winMarket = allMarkets.find((m: any) => m.id === 'race_winner') || allMarkets[0];
+  const placeMarket = allMarkets.find((m: any) => m.id === 'race_place');
+  const showMarket = allMarkets.find((m: any) => m.id === 'race_show');
+  const runners = winMarket?.outcomes || [];
   const runnersInfo = (event as any).runnersInfo || [];
   const raceDetails = (event as any).raceDetails;
+  const isHorseRacing = event.sportId === 18;
+  const hasWPS = isHorseRacing && placeMarket && showMarket;
 
   const formatTime = (dateStr: string) => {
     try {
@@ -797,23 +803,22 @@ function RaceEventCard({ event }: { event: Event }) {
     } catch { return ''; }
   };
 
-  const handleRunnerBet = (runner: any, idx: number) => {
-    const info = runnersInfo[idx];
+  const handleRunnerBet = (runner: any, idx: number, marketType: string, marketId: string, odds: number) => {
     addBet({
-      id: `${event.id}-race-winner-${runner.id || idx}`,
+      id: `${event.id}-${marketId}-${runner.id || idx}`,
       eventId: String(event.id),
       eventName: `${event.homeTeam}`,
-      marketId: "race-winner",
-      market: "Race Winner",
+      marketId,
+      market: marketType,
       outcomeId: runner.id || `runner_${idx}`,
       selectionId: runner.id || `runner_${idx}`,
       selectionName: runner.name || `Runner ${idx + 1}`,
-      odds: runner.odds,
+      odds,
       homeTeam: event.homeTeam,
       awayTeam: runner.name,
       isLive: false,
     });
-    toast({ title: "Added to bet slip", description: `${runner.name} @ ${runner.odds?.toFixed(2)}` });
+    toast({ title: "Added to bet slip", description: `${runner.name} ${marketType} @ ${odds.toFixed(2)}` });
   };
 
   return (
@@ -837,9 +842,21 @@ function RaceEventCard({ event }: { event: Event }) {
           )}
         </div>
       </div>
+
+      {hasWPS && (
+        <div className="flex items-center justify-end gap-1 mb-1 ml-0 md:ml-[80px] pr-3">
+          <div className="flex-1" />
+          <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider min-w-[48px] text-center">Win</span>
+          <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider min-w-[48px] text-center">Place</span>
+          <span className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider min-w-[48px] text-center">Show</span>
+        </div>
+      )}
+
       <div className="space-y-1 ml-0 md:ml-[80px]">
         {runners.map((runner: any, idx: number) => {
           const info = runnersInfo[idx];
+          const placeOdds = placeMarket?.outcomes?.[idx]?.odds;
+          const showOdds = showMarket?.outcomes?.[idx]?.odds;
           return (
             <div
               key={runner.id || idx}
@@ -862,13 +879,35 @@ function RaceEventCard({ event }: { event: Event }) {
                   </span>
                 )}
               </div>
-              <button
-                onClick={() => handleRunnerBet(runner, idx)}
-                className="ml-2 px-3 py-1.5 rounded text-xs font-bold bg-[#1a1a1a] text-cyan-400 hover:bg-cyan-500 hover:text-black transition-all min-w-[52px] text-center"
-                data-testid={`odds-runner-${event.id}-${idx}`}
-              >
-                {runner.odds?.toFixed(2) || 'N/A'}
-              </button>
+              <div className="flex items-center gap-1 ml-2">
+                <button
+                  onClick={() => handleRunnerBet(runner, idx, 'Win', 'race_winner', runner.odds)}
+                  className="px-2 py-1.5 rounded text-xs font-bold bg-[#1a1a1a] text-cyan-400 hover:bg-cyan-500 hover:text-black transition-all min-w-[48px] text-center"
+                  data-testid={`odds-win-${event.id}-${idx}`}
+                >
+                  {runner.odds?.toFixed(2) || 'N/A'}
+                </button>
+                {hasWPS && (
+                  <>
+                    <button
+                      onClick={() => placeOdds && handleRunnerBet(runner, idx, 'Place', 'race_place', placeOdds)}
+                      className="px-2 py-1.5 rounded text-xs font-bold bg-[#1a1a1a] text-emerald-400 hover:bg-emerald-500 hover:text-black transition-all min-w-[48px] text-center"
+                      data-testid={`odds-place-${event.id}-${idx}`}
+                      disabled={!placeOdds}
+                    >
+                      {placeOdds?.toFixed(2) || 'N/A'}
+                    </button>
+                    <button
+                      onClick={() => showOdds && handleRunnerBet(runner, idx, 'Show', 'race_show', showOdds)}
+                      className="px-2 py-1.5 rounded text-xs font-bold bg-[#1a1a1a] text-amber-400 hover:bg-amber-500 hover:text-black transition-all min-w-[48px] text-center"
+                      data-testid={`odds-show-${event.id}-${idx}`}
+                      disabled={!showOdds}
+                    >
+                      {showOdds?.toFixed(2) || 'N/A'}
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           );
         })}
