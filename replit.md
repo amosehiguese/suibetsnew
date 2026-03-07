@@ -47,7 +47,9 @@ Preferred communication style: Simple, everyday language.
 
 ### Sports Data Providers
 - **API-Sports**: Primary data source for Football (paid tier, live betting).
-- **Free Sports API**: Provides data for Basketball, Baseball, Ice Hockey, MMA, American Football, AFL, Formula 1, Handball, Rugby, Volleyball (upcoming only, no live betting for free sports). Each sport API has independent 100/day request limit on free tier. Data fetched daily at 6 AM UTC, results at 11 PM UTC. Admin force-refresh: POST `/api/admin/free-sports/refresh`. NFL and Tennis API hostnames don't exist — removed from config.
+- **Free Sports API**: Provides data for Basketball, Baseball, Ice Hockey, MMA, American Football, AFL, Handball, Rugby, Volleyball (upcoming only, no live betting for free sports). Each sport API has independent 100/day request limit on free tier. Data fetched daily at 6 AM UTC, results at 11 PM UTC. Admin force-refresh: POST `/api/admin/free-sports/refresh`. NFL and Tennis API hostnames don't exist — removed from config. F1 removed (free plan only has past data).
+- **Horse Racing (The Racing API via RapidAPI)**: `the-racing-api1.p.rapidapi.com` — real racecards with all runners per race as bet outcomes (horse name, jockey, number, odds). Sport ID 17. Free tier: today/tomorrow only. Response uses `racecards` key, start times from `off_dt` field.
+- **Cricket (Cricket API Free Data via RapidAPI)**: `cricket-api-free-data.p.rapidapi.com/cricket-schedule` — real upcoming matches (TEST, ODI, T20). Sport ID 18. TEST/ODI matches include Draw outcome. T20/ODI have Total Runs market. Boxing auto-detected from MMA feed (Sport ID 8).
 
 ### Blockchain Services
 - **Sui Network**: Layer 1 blockchain.

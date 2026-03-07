@@ -53,6 +53,7 @@ const SPORTS_LIST = [
   { id: 7, name: "MMA", icon: "🥊" },
   { id: 8, name: "Boxing", icon: "🥊" },
   { id: 17, name: "Horse Racing", icon: "🏇" },
+  { id: 18, name: "Cricket", icon: "🏏" },
   { id: 4, name: "American Football", icon: "🏈" },
   { id: 10, name: "AFL", icon: "🏉" },
   { id: 11, name: "Formula 1", icon: "🏎️" },
@@ -811,12 +812,19 @@ function LeagueGroup({ leagueName, events, defaultExpanded = false, favorites, t
       {isExpanded && (
         <div className="divide-y divide-cyan-900/20">
           {events.map((event, index) => (
-            <CompactEventCard 
-              key={`${event.sportId}-${event.id}-${index}`} 
-              event={event}
-              favorites={favorites}
-              toggleFavorite={toggleFavorite}
-            />
+            event.sportId === 17 ? (
+              <HorseRacingCard
+                key={`${event.sportId}-${event.id}-${index}`}
+                event={event}
+              />
+            ) : (
+              <CompactEventCard 
+                key={`${event.sportId}-${event.id}-${index}`} 
+                event={event}
+                favorites={favorites}
+                toggleFavorite={toggleFavorite}
+              />
+            )
           ))}
         </div>
       )}
@@ -873,6 +881,94 @@ function OddsMovement({ direction }: { direction: 'up' | 'down' | 'stable' }) {
     <TrendingUp size={10} className="text-green-400" />
   ) : (
     <TrendingDown size={10} className="text-red-400" />
+  );
+}
+
+function HorseRacingCard({ event }: { event: Event }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const { addBet } = useBetting();
+  const { toast } = useToast();
+
+  const runners = event.markets?.[0]?.outcomes || [];
+  const raceName = event.homeTeam || 'Race';
+
+  const formatTime = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const isToday = date.toDateString() === now.toDateString();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const isTomorrow = date.toDateString() === tomorrow.toDateString();
+      const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      if (isToday) return `Today ${timeStr}`;
+      if (isTomorrow) return `Tomorrow ${timeStr}`;
+      return date.toLocaleDateString([], { weekday: 'short', day: 'numeric' }) + ' ' + timeStr;
+    } catch { return ''; }
+  };
+
+  const handleRunnerBet = (runner: Outcome) => {
+    addBet({
+      id: `${event.id}-race-winner-${runner.id}`,
+      eventId: String(event.id),
+      eventName: raceName,
+      marketId: "race-winner",
+      market: "Race Winner",
+      outcomeId: runner.id,
+      selectionId: runner.id,
+      selectionName: runner.name,
+      odds: runner.odds,
+      homeTeam: raceName,
+      awayTeam: event.awayTeam || '',
+      isLive: false,
+    });
+    toast({ title: "Added to bet slip", description: `${runner.name} @ ${runner.odds.toFixed(2)}` });
+  };
+
+  return (
+    <div className="border-b border-cyan-900/20">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-[#111111] transition-colors"
+      >
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <span className="text-gray-500 text-xs w-20 flex-shrink-0">{formatTime(event.startTime)}</span>
+          <span className="text-white text-sm truncate">{raceName}</span>
+          <span className="bg-cyan-500/20 text-cyan-400 text-xs px-2 py-0.5 rounded-full flex-shrink-0">
+            {runners.length} runners
+          </span>
+        </div>
+        <span className={`text-gray-400 transition-transform duration-200 text-sm ${isExpanded ? 'rotate-180' : ''}`}>
+          ▼
+        </span>
+      </button>
+
+      {isExpanded && runners.length > 0 && (
+        <div className="px-4 pb-3 bg-[#0a0a0a]">
+          <div className="grid gap-1">
+            {runners.map((runner, idx) => (
+              <div
+                key={runner.id}
+                className="flex items-center justify-between py-2 px-3 rounded hover:bg-[#151515] transition-colors"
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <span className="text-gray-500 text-xs w-6 text-right flex-shrink-0">
+                    {idx + 1}.
+                  </span>
+                  <span className="text-white text-sm truncate">{runner.name}</span>
+                </div>
+                <button
+                  onClick={() => handleRunnerBet(runner)}
+                  className="px-3 py-1.5 rounded text-xs font-medium bg-[#1a1a1a] text-cyan-400 hover:bg-cyan-500 hover:text-black transition-all flex-shrink-0"
+                >
+                  {runner.odds.toFixed(2)}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

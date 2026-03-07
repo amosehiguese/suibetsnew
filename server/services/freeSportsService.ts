@@ -146,6 +146,16 @@ const FREE_SPORTS_CONFIG: Record<string, {
     isRapidApi: true,
     rapidApiKey: '35244dbeebmsh90d96a714c2827fp1b3101jsnafe411c38a3a'
   },
+  cricket: {
+    endpoint: 'https://cricket-api-free-data.p.rapidapi.com/cricket-schedule',
+    apiHost: 'cricket-api-free-data.p.rapidapi.com',
+    sportId: 18,
+    name: 'Cricket',
+    hasDraws: true,
+    daysAhead: 7,
+    isRapidApi: true,
+    rapidApiKey: '35244dbeebmsh90d96a714c2827fp1b3101jsnafe411c38a3a'
+  },
 };
 
 const MMA_ORGANIZATIONS = new Set([
@@ -278,7 +288,9 @@ export class FreeSportsService {
         const daysToFetch = config.daysAhead || 2;
         let sportRateLimited = false;
 
-        if (sportSlug === 'horse-racing') {
+        if (sportSlug === 'cricket') {
+          sportEvents = await this.fetchCricket(config);
+        } else if (sportSlug === 'horse-racing') {
           sportEvents = await this.fetchHorseRacing(config);
         } else {
           for (let dayOffset = 0; dayOffset < daysToFetch; dayOffset++) {
@@ -339,6 +351,122 @@ export class FreeSportsService {
       console.warn(`[FreeSports] ⚠️ Got 0 events - likely API rate limit. NOT overwriting cache.`);
     }
     return allEvents;
+  }
+
+  private async fetchCricket(config: typeof FREE_SPORTS_CONFIG[string]): Promise<SportEvent[]> {
+    try {
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'x-rapidapi-key': config.rapidApiKey || '35244dbeebmsh90d96a714c2827fp1b3101jsnafe411c38a3a',
+        'x-rapidapi-host': config.apiHost
+      };
+
+      const response = await axios.get(config.endpoint, { headers, timeout: 15000 });
+
+      const schedules = response.data?.response?.schedules || [];
+      if (schedules.length === 0) {
+        console.log('[FreeSports] Cricket: No schedules found');
+        return [];
+      }
+
+      const events: SportEvent[] = [];
+      const seenMatchIds = new Set<string>();
+
+      for (const sched of schedules) {
+        const wrapper = sched.scheduleAdWrapper;
+        if (!wrapper) continue;
+
+        for (const matchList of (wrapper.matchScheduleList || [])) {
+          const seriesName = matchList.seriesName || 'Cricket Series';
+
+          for (const matchInfo of (matchList.matchInfo || [])) {
+            const matchId = String(matchInfo.matchId || `cr-${Math.random().toString(36).slice(2,8)}`);
+            if (seenMatchIds.has(matchId)) continue;
+            seenMatchIds.add(matchId);
+
+            const team1 = matchInfo.team1?.teamName || 'Team 1';
+            const team2 = matchInfo.team2?.teamName || 'Team 2';
+            const format = matchInfo.matchFormat || '';
+            const venue = matchInfo.venueInfo?.ground || '';
+            const city = matchInfo.venueInfo?.city || '';
+
+            let startTime: string;
+            if (matchInfo.startDate) {
+              try {
+                const ts = typeof matchInfo.startDate === 'number' ? matchInfo.startDate : parseInt(matchInfo.startDate);
+                startTime = new Date(ts).toISOString();
+              } catch { startTime = new Date().toISOString(); }
+            } else {
+              startTime = new Date().toISOString();
+            }
+
+            const homeOdds = 1.5 + Math.random() * 1.5;
+            const awayOdds = 1.5 + Math.random() * 1.5;
+            const drawOdds = 3.0 + Math.random() * 2.0;
+
+            const outcomes: OutcomeData[] = [
+              { id: 'home', name: team1, odds: parseFloat(homeOdds.toFixed(2)), probability: 1 / homeOdds },
+              { id: 'away', name: team2, odds: parseFloat(awayOdds.toFixed(2)), probability: 1 / awayOdds }
+            ];
+
+            if (format === 'TEST' || format === 'ODI') {
+              outcomes.push({ id: 'draw', name: 'Draw', odds: parseFloat(drawOdds.toFixed(2)), probability: 1 / drawOdds });
+            }
+
+            const markets: MarketData[] = [
+              { id: 'winner', name: 'Match Winner', outcomes }
+            ];
+
+            if (format === 'T20' || format === 'ODI') {
+              const overLine = format === 'T20' ? 160.5 : 280.5;
+              markets.push({
+                id: 'total_runs',
+                name: `Total Runs (Over/Under ${overLine})`,
+                outcomes: [
+                  { id: 'over', name: `Over ${overLine}`, odds: parseFloat((1.8 + Math.random() * 0.4).toFixed(2)), probability: 0.5 },
+                  { id: 'under', name: `Under ${overLine}`, odds: parseFloat((1.8 + Math.random() * 0.4).toFixed(2)), probability: 0.5 }
+                ]
+              });
+            }
+
+            if (format === 'T20') {
+              markets.push({
+                id: 'top_batsman',
+                name: 'Highest Opening Partnership',
+                outcomes: [
+                  { id: 'home_open', name: `${team1} Openers`, odds: parseFloat((1.8 + Math.random() * 0.5).toFixed(2)), probability: 0.5 },
+                  { id: 'away_open', name: `${team2} Openers`, odds: parseFloat((1.8 + Math.random() * 0.5).toFixed(2)), probability: 0.5 }
+                ]
+              });
+            }
+
+            const leagueName = `${seriesName}${format ? ' (' + format + ')' : ''}`;
+            const awayLabel = `${team2}${venue ? ' @ ' + venue : ''}${city ? ', ' + city : ''}`;
+
+            events.push({
+              id: `cricket_${matchId}`,
+              sportId: 18,
+              leagueName,
+              homeTeam: team1,
+              awayTeam: awayLabel,
+              startTime,
+              status: 'scheduled',
+              isLive: false,
+              markets,
+              homeOdds: parseFloat(homeOdds.toFixed(2)),
+              awayOdds: parseFloat(awayOdds.toFixed(2)),
+              drawOdds: (format === 'TEST' || format === 'ODI') ? parseFloat(drawOdds.toFixed(2)) : undefined
+            });
+          }
+        }
+      }
+
+      console.log(`[FreeSports] Cricket: Parsed ${events.length} matches from ${schedules.length} schedule days`);
+      return events;
+    } catch (error: any) {
+      console.error('[FreeSports] Cricket fetch error:', error.message);
+      return [];
+    }
   }
 
   private async fetchHorseRacing(config: typeof FREE_SPORTS_CONFIG[string]): Promise<SportEvent[]> {
@@ -595,7 +723,7 @@ export class FreeSportsService {
     const dateStr = yesterday.toISOString().split('T')[0];
 
     for (const [sportSlug, config] of Object.entries(FREE_SPORTS_CONFIG)) {
-      if (sportSlug === 'horse-racing') continue;
+      if (sportSlug === 'horse-racing' || sportSlug === 'cricket') continue;
 
       try {
         const headers: Record<string, string> = {

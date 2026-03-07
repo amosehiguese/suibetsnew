@@ -13,6 +13,8 @@ interface AuthenticEvent {
   startTime?: string;
   venue?: string;
   isLive?: boolean;
+  sportId?: number;
+  markets?: { id: string; name: string; outcomes: { id: string; name: string; odds: number }[] }[];
   odds?: {
     home?: string | number;
     away?: string | number;
@@ -253,7 +255,7 @@ export function AuthenticEventsDisplay({ sportId, sportName, selectedTab }: Auth
               {/* Match Title */}
               <div className="text-center mb-6">
                 <h3 className="text-2xl font-bold text-white mb-2">
-                  {event.homeTeam} vs {event.awayTeam}
+                  {sportId === 17 ? event.homeTeam : `${event.homeTeam} vs ${event.awayTeam}`}
                 </h3>
                 {event.status && event.status !== 'Scheduled' && (
                   <Badge variant="outline" className="text-cyan-400 border-cyan-400/50">
@@ -262,8 +264,33 @@ export function AuthenticEventsDisplay({ sportId, sportName, selectedTab }: Auth
                 )}
               </div>
               
-              {/* Betting Odds */}
-              {(() => {
+              {/* Horse Racing - Show all runners */}
+              {sportId === 17 && event.markets?.[0]?.outcomes ? (
+                <div className="space-y-1">
+                  <div className="text-xs text-gray-400 font-medium mb-3 text-center">
+                    {event.markets[0].outcomes.length} Runners - Click odds to bet
+                  </div>
+                  {event.markets[0].outcomes.map((runner, idx) => (
+                    <div
+                      key={runner.id}
+                      className="flex items-center justify-between py-2 px-3 rounded hover:bg-[#0b1618] transition-colors"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <span className="text-gray-500 text-xs w-6 text-right flex-shrink-0">{idx + 1}.</span>
+                        <span className="text-white text-sm truncate">{runner.name}</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        className="border-[#1e3a3f] bg-[#14292e] hover:bg-cyan-400/20 hover:border-cyan-400 hover:text-cyan-400 transition-all duration-200 font-bold px-4"
+                      >
+                        {runner.odds.toFixed(2)}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+              /* Regular Sports Betting Odds */
+              (() => {
                 const homeOdds = (event as any).homeOdds || event.odds?.homeWin || event.odds?.home;
                 const awayOdds = (event as any).awayOdds || event.odds?.awayWin || event.odds?.away;
                 const drawOdds = (event as any).drawOdds || event.odds?.draw;
@@ -308,7 +335,7 @@ export function AuthenticEventsDisplay({ sportId, sportName, selectedTab }: Auth
                     </div>
                   </div>
                 );
-              })()}
+              })())}
               
               {/* Authentic Event Footer */}
               <div className="mt-6 pt-4 border-t border-[#1e3a3f] text-center">
