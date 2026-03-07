@@ -415,7 +415,7 @@ export class FreeSportsService {
 
       const games = response.data?.response || [];
       
-      return games.map((game: any) => this.transformToSportEvent(game, sportSlug, config)).filter(Boolean);
+      return games.map((game: any) => this.transformToSportEvent(game, sportSlug, config)).flat().filter(Boolean) as SportEvent[];
     } catch (error: any) {
       if (error.response?.status === 429) {
         console.warn(`[FreeSports] Rate limited for ${config.name}, skipping`);
@@ -434,9 +434,9 @@ export class FreeSportsService {
     game: any, 
     sportSlug: string, 
     config: typeof FREE_SPORTS_CONFIG[string]
-  ): SportEvent | null {
+  ): SportEvent | SportEvent[] | null {
     try {
-      // MMA uses 'fighters' structure instead of 'teams'
+      const gameId = String(game.id);
       let homeTeam: string;
       let awayTeam: string;
       
@@ -447,16 +447,16 @@ export class FreeSportsService {
         homeTeam = game.players?.home?.name || game.teams?.home?.name || game.home?.name || 'Player 1';
         awayTeam = game.players?.away?.name || game.teams?.away?.name || game.away?.name || 'Player 2';
       } else if (sportSlug === 'formula-1') {
-        homeTeam = game.competition?.name || game.circuit?.name || game.name || 'Grand Prix';
-        awayTeam = game.circuit?.name || game.type || 'Race';
+        const gpName = game.competition?.name || game.circuit?.name || game.name || 'Grand Prix';
+        const startTime = game.date || (game.timestamp ? new Date(game.timestamp * 1000).toISOString() : new Date().toISOString());
+        return this.generateF1DriverMatchups(gameId, gpName, startTime, config.sportId);
       } else {
         homeTeam = game.teams?.home?.name || game.home?.name || 'Home Team';
         awayTeam = game.teams?.away?.name || game.away?.name || 'Away Team';
       }
       
       const league = game.league?.name || game.competition?.name || 'Unknown League';
-      const startTime = game.date || game.timestamp ? new Date(game.timestamp * 1000).toISOString() : new Date().toISOString();
-      const gameId = String(game.id);
+      const startTime = game.date ? game.date : (game.timestamp ? new Date(game.timestamp * 1000).toISOString() : new Date().toISOString());
 
       // Generate basic odds (will be updated when API provides real odds)
       const homeOdds = 1.8 + Math.random() * 0.5;
@@ -608,6 +608,44 @@ export class FreeSportsService {
     }
   }
 
+  private generateF1DriverMatchups(raceId: string, gpName: string, startTime: string, sportId: number): SportEvent[] {
+    const f1Drivers = [
+      'Max Verstappen', 'Liam Lawson', 'Charles Leclerc', 'Lewis Hamilton',
+      'Lando Norris', 'Oscar Piastri', 'George Russell', 'Andrea Kimi Antonelli',
+      'Fernando Alonso', 'Lance Stroll', 'Pierre Gasly', 'Jack Doohan',
+      'Carlos Sainz', 'Alex Albon', 'Yuki Tsunoda', 'Isack Hadjar',
+      'Nico Hülkenberg', 'Gabriel Bortoleto', 'Esteban Ocon', 'Oliver Bearman'
+    ];
+    const h2hPairs: [number, number][] = [
+      [0, 3], [2, 4], [5, 6], [12, 8], [1, 7]
+    ];
+    return h2hPairs.map((pair, idx) => {
+      const [a, b] = pair;
+      const hOdds = parseFloat((1.7 + Math.random() * 0.6).toFixed(2));
+      const aOdds = parseFloat((1.7 + Math.random() * 0.6).toFixed(2));
+      return {
+        id: `formula-1_${raceId}_h2h_${idx}`,
+        sportId,
+        leagueName: `F1 ${gpName} - Driver H2H`,
+        homeTeam: f1Drivers[a],
+        awayTeam: f1Drivers[b],
+        startTime,
+        status: 'scheduled',
+        isLive: false,
+        markets: [{
+          id: 'winner',
+          name: 'Driver H2H',
+          outcomes: [
+            { id: 'home', name: f1Drivers[a], odds: hOdds, probability: 1 / hOdds },
+            { id: 'away', name: f1Drivers[b], odds: aOdds, probability: 1 / aOdds }
+          ]
+        }],
+        homeOdds: hOdds,
+        awayOdds: aOdds,
+      } as SportEvent;
+    });
+  }
+
   private getScheduledCombatAndMotorsportEvents(): SportEvent[] {
     const now = Date.now();
     const events: SportEvent[] = [];
@@ -623,12 +661,33 @@ export class FreeSportsService {
       { id: 'boxing_20260314_3', sportId: 17, league: 'DAZN Boxing - Dublin', home: 'Jono Carroll', away: 'Colm Murphy', date: '2026-03-14T19:00:00Z', venue: 'Dublin, Ireland', slug: 'boxing' },
       { id: 'boxing_20260919_1', sportId: 17, league: 'Sphere Arena - Super Fight', home: 'Floyd Mayweather Jr.', away: 'Manny Pacquiao', date: '2026-09-19T23:00:00Z', venue: 'Las Vegas, NV, USA', slug: 'boxing' },
 
-      { id: 'f1_2026_r01_fp', sportId: 11, league: 'Formula 1 2026', home: 'Australian Grand Prix', away: 'Practice & Qualifying', date: '2026-03-06T05:00:00Z', venue: 'Melbourne, Australia', slug: 'formula-1' },
-      { id: 'f1_2026_r01_race', sportId: 11, league: 'Formula 1 2026', home: 'Australian Grand Prix', away: 'Race', date: '2026-03-08T04:00:00Z', venue: 'Melbourne, Australia', slug: 'formula-1' },
-      { id: 'f1_2026_r02_fp', sportId: 11, league: 'Formula 1 2026', home: 'Chinese Grand Prix', away: 'Practice & Qualifying', date: '2026-03-13T07:00:00Z', venue: 'Shanghai, China', slug: 'formula-1' },
-      { id: 'f1_2026_r02_race', sportId: 11, league: 'Formula 1 2026', home: 'Chinese Grand Prix', away: 'Race', date: '2026-03-15T07:00:00Z', venue: 'Shanghai, China', slug: 'formula-1' },
-      { id: 'f1_2026_r03_fp', sportId: 11, league: 'Formula 1 2026', home: 'Japanese Grand Prix', away: 'Practice & Qualifying', date: '2026-03-27T06:00:00Z', venue: 'Suzuka, Japan', slug: 'formula-1' },
-      { id: 'f1_2026_r03_race', sportId: 11, league: 'Formula 1 2026', home: 'Japanese Grand Prix', away: 'Race', date: '2026-03-29T05:00:00Z', venue: 'Suzuka, Japan', slug: 'formula-1' },
+      { id: 'f1_2026_r02_h2h_1', sportId: 11, league: 'F1 Chinese GP - Driver H2H', home: 'Max Verstappen', away: 'Lewis Hamilton', date: '2026-03-15T07:00:00Z', venue: 'Shanghai, China', slug: 'formula-1' },
+      { id: 'f1_2026_r02_h2h_2', sportId: 11, league: 'F1 Chinese GP - Driver H2H', home: 'Charles Leclerc', away: 'Lando Norris', date: '2026-03-15T07:00:00Z', venue: 'Shanghai, China', slug: 'formula-1' },
+      { id: 'f1_2026_r02_h2h_3', sportId: 11, league: 'F1 Chinese GP - Driver H2H', home: 'Oscar Piastri', away: 'George Russell', date: '2026-03-15T07:00:00Z', venue: 'Shanghai, China', slug: 'formula-1' },
+      { id: 'f1_2026_r02_h2h_4', sportId: 11, league: 'F1 Chinese GP - Driver H2H', home: 'Carlos Sainz', away: 'Fernando Alonso', date: '2026-03-15T07:00:00Z', venue: 'Shanghai, China', slug: 'formula-1' },
+      { id: 'f1_2026_r02_h2h_5', sportId: 11, league: 'F1 Chinese GP - Driver H2H', home: 'Liam Lawson', away: 'Andrea Kimi Antonelli', date: '2026-03-15T07:00:00Z', venue: 'Shanghai, China', slug: 'formula-1' },
+
+      { id: 'f1_2026_r03_h2h_1', sportId: 11, league: 'F1 Japanese GP - Driver H2H', home: 'Max Verstappen', away: 'Charles Leclerc', date: '2026-03-29T05:00:00Z', venue: 'Suzuka, Japan', slug: 'formula-1' },
+      { id: 'f1_2026_r03_h2h_2', sportId: 11, league: 'F1 Japanese GP - Driver H2H', home: 'Lewis Hamilton', away: 'Lando Norris', date: '2026-03-29T05:00:00Z', venue: 'Suzuka, Japan', slug: 'formula-1' },
+      { id: 'f1_2026_r03_h2h_3', sportId: 11, league: 'F1 Japanese GP - Driver H2H', home: 'Oscar Piastri', away: 'Carlos Sainz', date: '2026-03-29T05:00:00Z', venue: 'Suzuka, Japan', slug: 'formula-1' },
+      { id: 'f1_2026_r03_h2h_4', sportId: 11, league: 'F1 Japanese GP - Driver H2H', home: 'George Russell', away: 'Fernando Alonso', date: '2026-03-29T05:00:00Z', venue: 'Suzuka, Japan', slug: 'formula-1' },
+      { id: 'f1_2026_r03_h2h_5', sportId: 11, league: 'F1 Japanese GP - Driver H2H', home: 'Alex Albon', away: 'Pierre Gasly', date: '2026-03-29T05:00:00Z', venue: 'Suzuka, Japan', slug: 'formula-1' },
+
+      { id: 'f1_2026_r04_h2h_1', sportId: 11, league: 'F1 Bahrain GP - Driver H2H', home: 'Max Verstappen', away: 'Lando Norris', date: '2026-04-12T15:00:00Z', venue: 'Sakhir, Bahrain', slug: 'formula-1' },
+      { id: 'f1_2026_r04_h2h_2', sportId: 11, league: 'F1 Bahrain GP - Driver H2H', home: 'Lewis Hamilton', away: 'Charles Leclerc', date: '2026-04-12T15:00:00Z', venue: 'Sakhir, Bahrain', slug: 'formula-1' },
+      { id: 'f1_2026_r04_h2h_3', sportId: 11, league: 'F1 Bahrain GP - Driver H2H', home: 'Oscar Piastri', away: 'George Russell', date: '2026-04-12T15:00:00Z', venue: 'Sakhir, Bahrain', slug: 'formula-1' },
+      { id: 'f1_2026_r04_h2h_4', sportId: 11, league: 'F1 Bahrain GP - Driver H2H', home: 'Carlos Sainz', away: 'Liam Lawson', date: '2026-04-12T15:00:00Z', venue: 'Sakhir, Bahrain', slug: 'formula-1' },
+      { id: 'f1_2026_r04_h2h_5', sportId: 11, league: 'F1 Bahrain GP - Driver H2H', home: 'Fernando Alonso', away: 'Nico Hülkenberg', date: '2026-04-12T15:00:00Z', venue: 'Sakhir, Bahrain', slug: 'formula-1' },
+
+      { id: 'f1_2026_r05_h2h_1', sportId: 11, league: 'F1 Saudi Arabian GP - Driver H2H', home: 'Max Verstappen', away: 'Oscar Piastri', date: '2026-04-19T17:00:00Z', venue: 'Jeddah, Saudi Arabia', slug: 'formula-1' },
+      { id: 'f1_2026_r05_h2h_2', sportId: 11, league: 'F1 Saudi Arabian GP - Driver H2H', home: 'Charles Leclerc', away: 'George Russell', date: '2026-04-19T17:00:00Z', venue: 'Jeddah, Saudi Arabia', slug: 'formula-1' },
+      { id: 'f1_2026_r05_h2h_3', sportId: 11, league: 'F1 Saudi Arabian GP - Driver H2H', home: 'Lewis Hamilton', away: 'Lando Norris', date: '2026-04-19T17:00:00Z', venue: 'Jeddah, Saudi Arabia', slug: 'formula-1' },
+      { id: 'f1_2026_r05_h2h_4', sportId: 11, league: 'F1 Saudi Arabian GP - Driver H2H', home: 'Andrea Kimi Antonelli', away: 'Oliver Bearman', date: '2026-04-19T17:00:00Z', venue: 'Jeddah, Saudi Arabia', slug: 'formula-1' },
+
+      { id: 'f1_2026_r06_h2h_1', sportId: 11, league: 'F1 Miami GP - Driver H2H', home: 'Max Verstappen', away: 'Lewis Hamilton', date: '2026-05-03T19:00:00Z', venue: 'Miami, FL, USA', slug: 'formula-1' },
+      { id: 'f1_2026_r06_h2h_2', sportId: 11, league: 'F1 Miami GP - Driver H2H', home: 'Lando Norris', away: 'Charles Leclerc', date: '2026-05-03T19:00:00Z', venue: 'Miami, FL, USA', slug: 'formula-1' },
+      { id: 'f1_2026_r06_h2h_3', sportId: 11, league: 'F1 Miami GP - Driver H2H', home: 'Oscar Piastri', away: 'Carlos Sainz', date: '2026-05-03T19:00:00Z', venue: 'Miami, FL, USA', slug: 'formula-1' },
+      { id: 'f1_2026_r06_h2h_4', sportId: 11, league: 'F1 Miami GP - Driver H2H', home: 'George Russell', away: 'Fernando Alonso', date: '2026-05-03T19:00:00Z', venue: 'Miami, FL, USA', slug: 'formula-1' },
 
       { id: 'mma_20260308_1', sportId: 7, league: 'UFC Fight Night', home: 'TBA', away: 'TBA', date: '2026-03-08T23:00:00Z', venue: 'Las Vegas, NV, USA', slug: 'mma' },
     ];
@@ -645,8 +704,9 @@ export class FreeSportsService {
         { id: 'away', name: ev.away, odds: awayOdds, probability: 1 / awayOdds }
       ];
 
+      const isF1 = ev.slug === 'formula-1';
       const markets: MarketData[] = [
-        { id: 'winner', name: 'Match Winner', outcomes }
+        { id: 'winner', name: isF1 ? 'Driver H2H' : 'Match Winner', outcomes }
       ];
 
       events.push({
