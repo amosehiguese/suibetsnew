@@ -112,14 +112,6 @@ const FREE_SPORTS_CONFIG: Record<string, {
     hasDraws: true,
     daysAhead: 2
   },
-  'formula-1': {
-    endpoint: 'https://v1.formula-1.api-sports.io/races',
-    apiHost: 'v1.formula-1.api-sports.io',
-    sportId: 13,
-    name: 'Formula 1',
-    hasDraws: false,
-    daysAhead: 2
-  },
   handball: {
     endpoint: 'https://v1.handball.api-sports.io/games',
     apiHost: 'v1.handball.api-sports.io',
@@ -154,22 +146,6 @@ const FREE_SPORTS_CONFIG: Record<string, {
     isRapidApi: true,
     rapidApiKey: '35244dbeebmsh90d96a714c2827fp1b3101jsnafe411c38a3a'
   },
-  cricket: {
-    endpoint: 'https://v1.cricket.api-sports.io/fixtures',
-    apiHost: 'v1.cricket.api-sports.io',
-    sportId: 9,
-    name: 'Cricket',
-    hasDraws: true,
-    daysAhead: 2
-  },
-  boxing: {
-    endpoint: 'https://v1.boxing.api-sports.io/fights',
-    apiHost: 'v1.boxing.api-sports.io',
-    sportId: 17,
-    name: 'Boxing',
-    hasDraws: false,
-    daysAhead: 2
-  }
 };
 
 const MMA_ORGANIZATIONS = new Set([
@@ -302,9 +278,7 @@ export class FreeSportsService {
         const daysToFetch = config.daysAhead || 2;
         let sportRateLimited = false;
 
-        if (sportSlug === 'formula-1') {
-          sportEvents = await this.fetchF1Races(config);
-        } else if (sportSlug === 'horse-racing') {
+        if (sportSlug === 'horse-racing') {
           sportEvents = await this.fetchHorseRacing(config);
         } else {
           for (let dayOffset = 0; dayOffset < daysToFetch; dayOffset++) {
@@ -365,89 +339,6 @@ export class FreeSportsService {
       console.warn(`[FreeSports] ⚠️ Got 0 events - likely API rate limit. NOT overwriting cache.`);
     }
     return allEvents;
-  }
-
-  private async fetchF1Races(config: typeof FREE_SPORTS_CONFIG[string]): Promise<SportEvent[]> {
-    try {
-      const currentYear = new Date().getFullYear();
-      const seasonsToTry = [currentYear, currentYear - 1, currentYear - 2];
-      
-      for (const season of seasonsToTry) {
-        try {
-          const response = await axios.get(config.endpoint, {
-            params: { season, type: 'Race' },
-            headers: {
-              'x-apisports-key': API_KEY,
-              'Accept': 'application/json'
-            },
-            timeout: 10000
-          });
-
-          if (response.data?.errors && Object.keys(response.data.errors).length > 0) {
-            console.log(`[FreeSports] F1 season ${season} not available: ${JSON.stringify(response.data.errors)}`);
-            continue;
-          }
-
-          const races = response.data?.response || [];
-          if (races.length === 0) continue;
-
-          const now = new Date();
-          const futureRaces = races.filter((race: any) => {
-            if (!race.date) return true;
-            try {
-              return new Date(race.date) > now;
-            } catch {
-              return true;
-            }
-          });
-
-          const events = futureRaces.map((race: any) => {
-            const competition = race.competition?.name || 'Formula 1 Grand Prix';
-            const circuit = race.circuit?.name || 'Circuit';
-            const location = race.circuit?.location || '';
-            const country = race.country?.name || '';
-            const raceId = String(race.id || `f1-${season}-${Math.random().toString(36).slice(2,8)}`);
-            const startTime = safeParseDate(race);
-
-            const homeTeam = `${competition}`;
-            const awayTeam = circuit + (country ? ` - ${country}` : '');
-
-            const homeOdds = 1.8 + Math.random() * 0.5;
-            const awayOdds = 1.8 + Math.random() * 0.5;
-
-            const outcomes: OutcomeData[] = [
-              { id: 'home', name: homeTeam, odds: parseFloat(homeOdds.toFixed(2)), probability: 1 / homeOdds },
-              { id: 'away', name: awayTeam, odds: parseFloat(awayOdds.toFixed(2)), probability: 1 / awayOdds }
-            ];
-
-            return {
-              id: `formula-1_${raceId}`,
-              sportId: 13,
-              leagueName: `Formula 1 ${season}`,
-              homeTeam,
-              awayTeam,
-              startTime,
-              status: 'scheduled' as const,
-              isLive: false,
-              markets: [{ id: 'winner', name: 'Race Winner', outcomes }],
-              homeOdds: parseFloat(homeOdds.toFixed(2)),
-              awayOdds: parseFloat(awayOdds.toFixed(2))
-            };
-          });
-
-          console.log(`[FreeSports] F1: Found ${events.length} upcoming races from season ${season}`);
-          return events;
-        } catch (err: any) {
-          console.warn(`[FreeSports] F1 season ${season} failed: ${err.message}`);
-        }
-      }
-
-      console.log('[FreeSports] F1: No races available from API');
-      return [];
-    } catch (error: any) {
-      console.error('[FreeSports] F1 fetch error:', error.message);
-      return [];
-    }
   }
 
   private async fetchHorseRacing(config: typeof FREE_SPORTS_CONFIG[string]): Promise<SportEvent[]> {
@@ -673,7 +564,7 @@ export class FreeSportsService {
     const dateStr = yesterday.toISOString().split('T')[0];
 
     for (const [sportSlug, config] of Object.entries(FREE_SPORTS_CONFIG)) {
-      if (sportSlug === 'horse-racing' || sportSlug === 'formula-1') continue;
+      if (sportSlug === 'horse-racing') continue;
 
       try {
         const headers: Record<string, string> = {
