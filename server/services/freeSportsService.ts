@@ -1162,6 +1162,26 @@ export class FreeSportsService {
       ['Dragon Lee', 'Ricochet', 1.85, 2.00, 'Cruiserweight Showcase'],
       ['R-Truth', 'Karrion Kross', 2.80, 1.43, 'Open Challenge'],
     ];
+    const rawMid2: [string, string, number, number, string][] = [
+      ['Bron Breakker', 'Ilja Dragunov', 1.55, 2.50, 'IC Title Contender'],
+      ['Sami Zayn', 'Chad Gable', 1.60, 2.35, 'Grudge Match'],
+      ['Pete Dunne', 'Dragon Lee', 1.80, 2.05, 'Cruiserweight Battle'],
+      ['Karrion Kross', 'Sheamus', 1.67, 2.25, 'Grudge Match'],
+      ['Ludwig Kaiser', 'Kofi Kingston', 1.50, 2.60, 'Singles Action'],
+      ['Ilja Dragunov', 'Ricochet', 1.70, 2.15, 'High Flying Clash'],
+      ['Damian Priest', 'Bronson Reed', 1.45, 2.75, 'Powerhouse Bout'],
+      ['Braun Strowman', 'Otis', 1.36, 3.10, 'Big Man Showdown'],
+    ];
+    const rawTitle: [string, string, number, number, string][] = [
+      ['Bron Breakker', 'Jey Uso', 1.40, 3.00, 'Intercontinental Championship'],
+      ['Sami Zayn', 'Ludwig Kaiser', 1.57, 2.45, 'IC Title Defense'],
+      ['Sheamus', 'Bron Breakker', 2.10, 1.77, 'IC Title Challenge'],
+      ['Jey Uso', 'Sami Zayn', 1.50, 2.60, 'IC Title Rematch'],
+      ['Bron Breakker', 'Pete Dunne', 1.30, 3.50, 'IC Title Open Challenge'],
+      ['Chad Gable', 'Sami Zayn', 2.20, 1.72, 'IC Title Contender Match'],
+      ['Ilja Dragunov', 'Bron Breakker', 1.91, 1.91, 'IC Title Dream Match'],
+      ['Jey Uso', 'Chad Gable', 1.44, 2.80, 'IC Title Defense'],
+    ];
     const rawTag: [string, string, number, number, string][] = [
       ['The Judgment Day', 'The LWO', 1.44, 2.80, 'Tag Team Match'],
       ['DIY', 'The Creed Brothers', 1.60, 2.35, 'Tag Team Contenders'],
@@ -1171,6 +1191,16 @@ export class FreeSportsService {
       ['The Usos', 'Pretty Deadly', 1.28, 3.75, 'Tag Team Showcase'],
       ['Authors of Pain', 'American Alpha', 1.67, 2.25, 'Tag Team Battle'],
       ['Motor City Machine Guns', 'Legado del Fantasma', 1.45, 2.75, 'Tag Team Classic'],
+    ];
+    const rawOpener: [string, string, number, number, string][] = [
+      ['Akira Tozawa', 'Cedric Alexander', 1.91, 1.91, 'Opening Contest'],
+      ['R-Truth', 'Giovanni Vinci', 1.65, 2.25, 'Opening Match'],
+      ['Ricochet', 'Akira Tozawa', 1.28, 3.75, 'High Energy Opener'],
+      ['Dominik Mysterio', 'Dragon Lee', 1.70, 2.15, 'Opening Bout'],
+      ['Xavier Woods', 'Giovanni Vinci', 1.57, 2.45, 'Show Opener'],
+      ['Pete Dunne', 'Cedric Alexander', 1.44, 2.80, 'Opening Singles'],
+      ['Kofi Kingston', 'Akira Tozawa', 1.33, 3.25, 'Kickoff Match'],
+      ['Otis', 'R-Truth', 1.50, 2.60, 'Fun Opener'],
     ];
     const sdMain: [string, string, number, number, string][] = [
       ['Cody Rhodes', 'AJ Styles', 1.30, 3.50, 'Main Event'],
@@ -1198,6 +1228,26 @@ export class FreeSportsService {
       ['Nick Aldis', 'Solo Sikoa', 2.60, 1.50, 'Authority vs Bloodline'],
       ['Bobby Lashley', 'Bron Breakker', 1.65, 2.25, 'Powerhouse Match'],
     ];
+    const sdMid2: [string, string, number, number, string][] = [
+      ['Andrade', 'Angel Garza', 1.50, 2.60, 'Former Partners Clash'],
+      ['Baron Corbin', 'Montez Ford', 1.70, 2.15, 'SmackDown Bout'],
+      ['Austin Theory', 'Apollo Crews', 1.57, 2.45, 'Singles Match'],
+      ['Santos Escobar', 'Carmelo Hayes', 1.65, 2.25, 'Rivalry Match'],
+      ['Bron Breakker', 'Grayson Waller', 1.33, 3.25, 'Powerhouse vs Flash'],
+      ['Angelo Dawkins', 'Baron Corbin', 1.80, 2.05, 'SmackDown Action'],
+      ['Bobby Lashley', 'Apollo Crews', 1.40, 3.00, 'All Mighty Challenge'],
+      ['Nick Aldis', 'Austin Theory', 2.40, 1.57, 'GM vs Superstar'],
+    ];
+    const sdTitle: [string, string, number, number, string][] = [
+      ['LA Knight', 'Carmelo Hayes', 1.44, 2.80, 'United States Championship'],
+      ['Santos Escobar', 'LA Knight', 1.70, 2.15, 'US Title Defense'],
+      ['Andrade', 'LA Knight', 1.91, 1.91, 'US Title Challenge'],
+      ['Carmelo Hayes', 'Andrade', 1.55, 2.50, 'US Title Contender Match'],
+      ['LA Knight', 'Grayson Waller', 1.30, 3.50, 'US Title Open Challenge'],
+      ['Austin Theory', 'LA Knight', 2.20, 1.72, 'US Title Grudge Match'],
+      ['Santos Escobar', 'Carmelo Hayes', 1.60, 2.35, 'US Title No.1 Contender'],
+      ['LA Knight', 'Apollo Crews', 1.36, 3.10, 'US Title Defense'],
+    ];
     const sdTag: [string, string, number, number, string][] = [
       ['Street Profits', 'B-Fab & Jade', 1.45, 2.75, 'Mixed Tag Match'],
       ['DIY', 'The Bloodline', 1.70, 2.15, 'Tag Team Match'],
@@ -1207,6 +1257,16 @@ export class FreeSportsService {
       ['Motor City Machine Guns', 'DIY', 1.91, 1.91, 'Tag Team Classic'],
       ['Imperium', 'Brawling Brutes', 1.50, 2.60, 'European Tag Match'],
       ['New Catch Republic', 'The Creed Brothers', 1.60, 2.35, 'Tag Division Match'],
+    ];
+    const sdOpener: [string, string, number, number, string][] = [
+      ['Pretty Deadly', 'Los Lotharios', 1.57, 2.45, 'Opening Contest'],
+      ['Giovanni Vinci', 'Cedric Alexander', 1.70, 2.15, 'Opening Match'],
+      ['Akira Tozawa', 'Angel Garza', 2.20, 1.72, 'Show Opener'],
+      ['Grayson Waller', 'Cedric Alexander', 1.44, 2.80, 'Opening Bout'],
+      ['Apollo Crews', 'Giovanni Vinci', 1.55, 2.50, 'SmackDown Opener'],
+      ['Austin Theory', 'Akira Tozawa', 1.33, 3.25, 'Opening Singles'],
+      ['Angel Garza', 'Giovanni Vinci', 1.91, 1.91, 'Kickoff Match'],
+      ['Baron Corbin', 'Cedric Alexander', 1.40, 3.00, 'Opening Action'],
     ];
 
     const nowUtcDay = now.getUTCDay();
@@ -1222,16 +1282,25 @@ export class FreeSportsService {
       const rv = rawVenues[venueIdx];
 
       const [m1, m2, mo1, mo2, mt] = rawMain[weekOffset % rawMain.length];
-      events.push({ id: `raw-${rawDateStr}-main`, wrestler1: m1, wrestler2: m2, odds1: mo1, odds2: mo2, title: mt, venue: rv, date: new Date(mondayMs + 3 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Singles Match' });
+      events.push({ id: `raw-${rawDateStr}-main`, wrestler1: m1, wrestler2: m2, odds1: mo1, odds2: mo2, title: mt, venue: rv, date: new Date(mondayMs + 4 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Singles Match' });
 
       const [w1, w2, wo1, wo2, wt] = rawWomens[weekOffset % rawWomens.length];
-      events.push({ id: `raw-${rawDateStr}-women`, wrestler1: w1, wrestler2: w2, odds1: wo1, odds2: wo2, title: wt, venue: rv, date: new Date(mondayMs + 2.5 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Singles Match' });
+      events.push({ id: `raw-${rawDateStr}-women`, wrestler1: w1, wrestler2: w2, odds1: wo1, odds2: wo2, title: wt, venue: rv, date: new Date(mondayMs + 3.5 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Singles Match' });
+
+      const [rt1, rt2, rto1, rto2, rtt] = rawTitle[weekOffset % rawTitle.length];
+      events.push({ id: `raw-${rawDateStr}-title`, wrestler1: rt1, wrestler2: rt2, odds1: rto1, odds2: rto2, title: rtt, venue: rv, date: new Date(mondayMs + 3 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Championship Match' });
 
       const [md1, md2, mdo1, mdo2, mdt] = rawMid[weekOffset % rawMid.length];
-      events.push({ id: `raw-${rawDateStr}-mid`, wrestler1: md1, wrestler2: md2, odds1: mdo1, odds2: mdo2, title: mdt, venue: rv, date: new Date(mondayMs + 2 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Singles Match' });
+      events.push({ id: `raw-${rawDateStr}-mid`, wrestler1: md1, wrestler2: md2, odds1: mdo1, odds2: mdo2, title: mdt, venue: rv, date: new Date(mondayMs + 2.5 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Singles Match' });
+
+      const [md21, md22, md2o1, md2o2, md2t] = rawMid2[weekOffset % rawMid2.length];
+      events.push({ id: `raw-${rawDateStr}-mid2`, wrestler1: md21, wrestler2: md22, odds1: md2o1, odds2: md2o2, title: md2t, venue: rv, date: new Date(mondayMs + 2 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Singles Match' });
 
       const [t1, t2, to1, to2, tt] = rawTag[weekOffset % rawTag.length];
       events.push({ id: `raw-${rawDateStr}-tag`, wrestler1: t1, wrestler2: t2, odds1: to1, odds2: to2, title: tt, venue: rv, date: new Date(mondayMs + 1.5 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Tag Team Match' });
+
+      const [ro1, ro2, roo1, roo2, rot] = rawOpener[weekOffset % rawOpener.length];
+      events.push({ id: `raw-${rawDateStr}-opener`, wrestler1: ro1, wrestler2: ro2, odds1: roo1, odds2: roo2, title: rot, venue: rv, date: new Date(mondayMs + 1 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Singles Match' });
 
       const fridayMs = mondayMs + 4 * 86400000;
       const sdVenueIdx = weekOffset % sdVenues.length;
@@ -1239,16 +1308,25 @@ export class FreeSportsService {
       const sv = sdVenues[sdVenueIdx];
 
       const [s1, s2, so1, so2, st] = sdMain[weekOffset % sdMain.length];
-      events.push({ id: `sd-${sdDateStr}-main`, wrestler1: s1, wrestler2: s2, odds1: so1, odds2: so2, title: st, venue: sv, date: new Date(fridayMs + 3 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Singles Match' });
+      events.push({ id: `sd-${sdDateStr}-main`, wrestler1: s1, wrestler2: s2, odds1: so1, odds2: so2, title: st, venue: sv, date: new Date(fridayMs + 4 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Singles Match' });
 
       const [sw1, sw2, swo1, swo2, swt] = sdWomens[weekOffset % sdWomens.length];
-      events.push({ id: `sd-${sdDateStr}-women`, wrestler1: sw1, wrestler2: sw2, odds1: swo1, odds2: swo2, title: swt, venue: sv, date: new Date(fridayMs + 2.5 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Singles Match' });
+      events.push({ id: `sd-${sdDateStr}-women`, wrestler1: sw1, wrestler2: sw2, odds1: swo1, odds2: swo2, title: swt, venue: sv, date: new Date(fridayMs + 3.5 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Singles Match' });
+
+      const [sdt1, sdt2, sdto1, sdto2, sdtt] = sdTitle[weekOffset % sdTitle.length];
+      events.push({ id: `sd-${sdDateStr}-title`, wrestler1: sdt1, wrestler2: sdt2, odds1: sdto1, odds2: sdto2, title: sdtt, venue: sv, date: new Date(fridayMs + 3 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Championship Match' });
 
       const [smd1, smd2, smdo1, smdo2, smdt] = sdMid[weekOffset % sdMid.length];
-      events.push({ id: `sd-${sdDateStr}-mid`, wrestler1: smd1, wrestler2: smd2, odds1: smdo1, odds2: smdo2, title: smdt, venue: sv, date: new Date(fridayMs + 2 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Singles Match' });
+      events.push({ id: `sd-${sdDateStr}-mid`, wrestler1: smd1, wrestler2: smd2, odds1: smdo1, odds2: smdo2, title: smdt, venue: sv, date: new Date(fridayMs + 2.5 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Singles Match' });
+
+      const [smd21, smd22, smd2o1, smd2o2, smd2t] = sdMid2[weekOffset % sdMid2.length];
+      events.push({ id: `sd-${sdDateStr}-mid2`, wrestler1: smd21, wrestler2: smd22, odds1: smd2o1, odds2: smd2o2, title: smd2t, venue: sv, date: new Date(fridayMs + 2 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Singles Match' });
 
       const [st1, st2, sto1, sto2, stt] = sdTag[weekOffset % sdTag.length];
       events.push({ id: `sd-${sdDateStr}-tag`, wrestler1: st1, wrestler2: st2, odds1: sto1, odds2: sto2, title: stt, venue: sv, date: new Date(fridayMs + 1.5 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Tag Team Match' });
+
+      const [sop1, sop2, sopo1, sopo2, sopt] = sdOpener[weekOffset % sdOpener.length];
+      events.push({ id: `sd-${sdDateStr}-opener`, wrestler1: sop1, wrestler2: sop2, odds1: sopo1, odds2: sopo2, title: sopt, venue: sv, date: new Date(fridayMs + 1 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Singles Match' });
     }
 
     return events;
