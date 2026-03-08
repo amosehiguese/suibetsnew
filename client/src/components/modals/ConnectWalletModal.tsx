@@ -412,7 +412,45 @@ export function ConnectWalletModal({ isOpen, onClose }: ConnectWalletModalProps)
             </Button>
           </div>
 
-          {/* Google zkLogin hidden until Enoki mainnet plan is activated */}
+          {googleClientId && (
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-gray-700" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-[#0d1b1e] px-2 text-gray-500">or sign in with</span>
+              </div>
+            </div>
+          )}
+
+          {googleClientId && (
+            <Button
+              variant="outline"
+              className="w-full py-3 hover:bg-cyan-900/20 hover:border-cyan-500/50 border-gray-700"
+              onClick={async () => {
+                try {
+                  await startGoogleLogin();
+                } catch (err: any) {
+                  setError(err.message || 'Failed to start Google login');
+                }
+              }}
+              disabled={zkLoading || connecting}
+              data-testid="button-google-zklogin"
+            >
+              {zkLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                <>
+                  <SiGoogle className="mr-2 h-5 w-5 text-white" />
+                  <span className="text-white">Continue with Google</span>
+                  <span className="ml-auto text-xs text-cyan-400">zkLogin</span>
+                </>
+              )}
+            </Button>
+          )}
 
           {displayWallets.length > 0 ? (
             <div className="space-y-2">

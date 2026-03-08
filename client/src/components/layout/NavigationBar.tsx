@@ -8,6 +8,7 @@ import { SettingsModal } from "@/components/modals/SettingsModal";
 import { shortenAddress } from "@/lib/utils";
 import { Bell, Settings, LogOut } from "lucide-react";
 import { useCurrentAccount } from "@mysten/dapp-kit";
+import { useZkLogin } from "@/context/ZkLoginContext";
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
@@ -22,7 +23,8 @@ const NavigationBar = () => {
   const [location, setLocation] = useLocation();
   const { user, isAuthenticated, disconnectWallet } = useAuth();
   const currentAccount = useCurrentAccount();
-  const address = currentAccount?.address;
+  const { isZkLoginActive, zkLoginAddress } = useZkLogin();
+  const address = currentAccount?.address || (isZkLoginActive ? zkLoginAddress : null);
   const isConnected = !!address;
   const { toast } = useToast();
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
