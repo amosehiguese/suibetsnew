@@ -12,6 +12,7 @@ import sportMarketsAdapter from "@/lib/sportMarketsAdapter";
 import { useBetting } from "@/context/BettingContext";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrentAccount, useDisconnectWallet, useSuiClientQuery } from "@mysten/dapp-kit";
+import { useZkLogin } from "@/context/ZkLoginContext";
 import { ConnectWalletModal } from "@/components/modals/ConnectWalletModal";
 import Footer from "@/components/layout/Footer";
 import { useLiveEvents, useUpcomingEvents } from "@/hooks/useEvents";
@@ -132,10 +133,10 @@ export default function CleanHome() {
     setTimeout(() => scrollToMatches(), 100);
   };
   
-  // Use dapp-kit for wallet state
   const currentAccount = useCurrentAccount();
   const { mutate: disconnectWallet } = useDisconnectWallet();
-  const walletAddress = currentAccount?.address;
+  const { isZkLoginActive, zkLoginAddress, logout: zkLogout } = useZkLogin();
+  const walletAddress = currentAccount?.address || (isZkLoginActive ? zkLoginAddress : null);
   const isConnected = !!walletAddress;
   
   // Fetch on-chain wallet SUI balance
@@ -196,7 +197,12 @@ export default function CleanHome() {
   });
 
   const promotion = promotionData?.promotion;
-  const disconnect = () => disconnectWallet();
+  const disconnect = () => {
+    if (isZkLoginActive) {
+      zkLogout();
+    }
+    disconnectWallet();
+  };
 
   const { data: liveEvents = [], isLoading: liveLoading, refetch: refetchLive } = useLiveEvents(selectedSport);
   const { data: upcomingEvents = [], isLoading: upcomingLoading, refetch: refetchUpcoming } = useUpcomingEvents(selectedSport);
