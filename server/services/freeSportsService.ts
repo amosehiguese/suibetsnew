@@ -434,6 +434,8 @@ export class FreeSportsService {
       { sportId: 15, name: 'Rugby', fn: () => this.generateRugbyEvents() },
       { sportId: 16, name: 'Volleyball', fn: () => this.generateVolleyballEvents() },
       { sportId: 10, name: 'AFL', fn: () => this.generateAFLEvents() },
+      { sportId: 9, name: 'Cricket', fn: () => this.generateCricketEvents() },
+      { sportId: 18, name: 'Horse Racing', fn: () => this.generateFallbackHorseRacing() },
     ];
     for (const fb of fallbackSports) {
       try {
@@ -1855,6 +1857,79 @@ export class FreeSportsService {
           { id: 'away', name: g.away, odds: aOdds, probability: 1/aOdds },
         ]}],
         homeOdds: hOdds, awayOdds: aOdds, venue: g.venue,
+      } as SportEvent;
+    });
+  }
+
+  private generateCricketEvents(): SportEvent[] {
+    const now = new Date();
+    const matches: Array<{home: string; away: string; venue: string; league: string; date: Date}> = [];
+
+    const iccChampionsTrophy = [
+      { home: 'India', away: 'Bangladesh', venue: 'Dubai International Stadium, Dubai', date: new Date('2026-02-19T09:30:00Z') },
+      { home: 'Australia', away: 'England', venue: 'Gaddafi Stadium, Lahore', date: new Date('2026-02-22T09:30:00Z') },
+      { home: 'Pakistan', away: 'New Zealand', venue: 'National Stadium, Karachi', date: new Date('2026-02-23T09:30:00Z') },
+      { home: 'South Africa', away: 'Sri Lanka', venue: 'Dubai International Stadium, Dubai', date: new Date('2026-02-25T09:30:00Z') },
+      { home: 'India', away: 'Pakistan', venue: 'Dubai International Stadium, Dubai', date: new Date('2026-02-28T09:30:00Z') },
+      { home: 'England', away: 'West Indies', venue: 'Gaddafi Stadium, Lahore', date: new Date('2026-03-01T09:30:00Z') },
+      { home: 'Australia', away: 'South Africa', venue: 'Rawalpindi Cricket Stadium', date: new Date('2026-03-02T09:30:00Z') },
+      { home: 'New Zealand', away: 'Bangladesh', venue: 'National Stadium, Karachi', date: new Date('2026-03-04T09:30:00Z') },
+    ];
+    iccChampionsTrophy.forEach(m => matches.push({ ...m, league: 'ICC Champions Trophy 2026' }));
+
+    const iplMatches = [
+      { home: 'Chennai Super Kings', away: 'Mumbai Indians', venue: 'MA Chidambaram Stadium, Chennai', date: new Date('2026-03-14T14:00:00Z') },
+      { home: 'Royal Challengers Bengaluru', away: 'Kolkata Knight Riders', venue: 'M. Chinnaswamy Stadium, Bengaluru', date: new Date('2026-03-15T14:00:00Z') },
+      { home: 'Delhi Capitals', away: 'Punjab Kings', venue: 'Arun Jaitley Stadium, Delhi', date: new Date('2026-03-16T14:00:00Z') },
+      { home: 'Rajasthan Royals', away: 'Sunrisers Hyderabad', venue: 'Sawai Mansingh Stadium, Jaipur', date: new Date('2026-03-17T14:00:00Z') },
+      { home: 'Gujarat Titans', away: 'Lucknow Super Giants', venue: 'Narendra Modi Stadium, Ahmedabad', date: new Date('2026-03-18T14:00:00Z') },
+      { home: 'Mumbai Indians', away: 'Royal Challengers Bengaluru', venue: 'Wankhede Stadium, Mumbai', date: new Date('2026-03-20T14:00:00Z') },
+      { home: 'Kolkata Knight Riders', away: 'Chennai Super Kings', venue: 'Eden Gardens, Kolkata', date: new Date('2026-03-21T14:00:00Z') },
+      { home: 'Sunrisers Hyderabad', away: 'Delhi Capitals', venue: 'Rajiv Gandhi Intl Stadium, Hyderabad', date: new Date('2026-03-22T14:00:00Z') },
+    ];
+    iplMatches.forEach(m => matches.push({ ...m, league: 'IPL 2026' }));
+
+    const countyMatches = [
+      { home: 'Surrey', away: 'Hampshire', venue: 'The Oval, London', league: 'County Championship', date: new Date('2026-03-10T10:00:00Z') },
+      { home: 'Essex', away: 'Kent', venue: 'County Ground, Chelmsford', league: 'County Championship', date: new Date('2026-03-11T10:00:00Z') },
+      { home: 'Yorkshire', away: 'Lancashire', venue: 'Headingley, Leeds', league: 'County Championship', date: new Date('2026-03-12T10:00:00Z') },
+      { home: 'Nottinghamshire', away: 'Warwickshire', venue: 'Trent Bridge, Nottingham', league: 'County Championship', date: new Date('2026-03-13T10:00:00Z') },
+    ];
+    matches.push(...countyMatches);
+
+    const upcoming = matches.filter(m => m.date.getTime() > now.getTime());
+    if (upcoming.length === 0) {
+      const futureMatches = [...iccChampionsTrophy, ...iplMatches].map((m, i) => ({
+        ...m,
+        league: i < iccChampionsTrophy.length ? 'ICC Champions Trophy 2026' : 'IPL 2026',
+        date: new Date(now.getTime() + (i + 1) * 24 * 60 * 60 * 1000)
+      }));
+      upcoming.push(...futureMatches);
+    }
+
+    return upcoming.map(m => {
+      const hStr = (2.0 + Math.random() * 3.0);
+      const aStr = (2.0 + Math.random() * 3.0);
+      const total = hStr + aStr;
+      const hProb = hStr / total;
+      const aProb = aStr / total;
+      const margin = 1.08;
+      const hOdds = parseFloat((margin / hProb).toFixed(2));
+      const aOdds = parseFloat((margin / aProb).toFixed(2));
+      return {
+        id: `cricket_fb_${m.home.toLowerCase().replace(/\s/g, '-')}_${m.date.getTime()}`,
+        sportId: 9,
+        sportName: 'Cricket',
+        league: m.league,
+        homeTeam: m.home,
+        awayTeam: m.away,
+        startTime: m.date.toISOString(),
+        status: 'upcoming',
+        markets: [{ type: 'match_winner', outcomes: [
+          { id: 'home', name: m.home, odds: hOdds, probability: 1/hOdds },
+          { id: 'away', name: m.away, odds: aOdds, probability: 1/aOdds },
+        ]}],
+        homeOdds: hOdds, awayOdds: aOdds, venue: m.venue,
       } as SportEvent;
     });
   }
