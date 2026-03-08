@@ -1672,13 +1672,31 @@ export class BlockchainBetService {
     }
   }
 
-  private phantomVoidStatus: { running: boolean; voided: number; skipped: number; errors: string[]; liabilityFreed: number; scanned: number; total: number; startedAt: number; completedAt?: number } | null = null;
+  private phantomVoidStatus: { running: boolean; voided: number; skipped: number; errors: string[]; liabilityFreed: number; scanned: number; total: number; startedAt: number; completedAt?: number; scanId?: string } | null = null;
+  private activeScanId: string | null = null;
 
   getPhantomVoidStatus() {
+    if (this.phantomVoidStatus?.running) {
+      const elapsed = Date.now() - this.phantomVoidStatus.startedAt;
+      const STALE_TIMEOUT = 30 * 60 * 1000;
+      if (elapsed > STALE_TIMEOUT) {
+        console.warn(`⚠️ Phantom void scan stale (running for ${Math.round(elapsed / 60000)}min), marking as timed out`);
+        this.phantomVoidStatus.running = false;
+        this.phantomVoidStatus.completedAt = Date.now();
+        this.phantomVoidStatus.errors.push('Scan timed out after 30 minutes');
+        this.activeScanId = null;
+      }
+    }
     return this.phantomVoidStatus;
   }
 
+  resetPhantomVoidStatus() {
+    this.activeScanId = null;
+    this.phantomVoidStatus = null;
+  }
+
   canStartPhantomVoid(): { canStart: boolean; error?: string } {
+    this.getPhantomVoidStatus();
     if (this.phantomVoidStatus?.running) {
       return { canStart: false, error: 'Void scan already in progress' };
     }
@@ -1810,7 +1828,9 @@ export class BlockchainBetService {
       return { voided: 0, errors: ['Void scan already in progress'], skipped: 0, liabilityFreed: 0 };
     }
 
-    this.phantomVoidStatus = { running: true, voided: 0, skipped: 0, errors: [], liabilityFreed: 0, scanned: 0, total: 0, startedAt: Date.now() };
+    const scanId = `scan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    this.activeScanId = scanId;
+    this.phantomVoidStatus = { running: true, voided: 0, skipped: 0, errors: [], liabilityFreed: 0, scanned: 0, total: 0, startedAt: Date.now(), scanId };
 
     const keypair = this.getAdminKeypair();
     if (!keypair) {
@@ -1863,13 +1883,29 @@ export class BlockchainBetService {
       const { sql } = await import('drizzle-orm');
       const { bets } = await import('@shared/schema');
 
+      const getObjectWithRetry = async (id: string, maxRetries = 3): Promise<any> => {
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          try {
+            return await this.client.getObject({ id, options: { showContent: true } });
+          } catch (err: any) {
+            if ((err.message?.includes('429') || err.message?.includes('rate')) && attempt < maxRetries) {
+              const backoff = Math.min(2000 * Math.pow(2, attempt), 10000);
+              await new Promise(r => setTimeout(r, backoff));
+              continue;
+            }
+            throw err;
+          }
+        }
+      };
+
       for (const betObj of allBetObjects) {
+        if (this.activeScanId !== scanId) {
+          console.log('🛑 Scan aborted (reset by admin)');
+          return { voided: this.phantomVoidStatus?.voided || 0, errors: ['Scan aborted by admin reset'], skipped: this.phantomVoidStatus?.skipped || 0, liabilityFreed: this.phantomVoidStatus?.liabilityFreed || 0 };
+        }
         this.phantomVoidStatus.scanned++;
         try {
-          const obj = await this.client.getObject({
-            id: betObj.id,
-            options: { showContent: true },
-          });
+          const obj = await getObjectWithRetry(betObj.id);
 
           if (!obj.data?.content || obj.data.content.dataType !== 'moveObject') {
             this.phantomVoidStatus.skipped++;

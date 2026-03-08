@@ -1472,6 +1472,13 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       if (!hasValidToken && !hasValidPassword) {
         return res.status(401).json({ success: false, message: "Unauthorized" });
       }
+
+      const forceReset = req.body?.forceReset === true;
+      
+      if (forceReset) {
+        blockchainBetService.resetPhantomVoidStatus();
+        console.log('🔄 Admin force-reset phantom void status');
+      }
       
       const preCheck = blockchainBetService.canStartPhantomVoid();
       if (!preCheck.canStart) {

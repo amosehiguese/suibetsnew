@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -712,16 +712,34 @@ export default function AdminPanel() {
     setLoadingLegacy(false);
   };
 
+  const pollRetryCountRef = useRef(0);
+
   const pollVoidStatus = async () => {
     try {
       const response = await fetch('/api/admin/void-phantom-status', {
         headers: { 'Authorization': `Bearer ${getToken()}` }
       });
+      if (response.status === 401) {
+        pollRetryCountRef.current++;
+        if (pollRetryCountRef.current <= 60) {
+          setTimeout(pollVoidStatus, 5000);
+          return;
+        }
+        setVoidingPhantom(false);
+        toast({ title: 'Session Expired', description: 'Admin session expired during scan. The scan continues on the server — please log in again and check status.', variant: 'destructive' });
+        return;
+      }
       if (!response.ok) {
+        pollRetryCountRef.current++;
+        if (pollRetryCountRef.current <= 10) {
+          setTimeout(pollVoidStatus, 5000);
+          return;
+        }
         setVoidingPhantom(false);
         toast({ title: 'Poll Failed', description: `Server returned ${response.status}`, variant: 'destructive' });
         return;
       }
+      pollRetryCountRef.current = 0;
       const data = await response.json();
       if (data.success && data.status) {
         setVoidResult(data.status);
@@ -741,22 +759,38 @@ export default function AdminPanel() {
         setVoidingPhantom(false);
       }
     } catch (err: any) {
+      pollRetryCountRef.current++;
+      if (pollRetryCountRef.current <= 10) {
+        setTimeout(pollVoidStatus, 5000);
+        return;
+      }
       setVoidingPhantom(false);
       toast({ title: 'Poll Error', description: err.message || 'Lost connection to server', variant: 'destructive' });
     }
   };
 
-  const voidPhantomSbets = async () => {
+  const voidPhantomSbets = async (forceReset = false) => {
     setVoidingPhantom(true);
     setVoidResult(null);
+    pollRetryCountRef.current = 0;
     try {
       const response = await fetch('/api/admin/void-phantom-sbets', {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${getToken()}`,
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({ forceReset })
       });
+      if (response.status === 401) {
+        toast({
+          title: 'Session Expired',
+          description: 'Your admin session has expired. Please log in again.',
+          variant: 'destructive',
+        });
+        setVoidingPhantom(false);
+        return;
+      }
       const data = await response.json();
       if (data.success) {
         setVoidResult(data.status);
@@ -766,11 +800,19 @@ export default function AdminPanel() {
         });
         setTimeout(pollVoidStatus, 3000);
       } else {
-        toast({
-          title: 'Void Failed',
-          description: data.message || data.error,
-          variant: 'destructive',
-        });
+        if (data.message?.includes('already in progress')) {
+          toast({
+            title: 'Scan Stuck',
+            description: 'A previous scan appears stuck. Click "Force Reset & Restart" to clear it.',
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Void Failed',
+            description: data.message || data.error,
+            variant: 'destructive',
+          });
+        }
         setVoidingPhantom(false);
       }
     } catch (error: any) {
@@ -1234,24 +1276,34 @@ export default function AdminPanel() {
                     Scans on-chain SBETS bet objects and voids any phantom bets that are stuck with status=0 (pending) 
                     but not owned by any user. This frees up phantom liability from the treasury.
                   </p>
-                  <Button
-                    onClick={voidPhantomSbets}
-                    disabled={voidingPhantom}
-                    className="bg-orange-600 hover:bg-orange-700 text-white"
-                    data-testid="button-void-phantom"
-                  >
-                    {voidingPhantom ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Scanning & Voiding...
-                      </>
-                    ) : (
-                      <>
-                        <Shield className="w-4 h-4 mr-2" />
-                        Void Phantom SBETS Bets
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={() => voidPhantomSbets(false)}
+                      disabled={voidingPhantom}
+                      className="bg-orange-600 hover:bg-orange-700 text-white"
+                      data-testid="button-void-phantom"
+                    >
+                      {voidingPhantom ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Scanning & Voiding...
+                        </>
+                      ) : (
+                        <>
+                          <Shield className="w-4 h-4 mr-2" />
+                          Void Phantom Bets
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      onClick={() => voidPhantomSbets(true)}
+                      disabled={voidingPhantom}
+                      variant="outline"
+                      className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                    >
+                      Force Reset & Restart
+                    </Button>
+                  </div>
                   {voidResult && (
                     <div className={`mt-4 p-4 rounded-lg ${voidResult.running ? 'bg-yellow-500/10 border border-yellow-500/30' : 'bg-green-500/10 border border-green-500/30'}`}>
                       <p className={`text-sm font-medium ${voidResult.running ? 'text-yellow-400' : 'text-green-400'}`}>
