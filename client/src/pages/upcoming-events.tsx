@@ -56,6 +56,7 @@ export default function UpcomingEventsPage() {
       13: 'Formula 1',
       14: 'Cycling',
       15: 'American Football',
+      20: 'WWE Entertainment',
       26: 'Soccer'
     };
     return sportNames[sportId] || `Sport ${sportId}`;

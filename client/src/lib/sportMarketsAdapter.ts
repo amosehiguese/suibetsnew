@@ -27,7 +27,8 @@ export enum SportIds {
   AMERICAN_FOOTBALL = 14,
   AFL = 15,
   SNOOKER = 16,
-  DARTS = 17
+  DARTS = 17,
+  WWE_ENTERTAINMENT = 20
 }
 
 // Type definition for outcome (if not already defined elsewhere)
@@ -349,6 +350,11 @@ export const getAvailableMarketTypesForSport = (sportId: number): string[] => {
         MarketTypes.HANDICAP,
         MarketTypes.OVER_UNDER,
         MarketTypes.CORRECT_SCORE
+      ];
+
+    case SportIds.WWE_ENTERTAINMENT:
+      return [
+        MarketTypes.MATCH_WINNER,
       ];
       
     // For all other sports, use general markets

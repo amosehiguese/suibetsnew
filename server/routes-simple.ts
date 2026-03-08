@@ -1968,7 +1968,7 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         if (cleaned && cleaned !== rawEventId) idsToTry.push(cleaned);
       }
       if (/^\d+$/.test(rawEventId)) {
-        const sportPrefixes = ['basketball', 'ice-hockey', 'baseball', 'handball', 'rugby', 'volleyball', 'mma', 'american-football', 'afl', 'formula-1', 'boxing', 'esports', 'cricket'];
+        const sportPrefixes = ['basketball', 'ice-hockey', 'baseball', 'handball', 'rugby', 'volleyball', 'mma', 'american-football', 'afl', 'formula-1', 'boxing', 'esports', 'cricket', 'wwe'];
         for (const prefix of sportPrefixes) {
           idsToTry.push(`${prefix}_${rawEventId}`);
         }
@@ -2048,7 +2048,7 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       }
       
       // FAST PATH: Free sports (non-football, non-esports) - return from daily cache
-      const FREE_SPORT_IDS = [2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 17, 18];
+      const FREE_SPORT_IDS = [2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 17, 18, 19, 20];
       if (reqSportId && FREE_SPORT_IDS.includes(reqSportId)) {
         const freeSportsEvents = freeSportsService.getUpcomingEvents();
         const now = Date.now();

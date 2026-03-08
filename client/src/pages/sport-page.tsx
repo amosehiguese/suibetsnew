@@ -213,7 +213,10 @@ const getSportIdBySlug = (slug: string): number => {
     'american-football': SportIds.AMERICAN_FOOTBALL,
     'afl': SportIds.AFL,
     'snooker': SportIds.SNOOKER,
-    'darts': SportIds.DARTS
+    'darts': SportIds.DARTS,
+    'wwe': SportIds.WWE_ENTERTAINMENT,
+    'entertainment': SportIds.WWE_ENTERTAINMENT,
+    'wwe-entertainment': SportIds.WWE_ENTERTAINMENT
   };
 
   return sportMap[slug.toLowerCase()] || SportIds.SOCCER;
@@ -237,7 +240,8 @@ const getSportNameById = (id: number): string => {
     [SportIds.AMERICAN_FOOTBALL]: 'American Football',
     [SportIds.AFL]: 'AFL',
     [SportIds.SNOOKER]: 'Snooker',
-    [SportIds.DARTS]: 'Darts'
+    [SportIds.DARTS]: 'Darts',
+    [SportIds.WWE_ENTERTAINMENT]: 'WWE Entertainment'
   };
 
   return sportNames[id] || 'Unknown Sport';
@@ -261,7 +265,8 @@ const getSportIconById = (id: number): string => {
     [SportIds.AMERICAN_FOOTBALL]: '🏈',
     [SportIds.AFL]: '🏉',
     [SportIds.SNOOKER]: '🎱',
-    [SportIds.DARTS]: '🎯'
+    [SportIds.DARTS]: '🎯',
+    [SportIds.WWE_ENTERTAINMENT]: '🎭'
   };
 
   return sportIcons[id] || '🎮';

@@ -40,7 +40,7 @@ export default function LiveEventsPage() {
       13: '🏎️ Formula 1',
       14: '🚴 Cycling',
       15: '🏈 American Football',
-      20: '🏸 Badminton',
+      20: '🎭 WWE Entertainment',
       23: '🏎️ Motorsports',
       26: '⚽ Soccer'
     };

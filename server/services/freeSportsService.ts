@@ -394,6 +394,16 @@ export class FreeSportsService {
       console.error(`[FreeSports] Tennis generation error:`, error.message);
     }
 
+    try {
+      const wweEvents = this.generateWWEEvents();
+      if (wweEvents.length > 0) {
+        allEvents.push(...wweEvents);
+        console.log(`[FreeSports] 🎭 WWE Entertainment: ${wweEvents.length} upcoming events generated`);
+      }
+    } catch (error: any) {
+      console.error(`[FreeSports] WWE generation error:`, error.message);
+    }
+
     if (allEvents.length > 0) {
       cachedFreeSportsEvents = allEvents;
       lastFetchTime = Date.now();
@@ -1067,6 +1077,285 @@ export class FreeSportsService {
     });
   }
 
+  private generateWWEEvents(): SportEvent[] {
+    const WWE_SPORT_ID = 20;
+
+    const wweEvents: {
+      id: string;
+      wrestler1: string;
+      wrestler2: string;
+      odds1: number;
+      odds2: number;
+      title: string;
+      venue: string;
+      date: string;
+      show: string;
+      matchType: string;
+    }[] = [
+      {
+        id: 'wrestlemania42-punk-reigns',
+        wrestler1: 'CM Punk (c)',
+        wrestler2: 'Roman Reigns',
+        odds1: 1.65,
+        odds2: 2.20,
+        title: 'World Heavyweight Championship',
+        venue: 'Allegiant Stadium, Las Vegas',
+        date: '2026-04-19T22:00:00Z',
+        show: 'WrestleMania 42 - Night 2',
+        matchType: 'Singles Match'
+      },
+      {
+        id: 'wrestlemania42-rhodes-orton',
+        wrestler1: 'Cody Rhodes (c)',
+        wrestler2: 'Randy Orton',
+        odds1: 1.50,
+        odds2: 2.50,
+        title: 'Undisputed WWE Championship',
+        venue: 'Allegiant Stadium, Las Vegas',
+        date: '2026-04-18T22:00:00Z',
+        show: 'WrestleMania 42 - Night 1',
+        matchType: 'Singles Match'
+      },
+      {
+        id: 'wrestlemania42-cargill-ripley',
+        wrestler1: 'Jade Cargill (c)',
+        wrestler2: 'Rhea Ripley',
+        odds1: 2.10,
+        odds2: 1.72,
+        title: 'WWE Women\'s Championship',
+        venue: 'Allegiant Stadium, Las Vegas',
+        date: '2026-04-18T20:00:00Z',
+        show: 'WrestleMania 42 - Night 1',
+        matchType: 'Singles Match'
+      },
+      {
+        id: 'wrestlemania42-vaquer-morgan',
+        wrestler1: 'Stephanie Vaquer (c)',
+        wrestler2: 'Liv Morgan',
+        odds1: 1.80,
+        odds2: 2.00,
+        title: 'Women\'s World Championship',
+        venue: 'Allegiant Stadium, Las Vegas',
+        date: '2026-04-19T20:00:00Z',
+        show: 'WrestleMania 42 - Night 2',
+        matchType: 'Singles Match'
+      },
+      {
+        id: 'wrestlemania42-lee-lynch',
+        wrestler1: 'AJ Lee (c)',
+        wrestler2: 'Becky Lynch',
+        odds1: 1.90,
+        odds2: 1.90,
+        title: 'Women\'s Intercontinental Championship',
+        venue: 'Allegiant Stadium, Las Vegas',
+        date: '2026-04-18T19:00:00Z',
+        show: 'WrestleMania 42 - Night 1',
+        matchType: 'Singles Match'
+      },
+      {
+        id: 'wrestlemania42-rollins-paul',
+        wrestler1: 'Seth Rollins',
+        wrestler2: 'Logan Paul',
+        odds1: 1.40,
+        odds2: 2.90,
+        title: 'Special Attraction Match',
+        venue: 'Allegiant Stadium, Las Vegas',
+        date: '2026-04-19T19:30:00Z',
+        show: 'WrestleMania 42 - Night 2',
+        matchType: 'Singles Match'
+      },
+      {
+        id: 'wrestlemania42-lesnar-open',
+        wrestler1: 'Brock Lesnar',
+        wrestler2: 'Oba Femi',
+        odds1: 2.10,
+        odds2: 1.72,
+        title: 'Open Challenge',
+        venue: 'Allegiant Stadium, Las Vegas',
+        date: '2026-04-18T21:00:00Z',
+        show: 'WrestleMania 42 - Night 1',
+        matchType: 'Singles Match'
+      },
+      {
+        id: 'wrestlemania42-giulia-flair',
+        wrestler1: 'Giulia (c)',
+        wrestler2: 'Charlotte Flair',
+        odds1: 2.20,
+        odds2: 1.65,
+        title: 'United States Championship',
+        venue: 'Allegiant Stadium, Las Vegas',
+        date: '2026-04-19T18:30:00Z',
+        show: 'WrestleMania 42 - Night 2',
+        matchType: 'Singles Match'
+      },
+      {
+        id: 'wrestlemania42-hayes-williams',
+        wrestler1: 'Carmelo Hayes',
+        wrestler2: 'Trick Williams',
+        odds1: 1.85,
+        odds2: 1.95,
+        title: 'Grudge Match',
+        venue: 'Allegiant Stadium, Las Vegas',
+        date: '2026-04-18T18:30:00Z',
+        show: 'WrestleMania 42 - Night 1',
+        matchType: 'Singles Match'
+      },
+      {
+        id: 'backlash2026-main',
+        wrestler1: 'CM Punk',
+        wrestler2: 'Seth Rollins',
+        odds1: 1.55,
+        odds2: 2.40,
+        title: 'World Heavyweight Championship',
+        venue: 'Benchmark International Arena, Tampa',
+        date: '2026-05-09T23:00:00Z',
+        show: 'Backlash 2026',
+        matchType: 'Singles Match'
+      },
+      {
+        id: 'backlash2026-womens',
+        wrestler1: 'Rhea Ripley',
+        wrestler2: 'Bianca Belair',
+        odds1: 1.60,
+        odds2: 2.30,
+        title: 'WWE Women\'s Championship',
+        venue: 'Benchmark International Arena, Tampa',
+        date: '2026-05-09T22:00:00Z',
+        show: 'Backlash 2026',
+        matchType: 'Singles Match'
+      },
+      {
+        id: 'backlash2026-tag',
+        wrestler1: 'The Usos',
+        wrestler2: 'DIY',
+        odds1: 1.70,
+        odds2: 2.10,
+        title: 'Tag Team Championship',
+        venue: 'Benchmark International Arena, Tampa',
+        date: '2026-05-09T21:00:00Z',
+        show: 'Backlash 2026',
+        matchType: 'Tag Team Match'
+      },
+      {
+        id: 'clash-italy-main',
+        wrestler1: 'Cody Rhodes',
+        wrestler2: 'Gunther',
+        odds1: 1.75,
+        odds2: 2.05,
+        title: 'Undisputed WWE Championship',
+        venue: 'Inalpi Arena, Turin',
+        date: '2026-05-31T20:00:00Z',
+        show: 'Clash in Italy',
+        matchType: 'Singles Match'
+      },
+      {
+        id: 'clash-italy-womens',
+        wrestler1: 'Liv Morgan',
+        wrestler2: 'IYO SKY',
+        odds1: 1.65,
+        odds2: 2.20,
+        title: 'Women\'s World Championship',
+        venue: 'Inalpi Arena, Turin',
+        date: '2026-05-31T19:00:00Z',
+        show: 'Clash in Italy',
+        matchType: 'Singles Match'
+      },
+      {
+        id: 'summerslam2026-main',
+        wrestler1: 'Roman Reigns',
+        wrestler2: 'John Cena',
+        odds1: 1.45,
+        odds2: 2.75,
+        title: 'Undisputed WWE Championship',
+        venue: 'U.S. Bank Stadium, Minneapolis',
+        date: '2026-08-01T23:00:00Z',
+        show: 'SummerSlam 2026 - Night 1',
+        matchType: 'Singles Match'
+      },
+      {
+        id: 'summerslam2026-wh',
+        wrestler1: 'CM Punk',
+        wrestler2: 'Drew McIntyre',
+        odds1: 1.60,
+        odds2: 2.30,
+        title: 'World Heavyweight Championship',
+        venue: 'U.S. Bank Stadium, Minneapolis',
+        date: '2026-08-02T23:00:00Z',
+        show: 'SummerSlam 2026 - Night 2',
+        matchType: 'Singles Match'
+      },
+      {
+        id: 'summerslam2026-womens',
+        wrestler1: 'Rhea Ripley',
+        wrestler2: 'Charlotte Flair',
+        odds1: 1.55,
+        odds2: 2.40,
+        title: 'WWE Women\'s Championship',
+        venue: 'U.S. Bank Stadium, Minneapolis',
+        date: '2026-08-01T21:00:00Z',
+        show: 'SummerSlam 2026 - Night 1',
+        matchType: 'Singles Match'
+      },
+      {
+        id: 'mitb2026-mens',
+        wrestler1: 'LA Knight',
+        wrestler2: 'Jey Uso',
+        odds1: 2.50,
+        odds2: 3.00,
+        title: 'Men\'s Money in the Bank Ladder Match',
+        venue: 'Smoothie King Center, New Orleans',
+        date: '2026-09-06T23:00:00Z',
+        show: 'Money in the Bank 2026',
+        matchType: 'Ladder Match'
+      },
+      {
+        id: 'mitb2026-womens',
+        wrestler1: 'Bianca Belair',
+        wrestler2: 'Bayley',
+        odds1: 2.80,
+        odds2: 3.20,
+        title: 'Women\'s Money in the Bank Ladder Match',
+        venue: 'Smoothie King Center, New Orleans',
+        date: '2026-09-06T22:00:00Z',
+        show: 'Money in the Bank 2026',
+        matchType: 'Ladder Match'
+      },
+    ];
+
+    const now = new Date();
+    const upcomingEvents = wweEvents.filter(e => new Date(e.date) > now);
+
+    return upcomingEvents.map(event => {
+      const drawOdds = event.matchType === 'Ladder Match'
+        ? parseFloat((4.00 + Math.random() * 3).toFixed(2))
+        : parseFloat((8.00 + Math.random() * 12).toFixed(2));
+
+      return {
+        id: `wwe_${event.id}`,
+        sportId: WWE_SPORT_ID,
+        leagueName: event.show,
+        homeTeam: event.wrestler1,
+        awayTeam: event.wrestler2,
+        startTime: event.date,
+        status: 'scheduled',
+        isLive: false,
+        markets: [{
+          id: 'match_winner',
+          name: 'Match Winner',
+          outcomes: [
+            { id: 'wrestler1', name: event.wrestler1, odds: event.odds1, probability: 1 / event.odds1 },
+            { id: 'wrestler2', name: event.wrestler2, odds: event.odds2, probability: 1 / event.odds2 },
+          ]
+        }],
+        homeOdds: event.odds1,
+        awayOdds: event.odds2,
+        drawOdds,
+        venue: event.venue,
+        eventTitle: event.title,
+      } as SportEvent;
+    });
+  }
+
   private generateTennisEvents(): SportEvent[] {
     const TENNIS_SPORT_ID = 3;
 
@@ -1544,6 +1833,9 @@ export class FreeSportsService {
       if (sportSlug === 'horse-racing') {
         return cachedFreeSportsEvents.filter(e => e.sportId === HORSE_RACING_SPORT_ID);
       }
+      if (sportSlug === 'wwe' || sportSlug === 'entertainment' || sportSlug === 'wwe-entertainment') {
+        return cachedFreeSportsEvents.filter(e => e.sportId === 20);
+      }
       const config = FREE_SPORTS_CONFIG[sportSlug];
       if (config) {
         return cachedFreeSportsEvents.filter(e => e.sportId === config.sportId);
@@ -1561,6 +1853,7 @@ export class FreeSportsService {
     if (!sports.includes('boxing')) sports.push('boxing');
     if (!sports.includes('cricket')) sports.push('cricket');
     if (!sports.includes('horse-racing')) sports.push('horse-racing');
+    if (!sports.includes('wwe')) sports.push('wwe');
     return sports;
   }
 
@@ -1574,7 +1867,9 @@ export class FreeSportsService {
            sportSlug === 'mlb' ||
            sportSlug === 'boxing' ||
            sportSlug === 'tennis' ||
-           sportSlug === 'cricket';
+           sportSlug === 'cricket' ||
+           sportSlug === 'wwe' ||
+           sportSlug === 'entertainment';
   }
 
   /**

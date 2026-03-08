@@ -104,8 +104,23 @@ const sportImages: SportImage[] = [
   },
   {
     slug: 'afl',
-    imagePath: '/images/Sports 1 (2).png', // Using football image as fallback
+    imagePath: '/images/Sports 1 (2).png',
     title: 'AFL'
+  },
+  {
+    slug: 'wwe',
+    imagePath: '/images/image_1743932923834.png',
+    title: 'WWE Entertainment'
+  },
+  {
+    slug: 'wwe-entertainment',
+    imagePath: '/images/image_1743932923834.png',
+    title: 'WWE Entertainment'
+  },
+  {
+    slug: 'entertainment',
+    imagePath: '/images/image_1743932923834.png',
+    title: 'WWE Entertainment'
   }
 ];
 

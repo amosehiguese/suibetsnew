@@ -49,18 +49,36 @@ const SPORTS_MAPPING: Record<string, number> = {
   'badminton': 29,
   'beach-volleyball': 30,
   'winter-sports': 31,
+  'wwe': 20,
+  'wwe-entertainment': 20,
+  'entertainment': 20,
 };
 
 export default function SportPage() {
   const [match, params] = useRoute<{ sport: string }>('/sports-live/:sport');
   const { toast } = useToast();
   const sportSlugLower = match ? params.sport.toLowerCase() : '';
-  const noLiveSports = ['esports', 'afl', 'formula-1', 'handball', 'rugby', 'volleyball', 'boxing', 'netball', 'mma', 'mma-ufc', 'ufc', 'tennis', 'american-football', 'nfl', 'cricket', 'horse-racing'];
+  const noLiveSports = ['esports', 'afl', 'formula-1', 'handball', 'rugby', 'volleyball', 'boxing', 'netball', 'mma', 'mma-ufc', 'ufc', 'tennis', 'american-football', 'nfl', 'cricket', 'horse-racing', 'wwe', 'wwe-entertainment', 'entertainment'];
   const defaultTab = noLiveSports.includes(sportSlugLower) ? 'upcoming' : 'live';
   const [selectedTab, setSelectedTab] = useState<'live' | 'upcoming'>(defaultTab);
   
   const sportId = match ? SPORTS_MAPPING[sportSlugLower] : undefined;
-  const sportName = match ? params.sport.charAt(0).toUpperCase() + params.sport.slice(1) : '';
+  const SPORT_DISPLAY_NAMES: Record<string, string> = {
+    'wwe': 'WWE Entertainment',
+    'wwe-entertainment': 'WWE Entertainment',
+    'entertainment': 'WWE Entertainment',
+    'mma': 'MMA',
+    'mma-ufc': 'MMA / UFC',
+    'ufc': 'UFC',
+    'nba': 'NBA',
+    'nfl': 'NFL',
+    'nhl': 'NHL',
+    'mlb': 'MLB',
+    'afl': 'AFL',
+  };
+  const sportName = match 
+    ? (SPORT_DISPLAY_NAMES[sportSlugLower] || params.sport.charAt(0).toUpperCase() + params.sport.slice(1)) 
+    : '';
   
   // Fetch events for the selected sport
   const { 
