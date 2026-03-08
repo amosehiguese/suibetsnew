@@ -155,7 +155,7 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
   esportsService.start();
   console.log('🎮 Esports service started - LoL Esports + Dota 2 pro matches (free APIs)');
 
-  // AUTO-VOID disabled: phantom SBETS cleanup already completed (0 voided on last runs)
+  // AUTO-VOID completed: 69 phantom bets voided, 30M+ SBETS liability freed (2026-03-07)
   // Can still be triggered manually via POST /api/admin/void-phantom-sbets if needed
 
   // Shared guard: prevents both auto-resolve worker and manual endpoint from resolving the same prediction simultaneously
@@ -1482,9 +1482,9 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         return res.status(400).json({ success: false, message: preCheck.error });
       }
 
-      console.log('🗑️ Admin triggered phantom SBETS bet void (background)...');
-      blockchainBetService.voidPhantomSbetsBets().then(result => {
-        console.log(`🏁 Background void finished: ${result.voided} voided, ${result.liabilityFreed.toFixed(2)} SBETS freed`);
+      console.log('🗑️ Admin triggered ALL phantom bet void (SUI + SBETS, background)...');
+      blockchainBetService.voidAllPhantomBets().then(result => {
+        console.log(`🏁 Background void finished: ${result.voided} voided, ${result.liabilityFreed.toFixed(2)} total freed`);
       }).catch(err => {
         console.error('Background void error:', err);
       });
@@ -1673,13 +1673,13 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
 
   app.post("/api/admin/staking/force-unstake", async (req: Request, res: Response) => {
     try {
-      const { adminPassword, stakeId } = req.body;
+      const { stakeId, adminPassword } = req.body;
       const authHeader = req.headers.authorization;
       const token = authHeader?.replace('Bearer ', '');
       
       const hasValidToken = token && isValidAdminSession(token);
       const actualPassword = process.env.ADMIN_PASSWORD || 'change-me-in-production';
-      const hasValidPassword = adminPassword === actualPassword;
+      const hasValidPassword = adminPassword && adminPassword === actualPassword;
       
       if (!hasValidToken && !hasValidPassword) {
         return res.status(401).json({ success: false, message: "Unauthorized" });
@@ -1961,7 +1961,7 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         if (cleaned && cleaned !== rawEventId) idsToTry.push(cleaned);
       }
       if (/^\d+$/.test(rawEventId)) {
-        const sportPrefixes = ['basketball', 'ice-hockey', 'baseball', 'handball', 'rugby', 'volleyball', 'mma', 'american-football', 'afl', 'formula-1', 'boxing', 'esports', 'horse-racing', 'cricket'];
+        const sportPrefixes = ['basketball', 'ice-hockey', 'baseball', 'handball', 'rugby', 'volleyball', 'mma', 'american-football', 'afl', 'formula-1', 'boxing', 'esports', 'cricket'];
         for (const prefix of sportPrefixes) {
           idsToTry.push(`${prefix}_${rawEventId}`);
         }
@@ -2041,7 +2041,7 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       }
       
       // FAST PATH: Free sports (non-football, non-esports) - return from daily cache
-      const FREE_SPORT_IDS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+      const FREE_SPORT_IDS = [2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 17, 18];
       if (reqSportId && FREE_SPORT_IDS.includes(reqSportId)) {
         const freeSportsEvents = freeSportsService.getUpcomingEvents();
         const now = Date.now();
@@ -2431,6 +2431,15 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       });
     } catch (error) {
       res.status(500).json({ success: false, message: "Failed to get free sports events" });
+    }
+  });
+
+  app.get("/api/events/cricket", async (req: Request, res: Response) => {
+    try {
+      const events = freeSportsService.getUpcomingEvents('cricket');
+      res.json(events);
+    } catch (error) {
+      res.status(500).json([]);
     }
   });
 

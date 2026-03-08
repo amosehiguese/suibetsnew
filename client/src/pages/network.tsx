@@ -11,7 +11,8 @@ import {
   Plus, Search, Filter, Flame, Crown, Award,
   BarChart3, Wallet, ExternalLink, RefreshCw, ChevronRight,
   Share2, CheckCircle, XCircle, DollarSign, Star, X,
-  MessageCircle, Info, Send, ChevronDown, ChevronUp
+  MessageCircle, Info, Send, ChevronDown, ChevronUp,
+  BookOpen, Globe, Bookmark
 } from 'lucide-react';
 import { SiX } from 'react-icons/si';
 import { Button } from '@/components/ui/button';
@@ -67,6 +68,12 @@ function timeLeft(date: string | Date) {
   if (days > 0) return `${days}d ${hours}h left`;
   const mins = Math.floor((diff % 3600000) / 60000);
   return `${hours}h ${mins}m left`;
+}
+
+function formatPool(amount: number): string {
+  if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
+  if (amount >= 1000) return `${(amount / 1000).toFixed(1)}K`;
+  return amount.toFixed(0);
 }
 
 function copyToClipboard(text: string) {
@@ -163,41 +170,41 @@ function CreatePredictionModal({ onClose, wallet }: { onClose: () => void; walle
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose} data-testid="modal-create-prediction">
-      <div className="bg-[#111111] border border-cyan-900/30 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold text-white">Create Prediction Market</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-white p-1"><X size={20} /></button>
+      <div className="bg-[#0d1117] border border-[#1e3a5f]/50 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl shadow-blue-900/20" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-xl font-bold text-white">Create Market</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-white p-1 rounded-lg hover:bg-white/5"><X size={20} /></button>
         </div>
         <div className="space-y-4">
           <div>
-            <label className="text-gray-400 text-sm mb-1 block">Question</label>
+            <label className="text-gray-400 text-sm mb-1.5 block font-medium">Question</label>
             <input
               type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="Will BTC hit $150k by end of 2026?"
-              className="w-full bg-muted/50 border border-cyan-900/30 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-cyan-500/50 focus:outline-none"
+              className="w-full bg-[#161b22] border border-[#1e3a5f]/40 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:border-[#4da2ff]/60 focus:outline-none focus:ring-1 focus:ring-[#4da2ff]/20 transition-all"
               data-testid="input-prediction-title"
             />
           </div>
           <div>
-            <label className="text-gray-400 text-sm mb-1 block">Description (optional)</label>
+            <label className="text-gray-400 text-sm mb-1.5 block font-medium">Description (optional)</label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="Add context or rules..."
-              className="w-full bg-muted/50 border border-cyan-900/30 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-cyan-500/50 focus:outline-none resize-none"
+              className="w-full bg-[#161b22] border border-[#1e3a5f]/40 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:border-[#4da2ff]/60 focus:outline-none focus:ring-1 focus:ring-[#4da2ff]/20 transition-all resize-none"
               rows={2}
               data-testid="input-prediction-description"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-gray-400 text-sm mb-1 block">Category</label>
+              <label className="text-gray-400 text-sm mb-1.5 block font-medium">Category</label>
               <select
                 value={category}
                 onChange={e => setCategory(e.target.value)}
-                className="w-full bg-muted/50 border border-cyan-900/30 rounded-lg px-4 py-3 text-white focus:border-cyan-500/50 focus:outline-none"
+                className="w-full bg-[#161b22] border border-[#1e3a5f]/40 rounded-xl px-4 py-3 text-white focus:border-[#4da2ff]/60 focus:outline-none"
                 data-testid="select-prediction-category"
               >
                 {CATEGORIES.filter(c => c.value !== 'all').map(c => (
@@ -206,23 +213,23 @@ function CreatePredictionModal({ onClose, wallet }: { onClose: () => void; walle
               </select>
             </div>
             <div>
-              <label className="text-gray-400 text-sm mb-1 block">End Date</label>
+              <label className="text-gray-400 text-sm mb-1.5 block font-medium">End Date</label>
               <input
                 type="datetime-local"
                 value={endDate}
                 onChange={e => setEndDate(e.target.value)}
-                className="w-full bg-muted/50 border border-cyan-900/30 rounded-lg px-4 py-3 text-white focus:border-cyan-500/50 focus:outline-none"
+                className="w-full bg-[#161b22] border border-[#1e3a5f]/40 rounded-xl px-4 py-3 text-white focus:border-[#4da2ff]/60 focus:outline-none"
                 data-testid="input-prediction-enddate"
               />
             </div>
           </div>
 
-          <div className="border border-cyan-900/20 rounded-lg p-4 space-y-3 bg-cyan-900/5">
+          <div className="border border-[#1e3a5f]/30 rounded-xl p-4 space-y-3 bg-[#4da2ff]/5">
             <div className="flex items-center justify-between flex-wrap gap-1">
               <label className="text-gray-300 text-sm font-medium">Initial Bet (optional)</label>
               <span className="text-gray-500 text-xs">Max: 1,000,000 SBETS</span>
             </div>
-            <p className="text-gray-500 text-xs">Put SBETS on your own prediction to seed the pool and show confidence</p>
+            <p className="text-gray-500 text-xs">Put SBETS on your prediction to seed the pool</p>
             <input
               type="number"
               value={initialAmount}
@@ -230,29 +237,33 @@ function CreatePredictionModal({ onClose, wallet }: { onClose: () => void; walle
               placeholder="0"
               min="0"
               max="1000000"
-              className="w-full bg-muted/50 border border-cyan-900/30 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-cyan-500/50 focus:outline-none"
+              className="w-full bg-[#161b22] border border-[#1e3a5f]/40 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:border-[#4da2ff]/60 focus:outline-none"
               data-testid="input-prediction-initial-amount"
             />
             {parsedAmount > 0 && (
               <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant={initialSide === 'yes' ? 'default' : 'outline'}
-                  className={initialSide === 'yes' ? 'flex-1 bg-green-600 text-white' : 'flex-1 border-green-600/30 text-green-400'}
+                <button
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                    initialSide === 'yes'
+                      ? 'bg-[#22c55e] text-white shadow-lg shadow-green-500/20'
+                      : 'bg-[#161b22] text-gray-400 border border-gray-700 hover:border-green-500/40'
+                  }`}
                   onClick={() => setInitialSide('yes')}
                   data-testid="button-initial-side-yes"
                 >
-                  YES
-                </Button>
-                <Button
-                  size="sm"
-                  variant={initialSide === 'no' ? 'default' : 'outline'}
-                  className={initialSide === 'no' ? 'flex-1 bg-red-600 text-white' : 'flex-1 border-red-600/30 text-red-400'}
+                  Yes
+                </button>
+                <button
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                    initialSide === 'no'
+                      ? 'bg-[#ef4444] text-white shadow-lg shadow-red-500/20'
+                      : 'bg-[#161b22] text-gray-400 border border-gray-700 hover:border-red-500/40'
+                  }`}
                   onClick={() => setInitialSide('no')}
                   data-testid="button-initial-side-no"
                 >
-                  NO
-                </Button>
+                  No
+                </button>
               </div>
             )}
             {parsedAmount > 0 && parsedAmount < 100 && (
@@ -264,15 +275,15 @@ function CreatePredictionModal({ onClose, wallet }: { onClose: () => void; walle
           </div>
 
           <div className="flex gap-3 pt-2">
-            <Button variant="outline" className="flex-1 border-cyan-900/30 text-gray-400" onClick={onClose} data-testid="button-cancel-prediction">Cancel</Button>
-            <Button
-              className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-black font-bold"
+            <button className="flex-1 py-3 rounded-xl border border-[#1e3a5f]/40 text-gray-400 font-medium hover:bg-white/5 transition-colors" onClick={onClose} data-testid="button-cancel-prediction">Cancel</button>
+            <button
+              className="flex-1 py-3 rounded-xl bg-[#4da2ff] hover:bg-[#3d8ae5] text-white font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={() => createMutation.mutate()}
               disabled={!title || !endDate || createMutation.isPending || (parsedAmount > 0 && (parsedAmount < 100 || parsedAmount > 1000000))}
               data-testid="button-submit-prediction"
             >
               {createMutation.isPending ? 'Creating...' : parsedAmount > 0 ? `Create + Bet ${parsedAmount.toLocaleString()} SBETS` : 'Create Market'}
-            </Button>
+            </button>
           </div>
         </div>
       </div>
@@ -301,28 +312,28 @@ function CreateChallengeModal({ onClose, wallet }: { onClose: () => void; wallet
     }
   });
 
-  const createMutation = useMutation({
+  const createChallengeMutation = useMutation({
     mutationFn: async () => {
-      if (!wallet || !treasuryWallet) {
-        throw new Error('Wallet not connected or treasury unavailable');
-      }
-      const parsedStake = parseFloat(stakeAmount);
-      if (isNaN(parsedStake) || parsedStake < 100) {
-        throw new Error('Invalid stake amount');
-      }
-      toast({ title: 'Sending SBETS stake on-chain', description: `Sign the transaction to stake ${stakeAmount} SBETS for your challenge` });
-      const tx = await buildSbetsTransferTx(suiClient, wallet, treasuryWallet, parsedStake);
+      const stake = parseFloat(stakeAmount) || 0;
+      if (stake < 100) throw new Error('Minimum stake is 100 SBETS');
+      if (!expiresAt) throw new Error('Expiry date required');
+      if (!treasuryWallet) throw new Error('Treasury wallet not available');
+
+      toast({ title: 'Sending SBETS stake', description: `Sign the transaction to send ${stake} SBETS` });
+      const tx = await buildSbetsTransferTx(suiClient, wallet, treasuryWallet, stake);
       const result = await signAndExecute({ transaction: tx } as any);
-      if (!result.digest) {
-        throw new Error('Transaction failed - no digest returned from wallet');
-      }
+      if (!result.digest) throw new Error('Transaction failed');
       const txHash = result.digest;
-      toast({ title: 'SBETS stake sent', description: 'Verifying and creating challenge...' });
-      const expiresAtUTC = new Date(expiresAt).toISOString();
+
       const res = await fetch('/api/social/challenges', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, stakeAmount, currency, maxParticipants: parseInt(maxParticipants), expiresAt: expiresAtUTC, wallet, txHash })
+        body: JSON.stringify({
+          title, description, stakeAmount: stake, currency,
+          maxParticipants: parseInt(maxParticipants) || 10,
+          expiresAt: new Date(expiresAt).toISOString(),
+          wallet, txHash
+        })
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -332,7 +343,7 @@ function CreateChallengeModal({ onClose, wallet }: { onClose: () => void; wallet
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/social/challenges'] });
-      toast({ title: 'Challenge Created On-Chain', description: `Your ${stakeAmount} SBETS stake has been verified and challenge is live!` });
+      toast({ title: 'Challenge Created', description: 'Your challenge is live!' });
       onClose();
     },
     onError: (err: Error) => {
@@ -342,86 +353,44 @@ function CreateChallengeModal({ onClose, wallet }: { onClose: () => void; wallet
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose} data-testid="modal-create-challenge">
-      <div className="bg-[#111111] border border-cyan-900/30 rounded-2xl p-6 w-full max-w-lg" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-[#0d1117] border border-[#1e3a5f]/50 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl shadow-blue-900/20" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
           <h3 className="text-xl font-bold text-white">Create Challenge</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-white p-1"><X size={20} /></button>
         </div>
         <div className="space-y-4">
           <div>
-            <label className="text-gray-400 text-sm mb-1 block">Your Bet</label>
-            <input
-              type="text"
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="I bet Barcelona wins El Clasico - who fades me?"
-              className="w-full bg-muted/50 border border-cyan-900/30 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-cyan-500/50 focus:outline-none"
-              data-testid="input-challenge-title"
-            />
+            <label className="text-gray-400 text-sm mb-1.5 block font-medium">Challenge Title</label>
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="Lakers win tonight" className="w-full bg-[#161b22] border border-[#1e3a5f]/40 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:border-[#4da2ff]/60 focus:outline-none" data-testid="input-challenge-title" />
           </div>
           <div>
-            <label className="text-gray-400 text-sm mb-1 block">Details (optional)</label>
-            <textarea
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder="Add context..."
-              className="w-full bg-muted/50 border border-cyan-900/30 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-cyan-500/50 focus:outline-none resize-none"
-              rows={2}
-              data-testid="input-challenge-description"
-            />
+            <label className="text-gray-400 text-sm mb-1.5 block font-medium">Description (optional)</label>
+            <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Add details..." className="w-full bg-[#161b22] border border-[#1e3a5f]/40 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:border-[#4da2ff]/60 focus:outline-none resize-none" rows={2} data-testid="input-challenge-description" />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-gray-400 text-sm mb-1 block">Stake</label>
-              <input
-                type="number"
-                value={stakeAmount}
-                onChange={e => setStakeAmount(e.target.value)}
-                min="1"
-                step="1"
-                className="w-full bg-muted/50 border border-cyan-900/30 rounded-lg px-4 py-3 text-white focus:border-cyan-500/50 focus:outline-none"
-                data-testid="input-challenge-stake"
-              />
+              <label className="text-gray-400 text-sm mb-1.5 block font-medium">Stake (SBETS)</label>
+              <input type="number" value={stakeAmount} onChange={e => setStakeAmount(e.target.value)} className="w-full bg-[#161b22] border border-[#1e3a5f]/40 rounded-xl px-4 py-3 text-white focus:border-[#4da2ff]/60 focus:outline-none" data-testid="input-challenge-stake" />
             </div>
             <div>
-              <label className="text-gray-400 text-sm mb-1 block">Token</label>
-              <div className="w-full bg-muted/50 border border-cyan-900/30 rounded-lg px-4 py-3 text-cyan-400 font-semibold" data-testid="display-challenge-currency">
-                SBETS
-              </div>
-            </div>
-            <div>
-              <label className="text-gray-400 text-sm mb-1 block">Max Players</label>
-              <input
-                type="number"
-                value={maxParticipants}
-                onChange={e => setMaxParticipants(e.target.value)}
-                min="2"
-                max="100"
-                className="w-full bg-muted/50 border border-cyan-900/30 rounded-lg px-4 py-3 text-white focus:border-cyan-500/50 focus:outline-none"
-                data-testid="input-challenge-max"
-              />
+              <label className="text-gray-400 text-sm mb-1.5 block font-medium">Max Players</label>
+              <input type="number" value={maxParticipants} onChange={e => setMaxParticipants(e.target.value)} className="w-full bg-[#161b22] border border-[#1e3a5f]/40 rounded-xl px-4 py-3 text-white focus:border-[#4da2ff]/60 focus:outline-none" data-testid="input-challenge-max" />
             </div>
           </div>
           <div>
-            <label className="text-gray-400 text-sm mb-1 block">Expires</label>
-            <input
-              type="datetime-local"
-              value={expiresAt}
-              onChange={e => setExpiresAt(e.target.value)}
-              className="w-full bg-muted/50 border border-cyan-900/30 rounded-lg px-4 py-3 text-white focus:border-cyan-500/50 focus:outline-none"
-              data-testid="input-challenge-expires"
-            />
+            <label className="text-gray-400 text-sm mb-1.5 block font-medium">Expires At</label>
+            <input type="datetime-local" value={expiresAt} onChange={e => setExpiresAt(e.target.value)} className="w-full bg-[#161b22] border border-[#1e3a5f]/40 rounded-xl px-4 py-3 text-white focus:border-[#4da2ff]/60 focus:outline-none" data-testid="input-challenge-expiry" />
           </div>
           <div className="flex gap-3 pt-2">
-            <Button variant="outline" className="flex-1 border-cyan-900/30 text-gray-400" onClick={onClose} data-testid="button-cancel-challenge">Cancel</Button>
-            <Button
-              className="flex-1 bg-orange-500 hover:bg-orange-600 text-black font-bold"
-              onClick={() => createMutation.mutate()}
-              disabled={!title || !stakeAmount || !expiresAt || createMutation.isPending}
+            <button className="flex-1 py-3 rounded-xl border border-[#1e3a5f]/40 text-gray-400 font-medium hover:bg-white/5 transition-colors" onClick={onClose} data-testid="button-cancel-challenge">Cancel</button>
+            <button
+              className="flex-1 py-3 rounded-xl bg-[#f97316] hover:bg-[#ea580c] text-white font-bold transition-colors disabled:opacity-50"
+              onClick={() => createChallengeMutation.mutate()}
+              disabled={!title || !expiresAt || createChallengeMutation.isPending}
               data-testid="button-submit-challenge"
             >
-              {createMutation.isPending ? 'Creating...' : 'Launch Challenge'}
-            </Button>
+              {createChallengeMutation.isPending ? 'Creating...' : `Create (${stakeAmount} SBETS)`}
+            </button>
           </div>
         </div>
       </div>
@@ -431,15 +400,15 @@ function CreateChallengeModal({ onClose, wallet }: { onClose: () => void; wallet
 
 function ProfileModal({ wallet, onClose, myWallet }: { wallet: string; onClose: () => void; myWallet?: string }) {
   const { toast } = useToast();
-  const xHandle = getXHandle(wallet);
 
   const { data: profile, isLoading } = useQuery<any>({
     queryKey: ['/api/social/profile', wallet],
     queryFn: async () => {
       const res = await fetch(`/api/social/profile/${wallet}`);
-      if (!res.ok) throw new Error('Failed');
+      if (!res.ok) return null;
       return res.json();
-    }
+    },
+    enabled: !!wallet
   });
 
   const { data: followingList = [] } = useQuery<string[]>({
@@ -453,7 +422,7 @@ function ProfileModal({ wallet, onClose, myWallet }: { wallet: string; onClose: 
     enabled: !!myWallet
   });
 
-  const isFollowing = followingList.includes(wallet.toLowerCase());
+  const isFollowing = followingList.includes(wallet?.toLowerCase());
 
   const followMutation = useMutation({
     mutationFn: async () => {
@@ -467,140 +436,92 @@ function ProfileModal({ wallet, onClose, myWallet }: { wallet: string; onClose: 
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/social/following'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/social/profile', wallet] });
-      toast({ title: data.action === 'followed' ? 'Following' : 'Unfollowed', description: data.action === 'followed' ? `You are now following ${formatWallet(wallet)}` : `Unfollowed ${formatWallet(wallet)}` });
+      toast({ title: data.action === 'followed' ? 'Following' : 'Unfollowed' });
     }
   });
 
   const handleCopyWallet = () => {
     copyToClipboard(wallet);
-    toast({ title: 'Copied', description: 'Wallet address copied to clipboard' });
+    toast({ title: 'Copied', description: 'Wallet address copied' });
   };
 
-  const handleShareOnX = () => {
-    const stats = profile ? `Win Rate: ${profile.winRate}% | ${profile.totalBets} bets | ${profile.profit >= 0 ? '+' : ''}${profile.profit} SUI profit` : '';
-    const handle = xHandle ? ` | ${xHandle}` : '';
-    const text = encodeURIComponent(`${stats}${handle}\n\nCheck my profile on @SuiBets \ud83c\udfb0\n${window.location.origin}/network`);
+  const handleShareProfileOnX = () => {
+    const statsLine = profile ? `Win Rate: ${profile.winRate}% | ${profile.totalBets} bets | ROI: ${profile.roi}%` : '';
+    const text = encodeURIComponent(`Check out this bettor on SuiBets!\n${statsLine}\n${window.location.origin}/network`);
     const url = `https://x.com/intent/tweet?text=${text}`;
-    const win = window.open(url, '_blank');
-    if (!win) window.location.href = url;
+    window.open(url, '_blank');
   };
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose} data-testid="modal-profile">
-      <div className="bg-[#111111] border border-cyan-900/30 rounded-2xl p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className="bg-[#0d1117] border border-[#1e3a5f]/50 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
         {isLoading ? (
-          <div className="space-y-4">
-            <Skeleton className="h-8 w-48 bg-gray-800" />
-            <Skeleton className="h-20 w-full bg-gray-800" />
-            <Skeleton className="h-32 w-full bg-gray-800" />
+          <div className="space-y-3 py-8">
+            <Skeleton className="h-10 w-40 bg-gray-800 mx-auto rounded-xl" />
+            <Skeleton className="h-20 bg-gray-800 rounded-xl" />
           </div>
         ) : profile ? (
           <>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-purple-500 rounded-full flex items-center justify-center">
-                    <Users className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white"><SuiNSName address={profile.wallet} className="text-lg font-bold" /></h3>
-                    <div className="flex items-center gap-2">
-                      <p className="text-gray-500 text-xs">{profile.followers} followers / {profile.following} following</p>
-                      {xHandle && (
-                        <span className="text-cyan-400 text-xs">@{xHandle.replace('@', '')}</span>
-                      )}
-                    </div>
-                  </div>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-[#4da2ff] to-[#7c3aed] rounded-full flex items-center justify-center">
+                  <Users className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg"><SuiNSName address={wallet} className="text-white font-bold text-lg" /></h3>
+                  {profile.loyaltyTier && <Badge className="bg-[#4da2ff]/20 text-[#4da2ff] border-[#4da2ff]/30 text-xs">{profile.loyaltyTier}</Badge>}
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="border-cyan-900/30 text-gray-400"
-                  onClick={handleShareOnX}
-                  data-testid="button-share-x-profile"
-                >
-                  <SiX className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="border-cyan-900/30 text-gray-400"
-                  onClick={handleCopyWallet}
-                  data-testid="button-copy-wallet"
-                >
+                <button onClick={handleCopyWallet} className="p-2 rounded-lg bg-[#161b22] text-gray-400 hover:text-white hover:bg-[#1e3a5f]/30 transition-colors" data-testid="button-copy-wallet">
                   <Copy className="h-4 w-4" />
-                </Button>
+                </button>
+                <button onClick={handleShareProfileOnX} className="p-2 rounded-lg bg-[#161b22] text-gray-400 hover:text-white hover:bg-[#1e3a5f]/30 transition-colors" data-testid="button-share-x-profile">
+                  <SiX className="h-4 w-4" />
+                </button>
                 {myWallet && myWallet.toLowerCase() !== wallet.toLowerCase() && (
-                  <Button
-                    variant={isFollowing ? 'outline' : 'default'}
-                    size="sm"
-                    className={isFollowing ? 'border-cyan-500/30 text-cyan-400' : 'bg-cyan-500 text-black'}
+                  <button
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isFollowing ? 'bg-[#161b22] text-[#4da2ff] border border-[#4da2ff]/30' : 'bg-[#4da2ff] text-white'}`}
                     onClick={() => followMutation.mutate()}
                     disabled={followMutation.isPending}
                     data-testid="button-follow-profile"
                   >
-                    <UserPlus className="h-4 w-4 mr-1" />
                     {isFollowing ? 'Unfollow' : 'Follow'}
-                  </Button>
+                  </button>
                 )}
               </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-              <div className="bg-muted/50 border border-cyan-900/20 rounded-xl p-3 text-center">
-                <p className={`text-lg font-bold ${profile.roi >= 0 ? 'text-green-400' : 'text-red-400'}`}>{profile.roi > 0 ? '+' : ''}{profile.roi}%</p>
-                <p className="text-gray-500 text-xs">ROI</p>
-              </div>
-              <div className="bg-muted/50 border border-cyan-900/20 rounded-xl p-3 text-center">
-                <p className="text-lg font-bold text-cyan-400">{profile.winRate}%</p>
-                <p className="text-gray-500 text-xs">Win Rate</p>
-              </div>
-              <div className="bg-muted/50 border border-cyan-900/20 rounded-xl p-3 text-center">
-                <p className="text-lg font-bold text-yellow-400">{profile.biggestWin} SUI</p>
-                <p className="text-gray-500 text-xs">Biggest Win</p>
-              </div>
-              <div className="bg-muted/50 border border-cyan-900/20 rounded-xl p-3 text-center">
-                <p className="text-lg font-bold text-white">{profile.totalBets}</p>
-                <p className="text-gray-500 text-xs">Total Bets</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              <div className="bg-muted/50 border border-cyan-900/20 rounded-xl p-3 text-center">
-                <p className={`text-lg font-bold ${profile.profit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {profile.profit >= 0 ? '+' : ''}{profile.profit} SUI
-                </p>
-                <p className="text-gray-500 text-xs">Total Profit</p>
-              </div>
-              <div className="bg-muted/50 border border-cyan-900/20 rounded-xl p-3 text-center">
-                <p className="text-lg font-bold text-purple-400">{profile.totalStaked} SUI</p>
-                <p className="text-gray-500 text-xs">Total Staked</p>
-              </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+              {[
+                { val: `${profile.roi > 0 ? '+' : ''}${profile.roi}%`, label: 'ROI', color: profile.roi >= 0 ? 'text-green-400' : 'text-red-400' },
+                { val: `${profile.winRate}%`, label: 'Win Rate', color: 'text-[#4da2ff]' },
+                { val: `${profile.biggestWin} SUI`, label: 'Biggest Win', color: 'text-yellow-400' },
+                { val: profile.totalBets, label: 'Total Bets', color: 'text-white' },
+              ].map((s, i) => (
+                <div key={i} className="bg-[#161b22] border border-[#1e3a5f]/20 rounded-xl p-3 text-center">
+                  <p className={`text-lg font-bold ${s.color}`}>{s.val}</p>
+                  <p className="text-gray-500 text-xs">{s.label}</p>
+                </div>
+              ))}
             </div>
             {profile.recentBets && profile.recentBets.length > 0 && (
               <div>
                 <h4 className="text-sm font-semibold text-gray-400 mb-3">Recent Bets</h4>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {profile.recentBets.map((bet: any) => (
-                    <div key={bet.id} className="flex items-center justify-between p-3 bg-muted/30 border border-cyan-900/10 rounded-lg gap-2">
+                    <div key={bet.id} className="flex items-center justify-between p-3 bg-[#161b22] border border-[#1e3a5f]/10 rounded-xl gap-2">
                       <div className="flex-1 min-w-0">
                         <p className="text-white text-sm truncate">{bet.event}</p>
-                        <p className="text-gray-500 text-xs">{bet.prediction} @ {bet.odds?.toFixed(2)} | {bet.stake} SUI</p>
+                        <p className="text-gray-500 text-xs">{bet.prediction} @ {bet.odds?.toFixed(2)}</p>
                       </div>
-                      <Badge className={
-                        bet.status === 'won' || bet.status === 'paid_out' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-                        bet.status === 'lost' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
-                        'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-                      }>{bet.status}</Badge>
+                      <span className={`text-xs font-bold px-2 py-1 rounded-lg ${
+                        bet.status === 'won' || bet.status === 'paid_out' ? 'bg-green-500/10 text-green-400' :
+                        bet.status === 'lost' ? 'bg-red-500/10 text-red-400' :
+                        'bg-yellow-500/10 text-yellow-400'
+                      }`}>{bet.status}</span>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-            {(!profile.recentBets || profile.recentBets.length === 0) && (
-              <div className="text-center py-4">
-                <p className="text-gray-500 text-sm">No betting history yet</p>
               </div>
             )}
           </>
@@ -610,13 +531,14 @@ function ProfileModal({ wallet, onClose, myWallet }: { wallet: string; onClose: 
             <p className="text-gray-400">Profile not found</p>
           </div>
         )}
-        <Button variant="outline" className="w-full mt-4 border-cyan-900/30 text-gray-400" onClick={onClose} data-testid="button-close-profile">Close</Button>
+        <button className="w-full mt-4 py-3 rounded-xl border border-[#1e3a5f]/40 text-gray-400 font-medium hover:bg-white/5 transition-colors" onClick={onClose} data-testid="button-close-profile">Close</button>
       </div>
     </div>
   );
 }
 
 function HomeTab({ onViewProfile }: { onViewProfile: (w: string) => void }) {
+  const { toast } = useToast();
   const { data: predictions = [], isLoading: loadingPredictions } = useQuery<any[]>({
     queryKey: ['/api/social/predictions'],
   });
@@ -629,176 +551,145 @@ function HomeTab({ onViewProfile }: { onViewProfile: (w: string) => void }) {
     queryKey: ['/api/leaderboard', 'weekly'],
   });
 
-  const trending = [...(predictions || [])].sort((a, b) => (b.totalParticipants || 0) - (a.totalParticipants || 0)).slice(0, 5);
-  const hotChallenges = [...(challenges || [])].filter(c => c.status === 'open').slice(0, 5);
+  const activePredictions = (predictions || []).filter((p: any) => p.status === 'active');
+  const trending = [...activePredictions].sort((a, b) => (b.totalParticipants || 0) - (a.totalParticipants || 0)).slice(0, 8);
+  const hotChallenges = [...(challenges || [])].filter(c => c.status === 'open').slice(0, 4);
   const topBettors = leaderboard?.leaderboard?.slice(0, 6) || [];
 
   return (
-    <div className="space-y-6" data-testid="tab-home">
-      <div className="grid grid-cols-3 gap-3">
-        <Card className="bg-gradient-to-br from-cyan-900/30 to-blue-900/20 border-cyan-500/30">
-          <CardContent className="p-4 text-center">
-            <Target className="h-7 w-7 text-cyan-400 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-white">{predictions?.length || 0}</p>
-            <p className="text-gray-400 text-xs">Active Markets</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-orange-900/30 to-red-900/20 border-orange-500/30">
-          <CardContent className="p-4 text-center">
-            <Zap className="h-7 w-7 text-orange-400 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-white">{challenges?.filter(c => c.status === 'open').length || 0}</p>
-            <p className="text-gray-400 text-xs">Open Challenges</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-purple-900/30 to-pink-900/20 border-purple-500/30">
-          <CardContent className="p-4 text-center">
-            <Users className="h-7 w-7 text-purple-400 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-white">{topBettors.length}</p>
-            <p className="text-gray-400 text-xs">Top Bettors</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <Flame className="h-5 w-5 text-orange-400" />
-            <h3 className="text-lg font-bold text-white">Trending Predictions</h3>
+    <div className="space-y-8" data-testid="tab-home">
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { icon: <Target className="h-6 w-6" />, value: activePredictions.length, label: 'Active Markets', gradient: 'from-[#4da2ff]/20 to-[#4da2ff]/5', iconColor: 'text-[#4da2ff]', border: 'border-[#4da2ff]/20' },
+          { icon: <Zap className="h-6 w-6" />, value: challenges?.filter(c => c.status === 'open').length || 0, label: 'Open Challenges', gradient: 'from-[#f97316]/20 to-[#f97316]/5', iconColor: 'text-[#f97316]', border: 'border-[#f97316]/20' },
+          { icon: <Users className="h-6 w-6" />, value: topBettors.length, label: 'Top Bettors', gradient: 'from-[#7c3aed]/20 to-[#7c3aed]/5', iconColor: 'text-[#7c3aed]', border: 'border-[#7c3aed]/20' },
+        ].map((stat, i) => (
+          <div key={i} className={`bg-gradient-to-br ${stat.gradient} ${stat.border} border rounded-2xl p-5 text-center`}>
+            <div className={`${stat.iconColor} mx-auto mb-2`}>{stat.icon}</div>
+            <p className="text-3xl font-bold text-white">{stat.value}</p>
+            <p className="text-gray-400 text-xs mt-1">{stat.label}</p>
           </div>
-          {loadingPredictions ? (
-            <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-20 bg-gray-800 rounded-xl" />)}</div>
-          ) : trending.length === 0 ? (
-            <Card className="bg-[#111111] border-cyan-900/20">
-              <CardContent className="p-6 text-center">
-                <Target className="h-10 w-10 text-gray-600 mx-auto mb-2" />
-                <p className="text-gray-400 text-sm">No predictions yet. Switch to the Predict tab to create one!</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {trending.map((p: any) => {
-                const total = (p.totalYesAmount || 0) + (p.totalNoAmount || 0);
-                const yesPct = total > 0 ? ((p.totalYesAmount || 0) / total) * 100 : 50;
-                return (
-                  <Card key={p.id} className="bg-[#111111] border-cyan-900/20 hover:border-cyan-500/30 transition-colors" data-testid={`prediction-card-${p.id}`}>
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <p className="text-white font-medium text-sm flex-1">{p.title}</p>
-                        <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30 text-xs shrink-0">{p.category}</Badge>
-                      </div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="flex-1 h-2.5 bg-muted/50 rounded-full overflow-hidden flex">
-                          <div className="h-full bg-green-500 rounded-l-full" style={{ width: `${yesPct}%` }} />
-                          <div className="h-full bg-red-500 rounded-r-full" style={{ width: `${100 - yesPct}%` }} />
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-3">
-                          <span className="text-green-400 font-bold">YES {yesPct.toFixed(0)}%</span>
-                          <span className="text-red-400 font-bold">NO {(100 - yesPct).toFixed(0)}%</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-gray-500">
-                          <span>{p.totalParticipants || 0} bets</span>
-                          <span>{total > 0 ? total.toFixed(0) : '0'} SBETS pool</span>
-                          <span>{timeLeft(p.endDate)}</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <Zap className="h-5 w-5 text-orange-400" />
-            <h3 className="text-lg font-bold text-white">Hot Challenges</h3>
-          </div>
-          {loadingChallenges ? (
-            <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-20 bg-gray-800 rounded-xl" />)}</div>
-          ) : hotChallenges.length === 0 ? (
-            <Card className="bg-[#111111] border-cyan-900/20">
-              <CardContent className="p-6 text-center">
-                <Zap className="h-10 w-10 text-gray-600 mx-auto mb-2" />
-                <p className="text-gray-400 text-sm">No challenges yet. Switch to the Challenge tab to create one!</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {hotChallenges.map((c: any) => {
-                const fillPct = ((c.currentParticipants || 1) / (c.maxParticipants || 10)) * 100;
-                return (
-                  <Card key={c.id} className="bg-[#111111] border-orange-900/20 hover:border-orange-500/30 transition-colors" data-testid={`challenge-card-${c.id}`}>
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <p className="text-white font-medium text-sm flex-1">{c.title}</p>
-                        <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 text-xs shrink-0">{c.stakeAmount} {c.currency}</Badge>
-                      </div>
-                      <div className="mb-2">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1.5 bg-muted/50 rounded-full overflow-hidden">
-                            <div className="h-full bg-orange-500 rounded-full" style={{ width: `${fillPct}%` }} />
-                          </div>
-                          <span className="text-orange-400 text-xs font-bold">{c.currentParticipants || 1}/{c.maxParticipants || 10}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>by <SuiNSName address={c.creatorWallet} /></span>
-                        <span>{timeLeft(c.expiresAt)}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        ))}
       </div>
 
       <div>
-        <div className="flex items-center gap-2 mb-3">
-          <Crown className="h-5 w-5 text-yellow-400" />
-          <h3 className="text-lg font-bold text-white">Smart Bettors to Follow</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-[#4da2ff]" />
+            Trending Markets
+          </h3>
         </div>
+        {loadingPredictions ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {[1,2,3,4].map(i => <Skeleton key={i} className="h-44 bg-[#161b22] rounded-2xl" />)}
+          </div>
+        ) : trending.length === 0 ? (
+          <div className="bg-[#0d1117] border border-[#1e3a5f]/20 rounded-2xl p-10 text-center">
+            <Target className="h-12 w-12 text-gray-600 mx-auto mb-3" />
+            <p className="text-gray-400">No active markets yet. Create one in the Predict tab!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {trending.map((p: any) => {
+              const total = (p.totalYesAmount || 0) + (p.totalNoAmount || 0);
+              const yesPct = total > 0 ? ((p.totalYesAmount || 0) / total) * 100 : 50;
+              return (
+                <div
+                  key={p.id}
+                  className="bg-[#0d1117] border border-[#1e3a5f]/20 hover:border-[#4da2ff]/40 rounded-2xl p-4 transition-all group cursor-pointer"
+                  data-testid={`prediction-card-${p.id}`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <p className="text-white font-medium text-sm leading-snug line-clamp-2 flex-1">{p.title}</p>
+                    <span className="text-2xl font-bold text-[#4da2ff] shrink-0">{yesPct.toFixed(0)}%</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 mb-3">
+                    <span className="text-[10px] font-semibold text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded">Yes</span>
+                    <span className="text-[10px] font-semibold text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded">No</span>
+                  </div>
+                  <div className="h-1.5 bg-[#161b22] rounded-full overflow-hidden flex mb-3">
+                    <div className="h-full bg-green-500 rounded-l-full transition-all" style={{ width: `${yesPct}%` }} />
+                    <div className="h-full bg-red-500/60 rounded-r-full transition-all" style={{ width: `${100 - yesPct}%` }} />
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>{formatPool(total)} SBETS Vol.</span>
+                    <span>{timeLeft(p.endDate)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {hotChallenges.length > 0 && (
+        <div>
+          <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
+            <Zap className="h-5 w-5 text-[#f97316]" />
+            Hot Challenges
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {hotChallenges.map((c: any) => {
+              const fillPct = ((c.currentParticipants || 1) / (c.maxParticipants || 10)) * 100;
+              return (
+                <div key={c.id} className="bg-[#0d1117] border border-[#f97316]/15 hover:border-[#f97316]/40 rounded-2xl p-4 transition-all" data-testid={`challenge-card-${c.id}`}>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <p className="text-white font-medium text-sm flex-1">{c.title}</p>
+                    <span className="text-[#f97316] font-bold text-sm">{c.stakeAmount} SBETS</span>
+                  </div>
+                  <div className="mb-2">
+                    <div className="h-1.5 bg-[#161b22] rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-[#f97316] to-[#ef4444] rounded-full" style={{ width: `${fillPct}%` }} />
+                    </div>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-gray-500 text-xs">{c.currentParticipants || 1}/{c.maxParticipants || 10} players</span>
+                      <span className="text-gray-500 text-xs">{timeLeft(c.expiresAt)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
+          <Crown className="h-5 w-5 text-yellow-400" />
+          Top Bettors
+        </h3>
         {topBettors.length === 0 ? (
-          <Card className="bg-[#111111] border-cyan-900/20">
-            <CardContent className="p-6 text-center">
-              <Trophy className="h-10 w-10 text-gray-600 mx-auto mb-2" />
-              <p className="text-gray-400">Leaderboard data loading...</p>
-            </CardContent>
-          </Card>
+          <div className="bg-[#0d1117] border border-[#1e3a5f]/20 rounded-2xl p-8 text-center">
+            <Trophy className="h-10 w-10 text-gray-600 mx-auto mb-2" />
+            <p className="text-gray-400">Leaderboard loading...</p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {topBettors.map((user: any, idx: number) => {
-              const rankColors = idx === 0 ? 'from-yellow-500 to-amber-500' : idx === 1 ? 'from-gray-300 to-gray-400' : idx === 2 ? 'from-amber-600 to-amber-700' : 'from-cyan-600 to-cyan-700';
+              const rankColors = idx === 0 ? 'from-yellow-500 to-amber-500' : idx === 1 ? 'from-gray-300 to-gray-400' : idx === 2 ? 'from-amber-600 to-amber-700' : 'from-[#4da2ff] to-[#7c3aed]';
               return (
-                <Card
+                <div
                   key={user.wallet || idx}
-                  className="bg-[#111111] border-cyan-900/20 hover:border-cyan-500/30 transition-colors cursor-pointer"
+                  className="bg-[#0d1117] border border-[#1e3a5f]/20 hover:border-[#4da2ff]/30 rounded-2xl p-4 transition-all cursor-pointer"
                   onClick={() => user.wallet && onViewProfile(user.wallet)}
                   data-testid={`bettor-card-${idx}`}
                 >
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 bg-gradient-to-br ${rankColors} rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0`}>
-                        #{idx + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white font-medium text-sm"><SuiNSName address={user.wallet} className="text-white font-medium text-sm" /></p>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-xs font-bold ${(user.totalProfitUsd || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {(user.totalProfitUsd || 0) >= 0 ? '+' : ''}${(user.totalProfitUsd || 0).toFixed(2)}
-                          </span>
-                          <span className="text-gray-500 text-xs">{user.winRate?.toFixed(0)}% WR</span>
-                          <span className="text-gray-600 text-xs">{user.totalBets} bets</span>
-                        </div>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-gray-600 shrink-0" />
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 bg-gradient-to-br ${rankColors} rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0`}>
+                      #{idx + 1}
                     </div>
-                  </CardContent>
-                </Card>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-medium text-sm"><SuiNSName address={user.wallet} className="text-white font-medium text-sm" /></p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-xs font-bold ${(user.totalProfitUsd || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {(user.totalProfitUsd || 0) >= 0 ? '+' : ''}${(user.totalProfitUsd || 0).toFixed(2)}
+                        </span>
+                        <span className="text-gray-500 text-xs">{user.winRate?.toFixed(0)}% WR</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-gray-600 shrink-0" />
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -870,7 +761,7 @@ function PredictTab({ wallet }: { wallet?: string }) {
   const [showCreate, setShowCreate] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [betAmounts, setBetAmounts] = useState<Record<number, number>>({});
-  const [showHowItWorks, setShowHowItWorks] = useState(true);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const { data: predictions = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/social/predictions', selectedCategory],
@@ -954,11 +845,9 @@ function PredictTab({ wallet }: { wallet?: string }) {
       const winningSide = data?.winningSide?.toUpperCase() || '?';
       const payoutInfo = data?.payoutResults;
       if (payoutInfo && payoutInfo.successful > 0) {
-        toast({ title: `${winningSide} Wins!`, description: `Majority side wins! ${payoutInfo.successful} winner(s) split ${data.totalPool} SBETS` });
-      } else if (data?.winnersCount === 0) {
-        toast({ title: 'Market Resolved', description: `${winningSide} won but no winners to pay` });
+        toast({ title: `${winningSide} Wins!`, description: `${payoutInfo.successful} winner(s) split ${data.totalPool} SBETS` });
       } else {
-        toast({ title: `${winningSide} Wins!`, description: `Pool: ${data?.totalPool || 0} SBETS | Winners: ${data?.winnersCount || 0}` });
+        toast({ title: `${winningSide} Wins!`, description: `Pool: ${data?.totalPool || 0} SBETS` });
       }
     },
     onError: (err: Error) => {
@@ -976,89 +865,68 @@ function PredictTab({ wallet }: { wallet?: string }) {
   };
 
   const getBetAmount = (id: number) => betAmounts[id] || 100;
-
-  const getBetsForPrediction = (predictionId: number) => {
-    return myBets.filter((b: any) => b.predictionId === predictionId);
-  };
+  const getBetsForPrediction = (predictionId: number) => myBets.filter((b: any) => b.predictionId === predictionId);
 
   return (
-    <div className="space-y-4" data-testid="tab-predict">
-      <Card className="bg-gradient-to-r from-cyan-900/20 to-blue-900/10 border-cyan-500/20">
-        <CardContent className="p-4">
-          <button
-            onClick={() => setShowHowItWorks(!showHowItWorks)}
-            className="flex items-center justify-between w-full"
-            data-testid="button-toggle-how-it-works"
-          >
-            <div className="flex items-center gap-2">
-              <Info className="h-5 w-5 text-cyan-400" />
-              <span className="text-white font-medium">How You Win</span>
-            </div>
-            {showHowItWorks ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
-          </button>
-          {showHowItWorks && (
-            <div className="mt-3 space-y-2 text-sm text-gray-400">
-              <p>Predict = Pool-based prediction market. You bet YES or NO on any question.</p>
-              <p>When you place a bet, your SBETS are transferred on-chain to the platform treasury. Your wallet signs the real transaction.</p>
-              <p>When time runs out, the side with more SBETS wagered wins automatically. Winners split the ENTIRE pool proportionally. Payouts are sent directly to your wallet.</p>
-              <p className="text-cyan-400/80">Example: If 10,000 SBETS on YES and 5,000 on NO, YES has majority so YES bettors split 15,000 SBETS proportionally.</p>
-              <p>Markets auto-resolve within minutes of expiry. Every bet is a real on-chain SBETS transfer verified by the Sui blockchain.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
+    <div className="space-y-5" data-testid="tab-predict">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
           {CATEGORIES.map(c => (
-            <Button
+            <button
               key={c.value}
-              variant={selectedCategory === c.value ? 'default' : 'outline'}
-              size="sm"
-              className={selectedCategory === c.value ? 'bg-cyan-500 text-black' : 'border-cyan-900/30 text-gray-400'}
+              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                selectedCategory === c.value
+                  ? 'bg-[#4da2ff] text-white shadow-lg shadow-[#4da2ff]/20'
+                  : 'bg-[#161b22] text-gray-400 hover:text-white hover:bg-[#1e3a5f]/30 border border-[#1e3a5f]/20'
+              }`}
               onClick={() => setSelectedCategory(c.value)}
               data-testid={`filter-category-${c.value}`}
             >
               {c.label}
-            </Button>
+            </button>
           ))}
         </div>
-        <Button className="bg-cyan-500 hover:bg-cyan-600 text-black font-bold" onClick={() => {
-          if (!wallet) {
-            window.dispatchEvent(new CustomEvent('suibets:connect-wallet-required'));
-            return;
-          }
-          setShowCreate(true);
-        }} data-testid="button-create-prediction">
-          <Plus className="h-4 w-4 mr-1" />
+        <button
+          className="px-5 py-2.5 rounded-xl bg-[#4da2ff] hover:bg-[#3d8ae5] text-white font-bold text-sm transition-colors flex items-center gap-1.5 shadow-lg shadow-[#4da2ff]/20"
+          onClick={() => {
+            if (!wallet) { window.dispatchEvent(new CustomEvent('suibets:connect-wallet-required')); return; }
+            setShowCreate(true);
+          }}
+          data-testid="button-create-prediction"
+        >
+          <Plus className="h-4 w-4" />
           Create Market
-        </Button>
+        </button>
       </div>
 
       {isLoading ? (
-        <div className="space-y-3">{[1,2,3,4].map(i => <Skeleton key={i} className="h-32 bg-gray-800 rounded-xl" />)}</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-48 bg-[#161b22] rounded-2xl" />)}
+        </div>
       ) : predictions.length === 0 ? (
-        <Card className="bg-[#111111] border-cyan-900/20">
-          <CardContent className="p-8 text-center">
-            <Target className="h-12 w-12 text-gray-600 mx-auto mb-3" />
-            <h3 className="text-white font-bold mb-1">No predictions yet</h3>
-            <p className="text-gray-400 text-sm mb-4">Create the first prediction market and let the community decide!</p>
-            <Button className="bg-cyan-500 hover:bg-cyan-600 text-black font-bold" onClick={() => {
+        <div className="bg-[#0d1117] border border-[#1e3a5f]/20 rounded-2xl p-12 text-center">
+          <Target className="h-14 w-14 text-gray-600 mx-auto mb-4" />
+          <h3 className="text-white font-bold text-lg mb-2">No markets yet</h3>
+          <p className="text-gray-400 text-sm mb-5">Create the first prediction market!</p>
+          <button
+            className="px-6 py-3 rounded-xl bg-[#4da2ff] hover:bg-[#3d8ae5] text-white font-bold transition-colors"
+            onClick={() => {
               if (!wallet) { window.dispatchEvent(new CustomEvent('suibets:connect-wallet-required')); return; }
               setShowCreate(true);
-            }} data-testid="button-create-first-prediction">
-              <Plus className="h-4 w-4 mr-1" />
-              Create First Market
-            </Button>
-          </CardContent>
-        </Card>
+            }}
+            data-testid="button-create-first-prediction"
+          >
+            <Plus className="h-4 w-4 mr-1 inline" />
+            Create First Market
+          </button>
+        </div>
       ) : (() => {
         const activeMarkets = predictions.filter((p: any) => p.status === 'active');
         const finishedMarkets = predictions.filter((p: any) => p.status !== 'active');
         return (
           <div className="space-y-6">
             {activeMarkets.length > 0 && (
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {activeMarkets.map((p: any) => {
                   const total = (p.totalYesAmount || 0) + (p.totalNoAmount || 0);
                   const yesPct = total > 0 ? ((p.totalYesAmount || 0) / total) * 100 : 50;
@@ -1068,264 +936,219 @@ function PredictTab({ wallet }: { wallet?: string }) {
                   const canResolve = wallet && isEnded;
                   const currentBetAmount = getBetAmount(p.id);
                   const userBets = getBetsForPrediction(p.id);
+                  const isExpanded = expandedId === p.id;
+
                   return (
-                    <Card key={p.id} className="bg-[#111111] border-cyan-900/20" data-testid={`prediction-${p.id}`}>
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between gap-2 mb-3">
-                          <div className="flex-1">
-                            <p className="text-white font-medium">{p.title}</p>
-                            {p.description && <p className="text-gray-500 text-sm mt-1">{p.description}</p>}
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30 text-xs">{p.category}</Badge>
-                            <button onClick={() => { copyToClipboard(`${window.location.origin}/network?p=${p.id}`); toast({ title: 'Link Copied', description: 'Share link copied!' }); }} className="text-gray-500 hover:text-cyan-400" data-testid={`share-prediction-${p.id}`}>
-                              <Share2 className="h-4 w-4" />
-                            </button>
-                          </div>
+                    <div
+                      key={p.id}
+                      className="bg-[#0d1117] border border-[#1e3a5f]/20 hover:border-[#4da2ff]/30 rounded-2xl overflow-hidden transition-all"
+                      data-testid={`prediction-${p.id}`}
+                    >
+                      <div className="p-4">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="text-white font-medium text-sm leading-snug flex-1 line-clamp-2">{p.title}</p>
+                          <button
+                            onClick={() => { copyToClipboard(`${window.location.origin}/network?p=${p.id}`); toast({ title: 'Link Copied' }); }}
+                            className="text-gray-600 hover:text-[#4da2ff] shrink-0 p-1"
+                            data-testid={`share-prediction-${p.id}`}
+                          >
+                            <Share2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        {p.description && <p className="text-gray-500 text-xs mb-2 line-clamp-1">{p.description}</p>}
+
+                        <div className="flex items-center gap-2 mb-3 mt-2">
+                          <span className="text-xs px-2 py-0.5 rounded-md bg-[#4da2ff]/10 text-[#4da2ff] font-medium">{p.category}</span>
+                          <span className="text-gray-600 text-xs">{p.totalParticipants || 0} bets</span>
                         </div>
 
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className="flex-1 h-3 bg-muted/50 rounded-full overflow-hidden flex">
-                            <div className="h-full bg-green-500 rounded-l-full transition-all" style={{ width: `${yesPct}%` }} />
-                            <div className="h-full bg-red-500 rounded-r-full transition-all" style={{ width: `${noPct}%` }} />
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-4">
-                            <span className="text-green-400 text-sm font-bold">YES {yesPct.toFixed(0)}%</span>
-                            <span className="text-red-400 text-sm font-bold">NO {noPct.toFixed(0)}%</span>
-                          </div>
-                          <div className="flex items-center gap-3 text-xs text-gray-500">
-                            <span>{p.totalParticipants || 0} bets</span>
-                            <span>{total > 0 ? total.toFixed(0) : '0'} SBETS pool</span>
-                            <span>{timeLeft(p.endDate)}</span>
-                          </div>
+                        <div className="h-1.5 bg-[#161b22] rounded-full overflow-hidden flex mb-2">
+                          <div className="h-full bg-green-500 rounded-l-full transition-all" style={{ width: `${yesPct}%` }} />
+                          <div className="h-full bg-red-500/60 rounded-r-full transition-all" style={{ width: `${noPct}%` }} />
                         </div>
 
                         {isActive && (
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2">
-                              <span className="text-gray-500 text-xs">Bet amount:</span>
-                              <div className="flex items-center gap-1 flex-wrap">
+                          <div className="flex gap-2 mb-2">
+                            <button
+                              className="flex-1 py-2 rounded-xl bg-green-500/10 hover:bg-green-500/20 text-green-400 font-bold text-sm border border-green-500/20 hover:border-green-500/40 transition-all"
+                              onClick={(e) => { e.stopPropagation(); handleBet(p.id, 'yes'); }}
+                              disabled={betMutation.isPending}
+                              data-testid={`button-yes-${p.id}`}
+                            >
+                              Yes {yesPct.toFixed(0)}%
+                            </button>
+                            <button
+                              className="flex-1 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold text-sm border border-red-500/20 hover:border-red-500/40 transition-all"
+                              onClick={(e) => { e.stopPropagation(); handleBet(p.id, 'no'); }}
+                              disabled={betMutation.isPending}
+                              data-testid={`button-no-${p.id}`}
+                            >
+                              No {noPct.toFixed(0)}%
+                            </button>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                          <span>{formatPool(total)} SBETS Vol.</span>
+                          <span>{timeLeft(p.endDate)}</span>
+                        </div>
+                      </div>
+
+                      <div
+                        className="border-t border-[#1e3a5f]/10 px-4 py-2 cursor-pointer hover:bg-[#161b22]/50 transition-colors"
+                        onClick={() => setExpandedId(isExpanded ? null : p.id)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-500 text-xs">
+                            {isActive ? `Bet ${currentBetAmount.toLocaleString()} SBETS` : 'Details'}
+                          </span>
+                          {isExpanded ? <ChevronUp className="h-3.5 w-3.5 text-gray-500" /> : <ChevronDown className="h-3.5 w-3.5 text-gray-500" />}
+                        </div>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="border-t border-[#1e3a5f]/10 p-4 bg-[#161b22]/30 space-y-3">
+                          {isActive && (
+                            <div>
+                              <span className="text-gray-500 text-xs block mb-2">Bet amount:</span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 {BET_AMOUNTS.map(amt => (
                                   <button
                                     key={amt}
                                     onClick={() => setBetAmounts(prev => ({ ...prev, [p.id]: amt }))}
-                                    className={`px-2 py-1 rounded text-xs font-bold transition-colors ${
+                                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
                                       currentBetAmount === amt
-                                        ? 'bg-cyan-500/30 text-cyan-400 border border-cyan-500/50'
-                                        : 'bg-muted/30 text-gray-500 border border-gray-800 hover:border-gray-600'
+                                        ? 'bg-[#4da2ff]/20 text-[#4da2ff] border border-[#4da2ff]/40'
+                                        : 'bg-[#161b22] text-gray-500 border border-[#1e3a5f]/20 hover:border-[#4da2ff]/30'
                                     }`}
                                     data-testid={`bet-amount-${amt}-${p.id}`}
                                   >
-                                    {amt.toLocaleString()} SBETS
+                                    {amt.toLocaleString()}
                                   </button>
                                 ))}
                               </div>
                             </div>
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                className="flex-1 bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 font-bold"
-                                onClick={() => handleBet(p.id, 'yes')}
-                                disabled={betMutation.isPending}
-                                data-testid={`button-yes-${p.id}`}
+                          )}
+
+                          {canResolve && (
+                            <div className="space-y-2">
+                              <p className="text-yellow-400 text-xs font-semibold">
+                                Expired - {yesPct > 50 ? 'YES' : yesPct < 50 ? 'NO' : 'TIE (YES)'} majority ({total > 0 ? `${Math.max(yesPct, noPct).toFixed(0)}%` : 'none'})
+                              </p>
+                              <button
+                                className="w-full py-2.5 rounded-xl bg-[#4da2ff]/10 text-[#4da2ff] border border-[#4da2ff]/30 font-bold text-sm hover:bg-[#4da2ff]/20 transition-all"
+                                onClick={() => resolveMutation.mutate({ predictionId: p.id })}
+                                disabled={resolveMutation.isPending}
+                                data-testid={`button-resolve-${p.id}`}
                               >
-                                <ThumbsUp className="h-4 w-4 mr-1" />
-                                YES ({currentBetAmount.toLocaleString()} SBETS)
-                              </Button>
-                              <Button
-                                size="sm"
-                                className="flex-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 font-bold"
-                                onClick={() => handleBet(p.id, 'no')}
-                                disabled={betMutation.isPending}
-                                data-testid={`button-no-${p.id}`}
-                              >
-                                <ThumbsDown className="h-4 w-4 mr-1" />
-                                NO ({currentBetAmount.toLocaleString()} SBETS)
-                              </Button>
+                                {resolveMutation.isPending ? 'Resolving...' : 'Resolve & Pay Winners'}
+                              </button>
                             </div>
-                          </div>
-                        )}
+                          )}
 
-                        {canResolve && (
-                          <div className="space-y-2 mt-3">
-                            <p className="text-yellow-400 text-xs font-semibold">
-                              Time expired - {yesPct > 50 ? 'YES' : yesPct < 50 ? 'NO' : 'TIE (YES)'} side has majority ({total > 0 ? `${Math.max(yesPct, noPct).toFixed(0)}%` : 'no bets'})
-                            </p>
-                            <Button
-                              size="sm"
-                              className="w-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 font-bold"
-                              onClick={() => resolveMutation.mutate({ predictionId: p.id })}
-                              disabled={resolveMutation.isPending}
-                              data-testid={`button-resolve-${p.id}`}
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              {resolveMutation.isPending ? 'Resolving...' : 'Resolve & Pay Winners'}
-                            </Button>
-                            <p className="text-gray-600 text-xs text-center">Auto-resolves within minutes, or tap to trigger now</p>
-                          </div>
-                        )}
-
-                        {userBets.length > 0 && (
-                          <div className="mt-3 border-t border-cyan-900/20 pt-3">
-                            <p className="text-xs font-semibold text-gray-400 mb-2">Your Bets</p>
-                            <div className="space-y-1">
-                              {userBets.map((b: any) => (
-                                <div key={b.id} className="flex items-center justify-between text-xs p-2 bg-muted/30 rounded-lg">
-                                  <div className="flex items-center gap-2">
-                                    <Badge className={b.side === 'yes' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}>
-                                      {b.side?.toUpperCase()}
-                                    </Badge>
-                                    <span className="text-white">{b.amount?.toLocaleString()} SBETS</span>
+                          {userBets.length > 0 && (
+                            <div>
+                              <p className="text-xs font-semibold text-gray-400 mb-2">Your Bets</p>
+                              <div className="space-y-1.5">
+                                {userBets.map((b: any) => (
+                                  <div key={b.id} className="flex items-center justify-between text-xs p-2.5 bg-[#0d1117] rounded-xl border border-[#1e3a5f]/10">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${b.side === 'yes' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                                        {b.side?.toUpperCase()}
+                                      </span>
+                                      <span className="text-white">{b.amount?.toLocaleString()} SBETS</span>
+                                    </div>
+                                    <span className="text-gray-500">{timeAgo(b.createdAt)}</span>
                                   </div>
-                                  <span className="text-gray-500">{timeAgo(b.createdAt)}</span>
-                                </div>
-                              ))}
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          )}
 
-                        <div className="flex items-center justify-between mt-2 text-xs text-gray-600">
-                          <span>by <SuiNSName address={p.creatorWallet} /></span>
-                          <span>{timeAgo(p.createdAt)}</span>
+                          <div className="flex items-center justify-between text-xs text-gray-600 pt-1">
+                            <span>by <SuiNSName address={p.creatorWallet} /></span>
+                            <span>{timeAgo(p.createdAt)}</span>
+                          </div>
                         </div>
-                      </CardContent>
-                    </Card>
+                      )}
+                    </div>
                   );
                 })}
               </div>
             )}
 
             {finishedMarkets.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 pt-2">
+              <div>
+                <div className="flex items-center gap-2 mb-4">
                   <Trophy className="h-5 w-5 text-yellow-500" />
-                  <h3 className="text-white font-bold text-lg">Finished Markets</h3>
-                  <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs">{finishedMarkets.length}</Badge>
+                  <h3 className="text-white font-bold text-lg">Resolved Markets</h3>
+                  <span className="text-gray-500 text-sm">({finishedMarkets.length})</span>
                 </div>
-                {finishedMarkets.map((p: any) => {
-                  const total = (p.totalYesAmount || 0) + (p.totalNoAmount || 0);
-                  const yesPct = total > 0 ? ((p.totalYesAmount || 0) / total) * 100 : 50;
-                  const noPct = 100 - yesPct;
-                  const isResolvedYes = p.status?.includes('resolved_yes');
-                  const isResolvedNo = p.status?.includes('resolved_no');
-                  const winningSide = isResolvedYes ? 'YES' : isResolvedNo ? 'NO' : null;
-                  const winningAmount = isResolvedYes ? (p.totalYesAmount || 0) : isResolvedNo ? (p.totalNoAmount || 0) : 0;
-                  const losingAmount = isResolvedYes ? (p.totalNoAmount || 0) : isResolvedNo ? (p.totalYesAmount || 0) : 0;
-                  const userBets = getBetsForPrediction(p.id);
-                  const userWon = userBets.some((b: any) => winningSide && b.side === winningSide.toLowerCase());
-                  const userLost = userBets.some((b: any) => winningSide && b.side !== winningSide.toLowerCase());
-                  const userWinningBets = userBets.filter((b: any) => winningSide && b.side === winningSide.toLowerCase());
-                  const userPayout = userWinningBets.reduce((sum: number, b: any) => {
-                    if (winningAmount <= 0) return sum;
-                    return sum + ((b.amount || 0) / winningAmount) * total;
-                  }, 0);
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {finishedMarkets.map((p: any) => {
+                    const total = (p.totalYesAmount || 0) + (p.totalNoAmount || 0);
+                    const yesPct = total > 0 ? ((p.totalYesAmount || 0) / total) * 100 : 50;
+                    const noPct = 100 - yesPct;
+                    const isResolvedYes = p.status?.includes('resolved_yes');
+                    const isResolvedNo = p.status?.includes('resolved_no');
+                    const winningSide = isResolvedYes ? 'YES' : isResolvedNo ? 'NO' : null;
+                    const winningAmount = isResolvedYes ? (p.totalYesAmount || 0) : isResolvedNo ? (p.totalNoAmount || 0) : 0;
+                    const losingAmount = isResolvedYes ? (p.totalNoAmount || 0) : isResolvedNo ? (p.totalYesAmount || 0) : 0;
+                    const userBets = getBetsForPrediction(p.id);
+                    const userWon = userBets.some((b: any) => winningSide && b.side === winningSide.toLowerCase());
+                    const userLost = userBets.some((b: any) => winningSide && b.side !== winningSide.toLowerCase());
+                    const userWinningBets = userBets.filter((b: any) => winningSide && b.side === winningSide.toLowerCase());
+                    const userPayout = userWinningBets.reduce((sum: number, b: any) => {
+                      if (winningAmount <= 0) return sum;
+                      return sum + ((b.amount || 0) / winningAmount) * total;
+                    }, 0);
 
-                  return (
-                    <Card key={p.id} className="bg-[#0a0a0a] border-gray-800/50 opacity-90" data-testid={`finished-prediction-${p.id}`}>
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between gap-2 mb-3">
-                          <div className="flex-1">
-                            <p className="text-gray-300 font-medium">{p.title}</p>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            {winningSide ? (
-                              <Badge className={winningSide === 'YES' ? 'bg-green-500/20 text-green-400 border-green-500/30 text-xs' : 'bg-red-500/20 text-red-400 border-red-500/30 text-xs'}>
-                                {winningSide} Won
-                              </Badge>
-                            ) : (
-                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs">
-                                {p.status === 'expired' ? 'Expired' : 'Ended'}
-                              </Badge>
+                    return (
+                      <div key={p.id} className="bg-[#0d1117]/80 border border-gray-800/40 rounded-2xl p-4 opacity-85" data-testid={`finished-prediction-${p.id}`}>
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <p className="text-gray-300 font-medium text-sm leading-snug flex-1 line-clamp-2">{p.title}</p>
+                          {winningSide ? (
+                            <span className={`text-xs font-bold px-2 py-1 rounded-lg ${winningSide === 'YES' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                              {winningSide} Won
+                            </span>
+                          ) : (
+                            <span className="text-xs font-bold px-2 py-1 rounded-lg bg-gray-500/10 text-gray-400">
+                              {p.status === 'expired' ? 'Expired' : 'Ended'}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 mb-2 text-xs">
+                          <span className={`font-bold ${isResolvedYes ? 'text-green-400' : 'text-green-400/40'}`}>Yes {yesPct.toFixed(0)}%</span>
+                          <span className={`font-bold ${isResolvedNo ? 'text-red-400' : 'text-red-400/40'}`}>No {noPct.toFixed(0)}%</span>
+                        </div>
+                        <div className="h-1.5 bg-[#161b22] rounded-full overflow-hidden flex mb-2">
+                          <div className={`h-full rounded-l-full ${isResolvedYes ? 'bg-green-500' : 'bg-green-500/20'}`} style={{ width: `${yesPct}%` }} />
+                          <div className={`h-full rounded-r-full ${isResolvedNo ? 'bg-red-500' : 'bg-red-500/20'}`} style={{ width: `${noPct}%` }} />
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                          <span>{formatPool(total)} SBETS pool</span>
+                          <span>{p.totalParticipants || 0} bets</span>
+                        </div>
+                        {userBets.length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-gray-800/30">
+                            {userWon && (
+                              <div className="flex items-center gap-1.5 text-xs">
+                                <Trophy className="h-3 w-3 text-green-400" />
+                                <span className="text-green-400 font-bold">You Won {userPayout > 0 ? `${userPayout.toFixed(0)} SBETS` : ''}</span>
+                              </div>
+                            )}
+                            {userLost && !userWon && (
+                              <div className="flex items-center gap-1.5 text-xs">
+                                <XCircle className="h-3 w-3 text-red-400" />
+                                <span className="text-red-400 font-bold">You Lost</span>
+                              </div>
                             )}
                           </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className="flex-1 h-2 bg-muted/30 rounded-full overflow-hidden flex">
-                            <div className={`h-full rounded-l-full transition-all ${isResolvedYes ? 'bg-green-500' : 'bg-green-500/30'}`} style={{ width: `${yesPct}%` }} />
-                            <div className={`h-full rounded-r-full transition-all ${isResolvedNo ? 'bg-red-500' : 'bg-red-500/30'}`} style={{ width: `${noPct}%` }} />
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-4">
-                            <span className={`text-sm font-bold ${isResolvedYes ? 'text-green-400' : 'text-green-400/40'}`}>YES {yesPct.toFixed(0)}%</span>
-                            <span className={`text-sm font-bold ${isResolvedNo ? 'text-red-400' : 'text-red-400/40'}`}>NO {noPct.toFixed(0)}%</span>
-                          </div>
-                          <div className="flex items-center gap-3 text-xs text-gray-500">
-                            <span>{p.totalParticipants || 0} bets</span>
-                            <span>{total > 0 ? total.toFixed(0) : '0'} SBETS pool</span>
-                          </div>
-                        </div>
-
-                        {winningSide && total > 0 && (
-                          <div className="bg-muted/20 rounded-lg p-3 mt-2 space-y-1">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-gray-400">Winning side pool</span>
-                              <span className="text-white font-bold">{winningAmount.toLocaleString()} SBETS</span>
-                            </div>
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-gray-400">Losing side pool</span>
-                              <span className="text-gray-500">{losingAmount.toLocaleString()} SBETS</span>
-                            </div>
-                            <div className="flex items-center justify-between text-xs border-t border-gray-800 pt-1 mt-1">
-                              <span className="text-gray-400">Total paid out</span>
-                              <span className="text-cyan-400 font-bold">{total.toLocaleString()} SBETS</span>
-                            </div>
-                          </div>
                         )}
-
-                        {userBets.length > 0 && (
-                          <div className="mt-3 border-t border-gray-800/50 pt-3">
-                            <div className="flex items-center gap-2 mb-2">
-                              {userWon && (
-                                <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">
-                                  <Trophy className="h-3 w-3 mr-1" />
-                                  You Won {userPayout > 0 ? `${userPayout.toFixed(0)} SBETS` : ''}
-                                </Badge>
-                              )}
-                              {userLost && !userWon && (
-                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">
-                                  <XCircle className="h-3 w-3 mr-1" />
-                                  You Lost
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="space-y-1">
-                              {userBets.map((b: any) => {
-                                const won = winningSide && b.side === winningSide.toLowerCase();
-                                const betPayout = won && winningAmount > 0 ? ((b.amount || 0) / winningAmount) * total : 0;
-                                return (
-                                  <div key={b.id} className="flex items-center justify-between text-xs p-2 bg-muted/20 rounded-lg">
-                                    <div className="flex items-center gap-2">
-                                      <Badge className={b.side === 'yes' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}>
-                                        {b.side?.toUpperCase()}
-                                      </Badge>
-                                      <span className="text-gray-300">{b.amount?.toLocaleString()} SBETS</span>
-                                    </div>
-                                    {won ? (
-                                      <span className="text-green-400 font-bold">+{betPayout.toFixed(0)} SBETS</span>
-                                    ) : winningSide ? (
-                                      <span className="text-red-400">-{(b.amount || 0).toLocaleString()} SBETS</span>
-                                    ) : null}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="flex items-center justify-between mt-2 text-xs text-gray-600">
-                          <span>by <SuiNSName address={p.creatorWallet} /></span>
-                          <span>Ended {p.resolvedAt ? timeAgo(p.resolvedAt) : timeAgo(p.endDate)}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -1383,7 +1206,7 @@ function ChallengeTab({ wallet }: { wallet?: string }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/social/challenges'] });
-      toast({ title: 'Challenge Joined On-Chain', description: 'Your SBETS stake has been verified and recorded on-chain!' });
+      toast({ title: 'Challenge Joined', description: 'Your stake has been verified on-chain!' });
     },
     onError: (err: Error) => {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
@@ -1404,51 +1227,50 @@ function ChallengeTab({ wallet }: { wallet?: string }) {
   const closedChallenges = challenges.filter(c => c.status !== 'open');
 
   return (
-    <div className="space-y-4" data-testid="tab-challenge">
+    <div className="space-y-5" data-testid="tab-challenge">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h3 className="text-lg font-bold text-white flex items-center gap-2">
-          <Zap className="h-5 w-5 text-orange-400" />
-          One-Tap Challenges
-        </h3>
-        <Button className="bg-orange-500 hover:bg-orange-600 text-black font-bold" onClick={() => {
-          if (!wallet) { window.dispatchEvent(new CustomEvent('suibets:connect-wallet-required')); return; }
-          setShowCreate(true);
-        }} data-testid="button-create-challenge">
-          <Plus className="h-4 w-4 mr-1" />
+        <div>
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <Zap className="h-5 w-5 text-[#f97316]" />
+            Challenges
+          </h3>
+          <p className="text-gray-500 text-xs mt-0.5">Create a bet, set your stake, others back or fade you</p>
+        </div>
+        <button
+          className="px-5 py-2.5 rounded-xl bg-[#f97316] hover:bg-[#ea580c] text-white font-bold text-sm transition-colors flex items-center gap-1.5 shadow-lg shadow-[#f97316]/20"
+          onClick={() => {
+            if (!wallet) { window.dispatchEvent(new CustomEvent('suibets:connect-wallet-required')); return; }
+            setShowCreate(true);
+          }}
+          data-testid="button-create-challenge"
+        >
+          <Plus className="h-4 w-4" />
           Create Challenge
-        </Button>
+        </button>
       </div>
 
-      <Card className="bg-gradient-to-r from-orange-900/20 to-red-900/10 border-orange-500/20">
-        <CardContent className="p-4">
-          <p className="text-white font-medium mb-1">How it works</p>
-          <div className="flex items-start gap-6 text-gray-400 text-sm flex-wrap">
-            <div className="flex items-center gap-2"><span className="text-orange-400 font-bold">1.</span> Create a bet</div>
-            <div className="flex items-center gap-2"><span className="text-orange-400 font-bold">2.</span> Set your stake</div>
-            <div className="flex items-center gap-2"><span className="text-orange-400 font-bold">3.</span> Others fade or back you</div>
-          </div>
-        </CardContent>
-      </Card>
-
       {isLoading ? (
-        <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-28 bg-gray-800 rounded-xl" />)}</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[1,2,3].map(i => <Skeleton key={i} className="h-36 bg-[#161b22] rounded-2xl" />)}
+        </div>
       ) : openChallenges.length === 0 ? (
-        <Card className="bg-[#111111] border-cyan-900/20">
-          <CardContent className="p-8 text-center">
-            <Zap className="h-12 w-12 text-gray-600 mx-auto mb-3" />
-            <h3 className="text-white font-bold mb-1">No open challenges</h3>
-            <p className="text-gray-400 text-sm mb-4">Be the first to throw down a challenge!</p>
-            <Button className="bg-orange-500 hover:bg-orange-600 text-black font-bold" onClick={() => {
+        <div className="bg-[#0d1117] border border-[#1e3a5f]/20 rounded-2xl p-12 text-center">
+          <Zap className="h-14 w-14 text-gray-600 mx-auto mb-4" />
+          <h3 className="text-white font-bold text-lg mb-2">No open challenges</h3>
+          <p className="text-gray-400 text-sm mb-5">Be the first to throw down!</p>
+          <button
+            className="px-6 py-3 rounded-xl bg-[#f97316] hover:bg-[#ea580c] text-white font-bold transition-colors"
+            onClick={() => {
               if (!wallet) { window.dispatchEvent(new CustomEvent('suibets:connect-wallet-required')); return; }
               setShowCreate(true);
-            }} data-testid="button-create-first-challenge">
-              <Plus className="h-4 w-4 mr-1" />
-              Create First Challenge
-            </Button>
-          </CardContent>
-        </Card>
+            }}
+            data-testid="button-create-first-challenge"
+          >
+            Create First Challenge
+          </button>
+        </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {openChallenges.map((c: any) => {
             const isFull = (c.currentParticipants || 1) >= (c.maxParticipants || 10);
             const isExpired = new Date(c.expiresAt) <= new Date();
@@ -1456,70 +1278,63 @@ function ChallengeTab({ wallet }: { wallet?: string }) {
             const fillPct = ((c.currentParticipants || 1) / (c.maxParticipants || 10)) * 100;
             const totalPool = (c.stakeAmount || 0) * (c.currentParticipants || 1);
             return (
-              <Card key={c.id} className="bg-[#111111] border-orange-900/20 hover:border-orange-500/30 transition-colors" data-testid={`challenge-${c.id}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex-1">
-                      <p className="text-white font-medium">{c.title}</p>
-                      {c.description && <p className="text-gray-500 text-sm mt-1">{c.description}</p>}
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-orange-400 font-bold text-lg">{c.stakeAmount} {c.currency}</p>
-                      <p className="text-gray-500 text-xs">per player</p>
-                    </div>
+              <div key={c.id} className="bg-[#0d1117] border border-[#f97316]/15 hover:border-[#f97316]/40 rounded-2xl p-4 transition-all" data-testid={`challenge-${c.id}`}>
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex-1">
+                    <p className="text-white font-medium text-sm">{c.title}</p>
+                    {c.description && <p className="text-gray-500 text-xs mt-1 line-clamp-1">{c.description}</p>}
                   </div>
-
-                  <div className="mb-3">
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-gray-400">{c.currentParticipants || 1}/{c.maxParticipants || 10} players</span>
-                      <span className="text-orange-400 font-bold">{totalPool.toFixed(0)} {c.currency} pool</span>
-                    </div>
-                    <div className="h-2 bg-muted/50 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-orange-500 to-red-500 rounded-full transition-all" style={{ width: `${fillPct}%` }} />
-                    </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-[#f97316] font-bold text-lg">{c.stakeAmount}</p>
+                    <p className="text-gray-600 text-[10px]">SBETS/player</p>
                   </div>
+                </div>
 
-                  {!isCreator && !isFull && !isExpired && (
-                    <div className="flex gap-2 mb-3">
-                      <Button
-                        size="sm"
-                        className="flex-1 bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 font-bold"
-                        onClick={() => handleJoin(c.id, 'for')}
-                        disabled={joinMutation.isPending}
-                        data-testid={`button-back-${c.id}`}
-                      >
-                        <ThumbsUp className="h-4 w-4 mr-1" />
-                        Back ({c.stakeAmount} {c.currency})
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="flex-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 font-bold"
-                        onClick={() => handleJoin(c.id, 'against')}
-                        disabled={joinMutation.isPending}
-                        data-testid={`button-fade-${c.id}`}
-                      >
-                        <ThumbsDown className="h-4 w-4 mr-1" />
-                        Fade ({c.stakeAmount} {c.currency})
-                      </Button>
-                    </div>
-                  )}
-
-                  {(isFull || isExpired) && !isCreator && (
-                    <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 mb-3">
-                      {isFull ? 'Challenge Full' : 'Challenge Expired'}
-                    </Badge>
-                  )}
-
-                  {isCreator && (
-                    <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30 mb-3">Your Challenge</Badge>
-                  )}
-
-                  <div className="flex items-center justify-between text-xs text-gray-600">
-                    <span>by <SuiNSName address={c.creatorWallet} /></span>
-                    <span>{timeLeft(c.expiresAt)}</span>
+                <div className="mb-3">
+                  <div className="h-1.5 bg-[#161b22] rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-[#f97316] to-[#ef4444] rounded-full transition-all" style={{ width: `${fillPct}%` }} />
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="flex items-center justify-between text-xs mt-1">
+                    <span className="text-gray-500">{c.currentParticipants || 1}/{c.maxParticipants || 10} players</span>
+                    <span className="text-[#f97316] font-bold">{totalPool} SBETS pool</span>
+                  </div>
+                </div>
+
+                {!isCreator && !isFull && !isExpired && (
+                  <div className="flex gap-2 mb-3">
+                    <button
+                      className="flex-1 py-2 rounded-xl bg-green-500/10 hover:bg-green-500/20 text-green-400 font-bold text-sm border border-green-500/20 transition-all"
+                      onClick={() => handleJoin(c.id, 'for')}
+                      disabled={joinMutation.isPending}
+                      data-testid={`button-back-${c.id}`}
+                    >
+                      Back
+                    </button>
+                    <button
+                      className="flex-1 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold text-sm border border-red-500/20 transition-all"
+                      onClick={() => handleJoin(c.id, 'against')}
+                      disabled={joinMutation.isPending}
+                      data-testid={`button-fade-${c.id}`}
+                    >
+                      Fade
+                    </button>
+                  </div>
+                )}
+
+                {(isFull || isExpired) && !isCreator && (
+                  <span className="text-gray-500 text-xs font-medium bg-gray-500/10 px-2 py-1 rounded-lg inline-block mb-3">
+                    {isFull ? 'Full' : 'Expired'}
+                  </span>
+                )}
+                {isCreator && (
+                  <span className="text-[#4da2ff] text-xs font-medium bg-[#4da2ff]/10 px-2 py-1 rounded-lg inline-block mb-3">Your Challenge</span>
+                )}
+
+                <div className="flex items-center justify-between text-xs text-gray-600">
+                  <span>by <SuiNSName address={c.creatorWallet} /></span>
+                  <span>{timeLeft(c.expiresAt)}</span>
+                </div>
+              </div>
             );
           })}
         </div>
@@ -1530,15 +1345,13 @@ function ChallengeTab({ wallet }: { wallet?: string }) {
           <h4 className="text-gray-400 font-semibold mb-3 text-sm">Past Challenges</h4>
           <div className="space-y-2">
             {closedChallenges.slice(0, 5).map((c: any) => (
-              <Card key={c.id} className="bg-card border-gray-800 opacity-60">
-                <CardContent className="p-3 flex items-center justify-between gap-2">
-                  <p className="text-gray-400 text-sm flex-1 truncate">{c.title}</p>
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-600 text-xs">{c.stakeAmount} {c.currency}</span>
-                    <Badge className="bg-gray-700/50 text-gray-500 border-gray-700">{c.status}</Badge>
-                  </div>
-                </CardContent>
-              </Card>
+              <div key={c.id} className="bg-[#0d1117]/60 border border-gray-800/30 rounded-xl p-3 flex items-center justify-between gap-2 opacity-60">
+                <p className="text-gray-400 text-sm flex-1 truncate">{c.title}</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600 text-xs">{c.stakeAmount} SBETS</span>
+                  <span className="text-gray-500 text-xs bg-gray-500/10 px-2 py-0.5 rounded">{c.status}</span>
+                </div>
+              </div>
             ))}
           </div>
         </div>
@@ -1600,58 +1413,56 @@ function LiveChat({ myWallet }: { myWallet?: string }) {
   }, [messages]);
 
   return (
-    <Card className="bg-[#111111] border-cyan-900/20">
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <MessageCircle className="h-5 w-5 text-cyan-400" />
-          <h3 className="text-white font-semibold">Live Chat</h3>
-        </div>
-        <div className="h-64 overflow-y-auto mb-3 space-y-2 border border-cyan-900/10 rounded-lg p-3 bg-muted/30" data-testid="chat-messages">
-          {messages.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-gray-500 text-sm">No messages yet. Start the conversation!</p>
-            </div>
-          ) : (
-            messages.map((msg) => (
-              <div key={msg.id} className="flex items-start gap-2" data-testid={`chat-message-${msg.id}`}>
-                <div className="w-7 h-7 bg-gradient-to-br from-cyan-500 to-purple-500 rounded-full flex items-center justify-center shrink-0 mt-0.5">
-                  <Users className="h-3.5 w-3.5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-cyan-400 text-xs font-medium"><SuiNSName address={msg.wallet} className="text-cyan-400 text-xs font-medium" /></span>
-                    <span className="text-gray-600 text-xs">{timeAgo(msg.createdAt)}</span>
-                  </div>
-                  <p className="text-gray-300 text-sm break-words">{msg.message}</p>
-                </div>
+    <div className="bg-[#0d1117] border border-[#1e3a5f]/20 rounded-2xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-[#1e3a5f]/10 flex items-center gap-2">
+        <MessageCircle className="h-4 w-4 text-[#4da2ff]" />
+        <h3 className="text-white font-semibold text-sm">Live Chat</h3>
+        <span className="text-gray-600 text-xs">({messages.length})</span>
+      </div>
+      <div className="h-64 overflow-y-auto p-4 space-y-3" data-testid="chat-messages">
+        {messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-gray-600 text-sm">No messages yet</p>
+          </div>
+        ) : (
+          messages.map((msg) => (
+            <div key={msg.id} className="flex items-start gap-2.5" data-testid={`chat-message-${msg.id}`}>
+              <div className="w-7 h-7 bg-gradient-to-br from-[#4da2ff] to-[#7c3aed] rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                <Users className="h-3.5 w-3.5 text-white" />
               </div>
-            ))
-          )}
-          <div ref={chatEndRef} />
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={message}
-            onChange={e => setMessage(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-            placeholder={myWallet ? "Type a message..." : "Connect wallet to chat"}
-            className="flex-1 bg-muted/50 border border-cyan-900/30 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:border-cyan-500/50 focus:outline-none text-sm"
-            disabled={!myWallet}
-            data-testid="input-chat-message"
-          />
-          <Button
-            size="icon"
-            className="bg-cyan-500 hover:bg-cyan-600 text-black"
-            onClick={handleSend}
-            disabled={!myWallet || !message.trim() || sendMutation.isPending}
-            data-testid="button-send-chat"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[#4da2ff] text-xs font-medium"><SuiNSName address={msg.wallet} className="text-[#4da2ff] text-xs font-medium" /></span>
+                  <span className="text-gray-600 text-xs">{timeAgo(msg.createdAt)}</span>
+                </div>
+                <p className="text-gray-300 text-sm break-words">{msg.message}</p>
+              </div>
+            </div>
+          ))
+        )}
+        <div ref={chatEndRef} />
+      </div>
+      <div className="p-3 border-t border-[#1e3a5f]/10 flex items-center gap-2">
+        <input
+          type="text"
+          value={message}
+          onChange={e => setMessage(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+          placeholder={myWallet ? "Type a message..." : "Connect wallet to chat"}
+          className="flex-1 bg-[#161b22] border border-[#1e3a5f]/30 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:border-[#4da2ff]/50 focus:outline-none text-sm"
+          disabled={!myWallet}
+          data-testid="input-chat-message"
+        />
+        <button
+          className="p-2.5 rounded-xl bg-[#4da2ff] hover:bg-[#3d8ae5] text-white transition-colors disabled:opacity-40"
+          onClick={handleSend}
+          disabled={!myWallet || !message.trim() || sendMutation.isPending}
+          data-testid="button-send-chat"
+        >
+          <Send className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -1688,10 +1499,7 @@ function SocialTab({ onViewProfile, myWallet }: { onViewProfile: (w: string) => 
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/social/following'] });
-      toast({
-        title: data.action === 'followed' ? 'Following' : 'Unfollowed',
-        description: data.action === 'followed' ? 'You are now following this bettor' : 'Unfollowed successfully'
-      });
+      toast({ title: data.action === 'followed' ? 'Following' : 'Unfollowed' });
     },
     onError: () => {
       toast({ title: 'Error', description: 'Failed to update follow status', variant: 'destructive' });
@@ -1728,70 +1536,57 @@ function SocialTab({ onViewProfile, myWallet }: { onViewProfile: (w: string) => 
     : allUsers;
 
   return (
-    <div className="space-y-4" data-testid="tab-social">
+    <div className="space-y-5" data-testid="tab-social">
       {myWallet && (
-        <Card className="bg-[#111111] border-cyan-900/20">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <SiX className="h-4 w-4 text-white" />
-              <h3 className="text-white font-semibold text-sm">X / Twitter Profile</h3>
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={xInput}
-                onChange={e => setXInput(e.target.value)}
-                placeholder="@yourusername"
-                className="flex-1 bg-muted/50 border border-cyan-900/30 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:border-cyan-500/50 focus:outline-none text-sm"
-                data-testid="input-x-handle"
-              />
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-cyan-900/30 text-gray-400"
-                onClick={handleSaveXHandle}
-                data-testid="button-save-x-handle"
-              >
-                Save
-              </Button>
-              <Button
-                size="sm"
-                className="bg-card text-white border border-gray-700"
-                onClick={handleShareOnX}
-                data-testid="button-share-on-x"
-              >
-                <SiX className="h-3.5 w-3.5 mr-1" />
-                Share
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="bg-[#0d1117] border border-[#1e3a5f]/20 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <SiX className="h-4 w-4 text-white" />
+            <h3 className="text-white font-semibold text-sm">X / Twitter</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={xInput}
+              onChange={e => setXInput(e.target.value)}
+              placeholder="@yourusername"
+              className="flex-1 bg-[#161b22] border border-[#1e3a5f]/30 rounded-xl px-4 py-2.5 text-white placeholder-gray-600 focus:border-[#4da2ff]/50 focus:outline-none text-sm"
+              data-testid="input-x-handle"
+            />
+            <button className="px-3 py-2.5 rounded-xl border border-[#1e3a5f]/30 text-gray-400 hover:text-white text-sm hover:bg-white/5 transition-colors" onClick={handleSaveXHandle} data-testid="button-save-x-handle">Save</button>
+            <button className="px-3 py-2.5 rounded-xl bg-[#161b22] text-white border border-gray-700 text-sm hover:bg-white/5 transition-colors flex items-center gap-1" onClick={handleShareOnX} data-testid="button-share-on-x">
+              <SiX className="h-3.5 w-3.5" />
+              Share
+            </button>
+          </div>
+        </div>
       )}
 
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
           <input
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search by wallet address..."
-            className="w-full bg-[#111111] border border-cyan-900/30 rounded-lg pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:border-cyan-500/50 focus:outline-none"
+            placeholder="Search by wallet..."
+            className="w-full bg-[#0d1117] border border-[#1e3a5f]/20 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-600 focus:border-[#4da2ff]/50 focus:outline-none"
             data-testid="input-search-social"
           />
         </div>
         <div className="flex items-center gap-1">
           {(['weekly', 'monthly', 'all-time'] as const).map(p => (
-            <Button
+            <button
               key={p}
-              variant={period === p ? 'default' : 'outline'}
-              size="sm"
-              className={period === p ? 'bg-cyan-500 text-black' : 'border-cyan-900/30 text-gray-400'}
+              className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                period === p
+                  ? 'bg-[#4da2ff] text-white'
+                  : 'bg-[#161b22] text-gray-400 hover:text-white border border-[#1e3a5f]/20'
+              }`}
               onClick={() => setPeriod(p)}
               data-testid={`period-${p}`}
             >
               {p === 'weekly' ? 'Week' : p === 'monthly' ? 'Month' : 'All'}
-            </Button>
+            </button>
           ))}
         </div>
       </div>
@@ -1806,28 +1601,24 @@ function SocialTab({ onViewProfile, myWallet }: { onViewProfile: (w: string) => 
             {followingList.map(w => {
               const wXHandle = getXHandle(w);
               return (
-                <Card key={w} className="bg-[#111111] border-cyan-900/20 hover:border-cyan-500/30 transition-colors cursor-pointer" onClick={() => onViewProfile(w)}>
-                  <CardContent className="p-3 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-purple-500 rounded-full flex items-center justify-center">
-                        <Users className="h-4 w-4 text-white" />
-                      </div>
-                      <div>
-                        <span className="text-white text-sm"><SuiNSName address={w} className="text-white text-sm" /></span>
-                        {wXHandle && <p className="text-cyan-400 text-xs">@{wXHandle.replace('@', '')}</p>}
-                      </div>
+                <div key={w} className="bg-[#0d1117] border border-[#1e3a5f]/20 hover:border-[#4da2ff]/30 rounded-xl p-3 flex items-center justify-between gap-2 cursor-pointer transition-all" onClick={() => onViewProfile(w)}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-gradient-to-br from-[#4da2ff] to-[#7c3aed] rounded-full flex items-center justify-center">
+                      <Users className="h-4 w-4 text-white" />
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-cyan-500/30 text-cyan-400 text-xs"
-                      onClick={(e) => { e.stopPropagation(); handleFollow(w); }}
-                      data-testid={`button-unfollow-${w.slice(0,8)}`}
-                    >
-                      Unfollow
-                    </Button>
-                  </CardContent>
-                </Card>
+                    <div>
+                      <span className="text-white text-sm"><SuiNSName address={w} className="text-white text-sm" /></span>
+                      {wXHandle && <p className="text-[#4da2ff] text-xs">@{wXHandle.replace('@', '')}</p>}
+                    </div>
+                  </div>
+                  <button
+                    className="px-2.5 py-1.5 rounded-lg border border-[#4da2ff]/30 text-[#4da2ff] text-xs hover:bg-[#4da2ff]/10 transition-colors"
+                    onClick={(e) => { e.stopPropagation(); handleFollow(w); }}
+                    data-testid={`button-unfollow-${w.slice(0,8)}`}
+                  >
+                    Unfollow
+                  </button>
+                </div>
               );
             })}
           </div>
@@ -1837,68 +1628,61 @@ function SocialTab({ onViewProfile, myWallet }: { onViewProfile: (w: string) => 
       <div>
         <h3 className="text-sm font-semibold text-gray-400 mb-3 flex items-center gap-2">
           <Trophy className="h-4 w-4" />
-          Leaderboard - Top Bettors ({period === 'weekly' ? 'This Week' : period === 'monthly' ? 'This Month' : 'All Time'})
+          Leaderboard ({period === 'weekly' ? 'This Week' : period === 'monthly' ? 'This Month' : 'All Time'})
         </h3>
         {isLoading ? (
-          <div className="space-y-3">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-14 bg-gray-800 rounded-xl" />)}</div>
+          <div className="space-y-2">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-14 bg-[#161b22] rounded-xl" />)}</div>
         ) : filtered.length === 0 ? (
-          <Card className="bg-[#111111] border-cyan-900/20">
-            <CardContent className="p-6 text-center">
-              <Users className="h-10 w-10 text-gray-600 mx-auto mb-2" />
-              <p className="text-gray-400">{searchQuery ? 'No wallets found matching your search' : 'No bettors in this period yet'}</p>
-            </CardContent>
-          </Card>
+          <div className="bg-[#0d1117] border border-[#1e3a5f]/20 rounded-2xl p-8 text-center">
+            <Users className="h-10 w-10 text-gray-600 mx-auto mb-2" />
+            <p className="text-gray-400">{searchQuery ? 'No wallets found' : 'No bettors yet'}</p>
+          </div>
         ) : (
           <div className="space-y-2">
             {filtered.map((user: any, idx: number) => {
               const isFollowing = followingList.includes(user.wallet?.toLowerCase());
-              const rankColors = idx === 0 ? 'from-yellow-500 to-amber-500' : idx === 1 ? 'from-gray-300 to-gray-400' : idx === 2 ? 'from-amber-600 to-amber-700' : 'from-cyan-600 to-cyan-700';
+              const rankColors = idx === 0 ? 'from-yellow-500 to-amber-500' : idx === 1 ? 'from-gray-300 to-gray-400' : idx === 2 ? 'from-amber-600 to-amber-700' : 'from-[#4da2ff] to-[#7c3aed]';
               const userXHandle = getXHandle(user.wallet || '');
               return (
-                <Card
+                <div
                   key={user.wallet || idx}
-                  className="bg-[#111111] border-cyan-900/20 hover:border-cyan-500/30 transition-colors cursor-pointer"
+                  className="bg-[#0d1117] border border-[#1e3a5f]/15 hover:border-[#4da2ff]/30 rounded-xl p-3 flex items-center justify-between gap-3 cursor-pointer transition-all"
                   onClick={() => user.wallet && onViewProfile(user.wallet)}
                   data-testid={`leaderboard-user-${idx}`}
                 >
-                  <CardContent className="p-3 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className={`w-9 h-9 bg-gradient-to-br ${rankColors} rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0`}>
-                        #{idx + 1}
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className={`w-9 h-9 bg-gradient-to-br ${rankColors} rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0`}>
+                      #{idx + 1}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-white text-sm font-medium"><SuiNSName address={user.wallet} className="text-white text-sm font-medium" /></p>
+                        {userXHandle && <span className="text-[#4da2ff] text-xs">@{userXHandle.replace('@', '')}</span>}
                       </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-white text-sm font-medium"><SuiNSName address={user.wallet} className="text-white text-sm font-medium" /></p>
-                          {userXHandle && <span className="text-cyan-400 text-xs">@{userXHandle.replace('@', '')}</span>}
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-xs font-bold ${(user.totalProfitUsd || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {(user.totalProfitUsd || 0) >= 0 ? '+' : ''}${(user.totalProfitUsd || 0).toFixed(2)}
-                          </span>
-                          <span className="text-gray-500 text-xs">{user.winRate?.toFixed(0)}% WR</span>
-                          <span className="text-gray-600 text-xs">{user.totalBets} bets</span>
-                          {user.loyaltyTier && user.loyaltyTier !== 'Bronze' && (
-                            <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 text-xs">{user.loyaltyTier}</Badge>
-                          )}
-                        </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-xs font-bold ${(user.totalProfitUsd || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {(user.totalProfitUsd || 0) >= 0 ? '+' : ''}${(user.totalProfitUsd || 0).toFixed(2)}
+                        </span>
+                        <span className="text-gray-500 text-xs">{user.winRate?.toFixed(0)}% WR</span>
+                        <span className="text-gray-600 text-xs">{user.totalBets} bets</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {myWallet && user.wallet && myWallet.toLowerCase() !== user.wallet.toLowerCase() && (
-                        <Button
-                          variant={isFollowing ? 'outline' : 'default'}
-                          size="sm"
-                          className={isFollowing ? 'border-cyan-500/30 text-cyan-400 text-xs' : 'bg-cyan-500 text-black text-xs'}
-                          onClick={(e) => { e.stopPropagation(); handleFollow(user.wallet); }}
-                          data-testid={`button-follow-${idx}`}
-                        >
-                          {isFollowing ? 'Following' : 'Follow'}
-                        </Button>
-                      )}
-                      <ChevronRight className="h-4 w-4 text-gray-600" />
-                    </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {myWallet && user.wallet && myWallet.toLowerCase() !== user.wallet.toLowerCase() && (
+                      <button
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                          isFollowing ? 'border border-[#4da2ff]/30 text-[#4da2ff] hover:bg-[#4da2ff]/10' : 'bg-[#4da2ff] text-white'
+                        }`}
+                        onClick={(e) => { e.stopPropagation(); handleFollow(user.wallet); }}
+                        data-testid={`button-follow-${idx}`}
+                      >
+                        {isFollowing ? 'Following' : 'Follow'}
+                      </button>
+                    )}
+                    <ChevronRight className="h-4 w-4 text-gray-600" />
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -1938,20 +1722,20 @@ export default function NetworkPage() {
   };
 
   const tabs: { key: SubTab; label: string; icon: JSX.Element }[] = [
-    { key: 'home', label: 'Home', icon: <Flame className="h-4 w-4" /> },
-    { key: 'predict', label: 'Predict', icon: <Target className="h-4 w-4" /> },
-    { key: 'challenge', label: 'Challenge', icon: <Zap className="h-4 w-4" /> },
+    { key: 'home', label: 'Trending', icon: <Flame className="h-4 w-4" /> },
+    { key: 'predict', label: 'Markets', icon: <BarChart3 className="h-4 w-4" /> },
+    { key: 'challenge', label: 'Challenges', icon: <Zap className="h-4 w-4" /> },
     { key: 'social', label: 'Social', icon: <Users className="h-4 w-4" /> },
   ];
 
   return (
-    <div className="min-h-screen bg-background" data-testid="network-page">
-      <nav className="bg-card border-b border-cyan-900/30 px-4 py-3">
+    <div className="min-h-screen bg-[#080c14]" data-testid="network-page">
+      <nav className="bg-[#0d1117] border-b border-[#1e3a5f]/20 px-4 py-3 sticky top-0 z-40 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={handleBack}
-              className="p-2 text-gray-400 hover:text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition-colors"
+              className="p-2 text-gray-400 hover:text-[#4da2ff] hover:bg-[#4da2ff]/10 rounded-xl transition-colors"
               data-testid="btn-back"
             >
               <ArrowLeft size={20} />
@@ -1961,20 +1745,20 @@ export default function NetworkPage() {
             </Link>
           </div>
           <div className="hidden md:flex items-center gap-6">
-            <Link href="/" className="text-gray-400 hover:text-cyan-400 text-sm font-medium" data-testid="nav-bets">Bets</Link>
-            <Link href="/dashboard" className="text-gray-400 hover:text-cyan-400 text-sm font-medium" data-testid="nav-dashboard">Dashboard</Link>
-            <Link href="/bet-history" className="text-gray-400 hover:text-cyan-400 text-sm font-medium" data-testid="nav-my-bets">My Bets</Link>
-            <Link href="/whitepaper" className="text-gray-400 hover:text-cyan-400 text-sm font-medium" data-testid="nav-whitepaper">Whitepaper</Link>
-            <Link href="/network" className="text-cyan-400 text-sm font-medium" data-testid="nav-network">Predict</Link>
+            <Link href="/" className="text-gray-400 hover:text-[#4da2ff] text-sm font-medium transition-colors" data-testid="nav-bets">Bets</Link>
+            <Link href="/dashboard" className="text-gray-400 hover:text-[#4da2ff] text-sm font-medium transition-colors" data-testid="nav-dashboard">Dashboard</Link>
+            <Link href="/bet-history" className="text-gray-400 hover:text-[#4da2ff] text-sm font-medium transition-colors" data-testid="nav-my-bets">My Bets</Link>
+            <Link href="/whitepaper" className="text-gray-400 hover:text-[#4da2ff] text-sm font-medium transition-colors" data-testid="nav-whitepaper">Whitepaper</Link>
+            <Link href="/network" className="text-[#4da2ff] text-sm font-medium" data-testid="nav-network">Predict</Link>
           </div>
-          <div className="flex items-center gap-4">
-            <button onClick={handleRefresh} className="text-gray-400 hover:text-white p-2" data-testid="btn-refresh">
+          <div className="flex items-center gap-3">
+            <button onClick={handleRefresh} className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-colors" data-testid="btn-refresh">
               <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
             </button>
             {myWallet ? (
-              <SuiNSName address={myWallet} className="text-cyan-400 text-sm font-medium" />
+              <SuiNSName address={myWallet} className="text-[#4da2ff] text-sm font-medium" />
             ) : (
-              <button onClick={handleConnectWallet} className="bg-cyan-500 hover:bg-cyan-600 text-black font-bold px-4 py-2 rounded-lg text-sm flex items-center gap-2" data-testid="btn-connect">
+              <button onClick={handleConnectWallet} className="bg-[#4da2ff] hover:bg-[#3d8ae5] text-white font-bold px-5 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-lg shadow-[#4da2ff]/20 transition-colors" data-testid="btn-connect">
                 <Wallet size={16} />
                 Connect
               </button>
@@ -1983,49 +1767,24 @@ export default function NetworkPage() {
         </div>
       </nav>
 
-      <div className="max-w-5xl mx-auto px-4 py-6">
+      <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="mb-6">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-gradient-to-br from-cyan-500/20 to-purple-500/20 rounded-xl">
-              <TrendingUp className="h-6 w-6 text-cyan-400" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">Predict Anything</h1>
-              <p className="text-gray-400 text-sm">On-chain predictions, challenges & social betting</p>
-            </div>
+          <div className="flex items-center gap-3 mb-1">
+            <h1 className="text-2xl font-bold text-white">Predict Anything</h1>
+            <span className="text-xs font-medium text-[#4da2ff] bg-[#4da2ff]/10 px-2 py-1 rounded-lg">On-Chain</span>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-            <Card className="bg-[#111111] border-cyan-900/20">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <Target className="h-4 w-4 text-cyan-400" />
-                  <h4 className="text-white font-semibold text-sm">Predict</h4>
-                </div>
-                <p className="text-gray-400 text-xs">Create open markets anyone can bet on. Pool-based -- all bets go into a pot, winners split everything. Great for crypto, sports, politics, and anything else.</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-[#111111] border-orange-900/20">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <Zap className="h-4 w-4 text-orange-400" />
-                  <h4 className="text-white font-semibold text-sm">Challenge</h4>
-                </div>
-                <p className="text-gray-400 text-xs">Direct head-to-head challenges. Set a fixed stake, dare others to fade or back you. Think of it as a public bet slip others can match. Perfect for friendly wagers.</p>
-              </CardContent>
-            </Card>
-          </div>
+          <p className="text-gray-500 text-sm">Create markets, challenge friends, win SBETS - all verified on Sui blockchain</p>
         </div>
 
-        <div className="flex items-center gap-1 bg-card border border-cyan-900/30 rounded-xl p-1 mb-6">
+        <div className="flex items-center gap-1 bg-[#0d1117] border border-[#1e3a5f]/20 rounded-2xl p-1.5 mb-6">
           {tabs.map(tab => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
                 activeTab === tab.key
-                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  ? 'bg-[#4da2ff]/15 text-[#4da2ff] border border-[#4da2ff]/30'
+                  : 'text-gray-500 hover:text-white hover:bg-white/3'
               }`}
               data-testid={`tab-button-${tab.key}`}
             >
@@ -2036,18 +1795,16 @@ export default function NetworkPage() {
         </div>
 
         {!myWallet && (
-          <Card className="bg-gradient-to-r from-cyan-900/20 to-purple-900/10 border-cyan-500/20 mb-6">
-            <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
-              <div>
-                <p className="text-white font-medium">Connect your wallet to participate</p>
-                <p className="text-gray-400 text-sm">Create predictions, join challenges, and follow top bettors</p>
-              </div>
-              <Button className="bg-cyan-500 hover:bg-cyan-600 text-black font-bold" onClick={handleConnectWallet} data-testid="button-connect-cta">
-                <Wallet className="h-4 w-4 mr-1" />
-                Connect Wallet
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="bg-gradient-to-r from-[#4da2ff]/10 to-[#7c3aed]/5 border border-[#4da2ff]/20 rounded-2xl p-5 mb-6 flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <p className="text-white font-medium">Connect your wallet to participate</p>
+              <p className="text-gray-500 text-sm">Create predictions, join challenges, and follow top bettors</p>
+            </div>
+            <button className="bg-[#4da2ff] hover:bg-[#3d8ae5] text-white font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-lg shadow-[#4da2ff]/20 transition-colors" onClick={handleConnectWallet} data-testid="button-connect-cta">
+              <Wallet className="h-4 w-4" />
+              Connect Wallet
+            </button>
+          </div>
         )}
 
         {activeTab === 'home' && <HomeTab onViewProfile={setViewingProfile} />}

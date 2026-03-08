@@ -1746,14 +1746,14 @@ export default function AdminPanel() {
                                 </thead>
                                 <tbody>
                                   {allStakes.map((stake: any, index: number) => {
-                                    const stakedDays = stake.stakedAt ? Math.floor((Date.now() - new Date(stake.stakedAt).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+                                    const stakedDays = stake.stakedDays || (stake.stakingDate ? Math.floor((Date.now() - new Date(stake.stakingDate).getTime()) / (1000 * 60 * 60 * 24)) : 0);
                                     const isActive = stake.status === 'active' || stake.isActive;
                                     return (
                                       <tr key={stake.id || index} className="border-b border-gray-800" data-testid={`row-stake-${stake.id || index}`}>
                                         <td className="p-2">{stake.id}</td>
-                                        <td className="p-2 font-mono">{(stake.wallet || stake.walletAddress || '').slice(0, 8)}...</td>
-                                        <td className="p-2">{Number(stake.amount || 0).toLocaleString()} SBETS</td>
-                                        <td className="p-2">{Number(stake.rewards || stake.pendingRewards || 0).toLocaleString()}</td>
+                                        <td className="p-2 font-mono">{(stake.walletAddress || stake.wallet || '').slice(0, 8)}...</td>
+                                        <td className="p-2">{Number(stake.amountStaked || stake.amount || 0).toLocaleString()} SBETS</td>
+                                        <td className="p-2">{Number(stake.currentRewards || stake.rewards || stake.pendingRewards || 0).toLocaleString()}</td>
                                         <td className="p-2">
                                           <Badge variant={isActive ? 'default' : 'secondary'} data-testid={`badge-stake-status-${stake.id || index}`}>
                                             {isActive ? 'Active' : 'Inactive'}
@@ -1771,14 +1771,13 @@ export default function AdminPanel() {
                                               size="sm"
                                               variant="destructive"
                                               onClick={async () => {
-                                                const adminPassword = prompt('Enter admin password to force unstake:');
-                                                if (!adminPassword) return;
+                                                if (!confirm(`Force unstake ${Number(stake.amountStaked || stake.amount || 0).toLocaleString()} SBETS for ${(stake.walletAddress || '').slice(0, 10)}...?`)) return;
                                                 setForceUnstaking(String(stake.id));
                                                 try {
                                                   const response = await fetch('/api/admin/staking/force-unstake', {
                                                     method: 'POST',
                                                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
-                                                    body: JSON.stringify({ adminPassword, stakeId: stake.id })
+                                                    body: JSON.stringify({ stakeId: stake.id })
                                                   });
                                                   if (response.ok) {
                                                     const result = await response.json();

@@ -57,6 +57,7 @@ SPORTS_LIST = "football,basketball,hockey,mma,tennis,baseball"
 SINGLE_SPORT_MODE = "true"
 CURRENT_SPORT = "football"
 VITE_GOOGLE_CLIENT_ID = "4356122538-r1efdepcdcpt8uib5a8gko9f8l86n96s.apps.googleusercontent.com"
+RAPIDAPI_KEY = "35244dbeebmsh90d96a714c2827fp1b3101jsnafe411c38a3a"
 
 [agent]
 integrations = ["javascript_openai_ai_integrations:1.0.0"]

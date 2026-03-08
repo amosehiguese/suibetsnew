@@ -257,7 +257,7 @@ export function ShareableBetCard({ bet, isParlay = false, parlayLegs = [], isOpe
 
   const handleShare = async () => {
     const shareId = bet.numericId ?? bet.id;
-    const shareUrl = `https://suibets.com/bet/${shareId}`;
+    const shareUrl = `https://www.suibets.com/bet/${shareId}`;
 
     try {
       const canvas = await generateCanvas();
@@ -300,7 +300,7 @@ export function ShareableBetCard({ bet, isParlay = false, parlayLegs = [], isOpe
 
   const handleCopyBet = async () => {
     const shareId = bet.numericId ?? bet.id;
-    const shareUrl = `https://suibets.com/bet/${shareId}`;
+    const shareUrl = `https://www.suibets.com/bet/${shareId}`;
     const legs = isParlay && parlayLegs.length > 0
       ? parlayLegs
       : (isParlay && bet.prediction?.includes(' | '))

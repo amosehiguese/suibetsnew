@@ -251,7 +251,7 @@ export default function SharedBetPage() {
 
   const handleShareLink = async () => {
     const shareId = bet?.numericId ?? betId;
-    const shareUrl = `https://suibets.com/bet/${shareId}`;
+    const shareUrl = `https://www.suibets.com/bet/${shareId}`;
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
