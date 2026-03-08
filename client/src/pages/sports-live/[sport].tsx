@@ -29,6 +29,8 @@ const SPORTS_MAPPING: Record<string, number> = {
   'ufc': 7,
   'afl': 10,
   'formula-1': 11,
+  'formula1': 11,
+  'f1': 11,
   'handball': 12,
   'nfl': 14,
   'rugby': 15,
@@ -58,7 +60,7 @@ export default function SportPage() {
   const [match, params] = useRoute<{ sport: string }>('/sports-live/:sport');
   const { toast } = useToast();
   const sportSlugLower = match ? params.sport.toLowerCase() : '';
-  const noLiveSports = ['esports', 'afl', 'formula-1', 'handball', 'rugby', 'volleyball', 'boxing', 'netball', 'mma', 'mma-ufc', 'ufc', 'tennis', 'american-football', 'nfl', 'cricket', 'horse-racing', 'wwe', 'wwe-entertainment', 'entertainment'];
+  const noLiveSports = ['esports', 'afl', 'formula-1', 'formula1', 'f1', 'handball', 'rugby', 'volleyball', 'boxing', 'netball', 'mma', 'mma-ufc', 'ufc', 'tennis', 'american-football', 'nfl', 'cricket', 'horse-racing', 'wwe', 'wwe-entertainment', 'entertainment'];
   const defaultTab = noLiveSports.includes(sportSlugLower) ? 'upcoming' : 'live';
   const [selectedTab, setSelectedTab] = useState<'live' | 'upcoming'>(defaultTab);
   
@@ -75,6 +77,9 @@ export default function SportPage() {
     'nhl': 'NHL',
     'mlb': 'MLB',
     'afl': 'AFL',
+    'formula-1': 'Formula 1',
+    'formula1': 'Formula 1',
+    'f1': 'Formula 1',
   };
   const sportName = match 
     ? (SPORT_DISPLAY_NAMES[sportSlugLower] || params.sport.charAt(0).toUpperCase() + params.sport.slice(1)) 

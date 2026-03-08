@@ -404,6 +404,28 @@ export class FreeSportsService {
       console.error(`[FreeSports] WWE generation error:`, error.message);
     }
 
+    try {
+      const generatedF1 = this.generateF1Schedule();
+      if (generatedF1.length > 0) {
+        const existingF1Ids = new Set(allEvents.filter(e => e.sportId === 11).map(e => String(e.id)));
+        const newF1 = generatedF1.filter(e => !existingF1Ids.has(String(e.id)));
+        allEvents.push(...newF1);
+        console.log(`[FreeSports] 🏎️ F1 Generated: ${newF1.length} upcoming races added (${existingF1Ids.size} from API skipped)`);
+      }
+    } catch (error: any) {
+      console.error(`[FreeSports] F1 schedule generation error:`, error.message);
+    }
+
+    try {
+      const generatedUFC = this.generateUFCEvents();
+      if (generatedUFC.length > 0) {
+        allEvents.push(...generatedUFC);
+        console.log(`[FreeSports] 🥋 UFC Generated: ${generatedUFC.length} upcoming fight cards`);
+      }
+    } catch (error: any) {
+      console.error(`[FreeSports] UFC generation error:`, error.message);
+    }
+
     if (allEvents.length > 0) {
       cachedFreeSportsEvents = allEvents;
       lastFetchTime = Date.now();
@@ -694,26 +716,28 @@ export class FreeSportsService {
 
   private generateF1RaceEvent(raceId: string, gpName: string, circuitName: string, startTime: string, sportId: number): SportEvent {
     const f1Grid: { name: string; team: string; number: number; rating: number }[] = [
-      { name: 'Max Verstappen', team: 'Red Bull Racing', number: 1, rating: 92 },
-      { name: 'Liam Lawson', team: 'Red Bull Racing', number: 30, rating: 68 },
-      { name: 'Charles Leclerc', team: 'Ferrari', number: 16, rating: 88 },
+      { name: 'Max Verstappen', team: 'Red Bull Racing', number: 1, rating: 94 },
+      { name: 'Isack Hadjar', team: 'Red Bull Racing', number: 6, rating: 72 },
+      { name: 'Charles Leclerc', team: 'Ferrari', number: 16, rating: 90 },
       { name: 'Lewis Hamilton', team: 'Ferrari', number: 44, rating: 85 },
-      { name: 'Lando Norris', team: 'McLaren', number: 4, rating: 86 },
-      { name: 'Oscar Piastri', team: 'McLaren', number: 81, rating: 83 },
-      { name: 'George Russell', team: 'Mercedes', number: 63, rating: 96 },
-      { name: 'Andrea Kimi Antonelli', team: 'Mercedes', number: 12, rating: 87 },
-      { name: 'Fernando Alonso', team: 'Aston Martin', number: 14, rating: 75 },
-      { name: 'Lance Stroll', team: 'Aston Martin', number: 18, rating: 60 },
-      { name: 'Pierre Gasly', team: 'Alpine', number: 10, rating: 72 },
-      { name: 'Jack Doohan', team: 'Alpine', number: 7, rating: 64 },
+      { name: 'Lando Norris', team: 'McLaren', number: 4, rating: 88 },
+      { name: 'Oscar Piastri', team: 'McLaren', number: 81, rating: 85 },
+      { name: 'George Russell', team: 'Mercedes', number: 63, rating: 86 },
+      { name: 'Andrea Kimi Antonelli', team: 'Mercedes', number: 12, rating: 78 },
+      { name: 'Fernando Alonso', team: 'Aston Martin Honda', number: 14, rating: 75 },
+      { name: 'Lance Stroll', team: 'Aston Martin Honda', number: 18, rating: 60 },
+      { name: 'Pierre Gasly', team: 'Alpine Mercedes', number: 10, rating: 72 },
+      { name: 'Franco Colapinto', team: 'Alpine Mercedes', number: 43, rating: 66 },
       { name: 'Carlos Sainz', team: 'Williams', number: 55, rating: 80 },
       { name: 'Alex Albon', team: 'Williams', number: 23, rating: 74 },
-      { name: 'Yuki Tsunoda', team: 'RB', number: 22, rating: 71 },
-      { name: 'Isack Hadjar', team: 'RB', number: 6, rating: 65 },
-      { name: 'Nico Hülkenberg', team: 'Sauber', number: 27, rating: 70 },
-      { name: 'Gabriel Bortoleto', team: 'Sauber', number: 5, rating: 63 },
+      { name: 'Liam Lawson', team: 'Racing Bulls', number: 30, rating: 71 },
+      { name: 'Arvid Lindblad', team: 'Racing Bulls', number: 39, rating: 64 },
+      { name: 'Nico Hülkenberg', team: 'Audi', number: 27, rating: 70 },
+      { name: 'Gabriel Bortoleto', team: 'Audi', number: 5, rating: 65 },
       { name: 'Esteban Ocon', team: 'Haas', number: 31, rating: 73 },
-      { name: 'Oliver Bearman', team: 'Haas', number: 87, rating: 66 },
+      { name: 'Oliver Bearman', team: 'Haas', number: 87, rating: 68 },
+      { name: 'Sergio Pérez', team: 'Cadillac', number: 11, rating: 69 },
+      { name: 'Valtteri Bottas', team: 'Cadillac', number: 77, rating: 67 },
     ];
 
     const rawPowers = f1Grid.map(driver => {
@@ -1320,6 +1344,30 @@ export class FreeSportsService {
         show: 'Money in the Bank 2026',
         matchType: 'Ladder Match'
       },
+      { id: 'raw-mar09', wrestler1: 'CM Punk', wrestler2: 'Gunther', odds1: 1.55, odds2: 2.40, title: 'Main Event Singles Match', venue: 'Climate Pledge Arena, Seattle', date: '2026-03-10T01:00:00Z', show: 'Monday Night Raw', matchType: 'Singles Match' },
+      { id: 'raw-mar09-2', wrestler1: 'Seth Rollins', wrestler2: 'Drew McIntyre', odds1: 1.60, odds2: 2.30, title: 'WrestleMania Build', venue: 'Climate Pledge Arena, Seattle', date: '2026-03-10T00:00:00Z', show: 'Monday Night Raw', matchType: 'Singles Match' },
+      { id: 'sd-mar13', wrestler1: 'Cody Rhodes', wrestler2: 'AJ Styles', odds1: 1.45, odds2: 2.75, title: 'Main Event', venue: 'PHX Arena, Phoenix', date: '2026-03-14T01:00:00Z', show: 'Friday Night SmackDown', matchType: 'Singles Match' },
+      { id: 'sd-mar13-2', wrestler1: 'Rhea Ripley', wrestler2: 'Nia Jax', odds1: 1.50, odds2: 2.50, title: 'Women\'s Division', venue: 'PHX Arena, Phoenix', date: '2026-03-14T00:00:00Z', show: 'Friday Night SmackDown', matchType: 'Singles Match' },
+      { id: 'raw-mar16', wrestler1: 'Roman Reigns', wrestler2: 'Solo Sikoa', odds1: 1.40, odds2: 2.90, title: 'Tribal Combat', venue: 'Desert Diamond Arena, Glendale', date: '2026-03-17T01:00:00Z', show: 'Monday Night Raw', matchType: 'Singles Match' },
+      { id: 'raw-mar16-2', wrestler1: 'Jade Cargill', wrestler2: 'Bianca Belair', odds1: 1.75, odds2: 2.05, title: 'Women\'s Championship Contender', venue: 'Desert Diamond Arena, Glendale', date: '2026-03-17T00:00:00Z', show: 'Monday Night Raw', matchType: 'Singles Match' },
+      { id: 'sd-mar20', wrestler1: 'Randy Orton', wrestler2: 'LA Knight', odds1: 1.65, odds2: 2.20, title: 'WrestleMania Qualifier', venue: 'Lenovo Center, Raleigh', date: '2026-03-21T01:00:00Z', show: 'Friday Night SmackDown', matchType: 'Singles Match' },
+      { id: 'sd-mar20-2', wrestler1: 'Kevin Owens', wrestler2: 'Sami Zayn', odds1: 1.85, odds2: 1.95, title: 'Tag Team Breakup', venue: 'Lenovo Center, Raleigh', date: '2026-03-21T00:00:00Z', show: 'Friday Night SmackDown', matchType: 'Singles Match' },
+      { id: 'raw-mar23', wrestler1: 'Brock Lesnar', wrestler2: 'Bronson Reed', odds1: 1.35, odds2: 3.10, title: 'Open Challenge Preview', venue: 'TD Garden, Boston', date: '2026-03-24T01:00:00Z', show: 'Monday Night Raw', matchType: 'Singles Match' },
+      { id: 'raw-mar23-2', wrestler1: 'Liv Morgan', wrestler2: 'Becky Lynch', odds1: 1.70, odds2: 2.10, title: 'Women\'s Main Event', venue: 'TD Garden, Boston', date: '2026-03-24T00:00:00Z', show: 'Monday Night Raw', matchType: 'Singles Match' },
+      { id: 'sd-mar27', wrestler1: 'The Usos', wrestler2: 'The Bloodline', odds1: 1.60, odds2: 2.30, title: 'Tag Team Match', venue: 'PPG Paints Arena, Pittsburgh', date: '2026-03-28T01:00:00Z', show: 'Friday Night SmackDown', matchType: 'Tag Team Match' },
+      { id: 'raw-mar30', wrestler1: 'CM Punk', wrestler2: 'Roman Reigns', odds1: 1.90, odds2: 1.90, title: 'WrestleMania Contract Signing', venue: 'Madison Square Garden, New York', date: '2026-03-31T01:00:00Z', show: 'Monday Night Raw', matchType: 'Singles Match' },
+      { id: 'raw-mar30-2', wrestler1: 'Cody Rhodes', wrestler2: 'Randy Orton', odds1: 1.85, odds2: 1.95, title: 'Pre-WrestleMania Showdown', venue: 'Madison Square Garden, New York', date: '2026-03-31T00:00:00Z', show: 'Monday Night Raw', matchType: 'Singles Match' },
+      { id: 'sd-apr03', wrestler1: 'Gunther', wrestler2: 'Jey Uso', odds1: 1.55, odds2: 2.40, title: 'Intercontinental Match', venue: 'Enterprise Center, St. Louis', date: '2026-04-04T01:00:00Z', show: 'Friday Night SmackDown', matchType: 'Singles Match' },
+      { id: 'raw-apr06', wrestler1: 'Seth Rollins', wrestler2: 'Logan Paul', odds1: 1.45, odds2: 2.75, title: 'WrestleMania Preview', venue: 'Toyota Center, Houston', date: '2026-04-07T01:00:00Z', show: 'Monday Night Raw', matchType: 'Singles Match' },
+      { id: 'sd-apr10', wrestler1: 'AJ Styles', wrestler2: 'Carmelo Hayes', odds1: 1.65, odds2: 2.20, title: 'Go-Home Show Main Event', venue: 'SAP Center, San Jose', date: '2026-04-11T01:00:00Z', show: 'Friday Night SmackDown', matchType: 'Singles Match' },
+      { id: 'raw-apr13', wrestler1: 'Roman Reigns', wrestler2: 'Drew McIntyre', odds1: 1.50, odds2: 2.50, title: 'WrestleMania Go-Home Show', venue: 'Golden 1 Center, Sacramento', date: '2026-04-14T01:00:00Z', show: 'Monday Night Raw', matchType: 'Singles Match' },
+      { id: 'sd-apr17', wrestler1: 'Cody Rhodes', wrestler2: 'Kevin Owens', odds1: 1.45, odds2: 2.75, title: 'WrestleMania Week SmackDown', venue: 'T-Mobile Arena, Las Vegas', date: '2026-04-18T01:00:00Z', show: 'Friday Night SmackDown', matchType: 'Singles Match' },
+      { id: 'raw-apr20', wrestler1: 'World Title Winner', wrestler2: 'TBA Challenger', odds1: 1.50, odds2: 2.50, title: 'Post-WrestleMania Raw', venue: 'T-Mobile Arena, Las Vegas', date: '2026-04-21T01:00:00Z', show: 'Monday Night Raw', matchType: 'Singles Match' },
+      { id: 'sd-apr24', wrestler1: 'Undisputed Champion', wrestler2: 'TBA Challenger', odds1: 1.55, odds2: 2.40, title: 'Post-WrestleMania Fallout', venue: 'Dickies Arena, Fort Worth', date: '2026-04-25T01:00:00Z', show: 'Friday Night SmackDown', matchType: 'Singles Match' },
+      { id: 'raw-apr27', wrestler1: 'Rhea Ripley', wrestler2: 'Liv Morgan', odds1: 1.60, odds2: 2.30, title: 'Women\'s Rematch', venue: 'Sames Auto Arena, Laredo', date: '2026-04-28T01:00:00Z', show: 'Monday Night Raw', matchType: 'Singles Match' },
+      { id: 'sd-may01', wrestler1: 'Gunther', wrestler2: 'Sami Zayn', odds1: 1.55, odds2: 2.40, title: 'Backlash Build', venue: 'BOK Center, Tulsa', date: '2026-05-02T01:00:00Z', show: 'Friday Night SmackDown', matchType: 'Singles Match' },
+      { id: 'raw-may04', wrestler1: 'CM Punk', wrestler2: 'Seth Rollins', odds1: 1.85, odds2: 1.95, title: 'Backlash Preview', venue: 'CHI Health Center, Omaha', date: '2026-05-05T01:00:00Z', show: 'Monday Night Raw', matchType: 'Singles Match' },
+      { id: 'sd-may08', wrestler1: 'Cody Rhodes', wrestler2: 'AJ Styles', odds1: 1.50, odds2: 2.50, title: 'Backlash Go-Home', venue: 'Vystar Veterans Memorial Arena, Jacksonville', date: '2026-05-09T01:00:00Z', show: 'Friday Night SmackDown', matchType: 'Singles Match' },
     ];
 
     const now = new Date();
@@ -1352,6 +1400,101 @@ export class FreeSportsService {
         drawOdds,
         venue: event.venue,
         eventTitle: event.title,
+      } as SportEvent;
+    });
+  }
+
+  private generateF1Schedule(): SportEvent[] {
+    const F1_SPORT_ID = 11;
+    const f1Races2026: { id: string; gpName: string; circuit: string; date: string }[] = [
+      { id: 'china-gp', gpName: 'Chinese Grand Prix', circuit: 'Shanghai International Circuit', date: '2026-03-15T07:00:00Z' },
+      { id: 'japan-gp', gpName: 'Japanese Grand Prix', circuit: 'Suzuka Circuit', date: '2026-03-29T06:00:00Z' },
+      { id: 'bahrain-gp', gpName: 'Bahrain Grand Prix', circuit: 'Bahrain International Circuit', date: '2026-04-12T15:00:00Z' },
+      { id: 'saudi-gp', gpName: 'Saudi Arabian Grand Prix', circuit: 'Jeddah Corniche Circuit', date: '2026-04-19T17:00:00Z' },
+      { id: 'miami-gp', gpName: 'Miami Grand Prix', circuit: 'Miami International Autodrome', date: '2026-05-03T19:30:00Z' },
+      { id: 'canada-gp', gpName: 'Canadian Grand Prix', circuit: 'Circuit Gilles Villeneuve, Montréal', date: '2026-05-24T18:00:00Z' },
+      { id: 'monaco-gp', gpName: 'Monaco Grand Prix', circuit: 'Circuit de Monaco, Monte Carlo', date: '2026-06-07T13:00:00Z' },
+      { id: 'spain-gp', gpName: 'Spanish Grand Prix', circuit: 'Circuit de Barcelona-Catalunya', date: '2026-06-14T13:00:00Z' },
+      { id: 'austria-gp', gpName: 'Austrian Grand Prix', circuit: 'Red Bull Ring, Spielberg', date: '2026-06-28T13:00:00Z' },
+      { id: 'britain-gp', gpName: 'British Grand Prix', circuit: 'Silverstone Circuit', date: '2026-07-05T14:00:00Z' },
+      { id: 'belgium-gp', gpName: 'Belgian Grand Prix', circuit: 'Spa-Francorchamps', date: '2026-07-19T13:00:00Z' },
+      { id: 'hungary-gp', gpName: 'Hungarian Grand Prix', circuit: 'Hungaroring, Budapest', date: '2026-07-26T13:00:00Z' },
+      { id: 'netherlands-gp', gpName: 'Dutch Grand Prix', circuit: 'Circuit Zandvoort', date: '2026-08-23T13:00:00Z' },
+      { id: 'italy-gp', gpName: 'Italian Grand Prix', circuit: 'Autodromo Nazionale Monza', date: '2026-09-06T13:00:00Z' },
+      { id: 'madrid-gp', gpName: 'Madrid Grand Prix', circuit: 'IFEMA Madrid Street Circuit', date: '2026-09-13T13:00:00Z' },
+      { id: 'azerbaijan-gp', gpName: 'Azerbaijan Grand Prix', circuit: 'Baku City Circuit', date: '2026-09-26T12:00:00Z' },
+      { id: 'singapore-gp', gpName: 'Singapore Grand Prix', circuit: 'Marina Bay Street Circuit', date: '2026-10-11T12:00:00Z' },
+      { id: 'usa-gp', gpName: 'United States Grand Prix', circuit: 'Circuit of the Americas, Austin', date: '2026-10-25T18:00:00Z' },
+      { id: 'mexico-gp', gpName: 'Mexico City Grand Prix', circuit: 'Autódromo Hermanos Rodríguez', date: '2026-11-01T19:00:00Z' },
+      { id: 'brazil-gp', gpName: 'São Paulo Grand Prix', circuit: 'Autódromo José Carlos Pace', date: '2026-11-08T17:00:00Z' },
+      { id: 'lasvegas-gp', gpName: 'Las Vegas Grand Prix', circuit: 'Las Vegas Street Circuit', date: '2026-11-21T06:00:00Z' },
+      { id: 'qatar-f1-gp', gpName: 'Qatar Grand Prix', circuit: 'Losail International Circuit', date: '2026-11-29T15:00:00Z' },
+      { id: 'abudhabi-gp', gpName: 'Abu Dhabi Grand Prix', circuit: 'Yas Marina Circuit', date: '2026-12-06T13:00:00Z' },
+    ];
+
+    const now = new Date();
+    const upcomingRaces = f1Races2026.filter(race => new Date(race.date) > now);
+    const racesToShow = upcomingRaces.slice(0, 5);
+
+    return racesToShow.map(race =>
+      this.generateF1RaceEvent(race.id, race.gpName, race.circuit, race.date, F1_SPORT_ID)
+    );
+  }
+
+  private generateUFCEvents(): SportEvent[] {
+    const MMA_SPORT_ID = 7;
+    const ufcFights: {
+      id: string; fighter1: string; fighter2: string;
+      odds1: number; odds2: number; title: string; venue: string;
+      date: string; card: string;
+    }[] = [
+      { id: 'ufc-fn-mar14-main', fighter1: 'Josh Emmett', fighter2: 'Kevin Vallejos', odds1: 1.55, odds2: 2.40, title: 'Featherweight Main Event', venue: 'UFC APEX, Las Vegas', date: '2026-03-15T01:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc-fn-mar14-co', fighter1: 'Amanda Lemos', fighter2: 'Virna Jandiroba', odds1: 1.65, odds2: 2.20, title: 'Women\'s Strawweight', venue: 'UFC APEX, Las Vegas', date: '2026-03-15T00:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc-fn-mar21-main', fighter1: 'Movsar Evloev', fighter2: 'Lerone Murphy', odds1: 1.70, odds2: 2.10, title: 'Featherweight Main Event', venue: 'UFC APEX, Las Vegas', date: '2026-03-21T19:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc-fn-mar21-co', fighter1: 'Jailton Almeida', fighter2: 'Alexandr Romanov', odds1: 1.45, odds2: 2.75, title: 'Heavyweight', venue: 'UFC APEX, Las Vegas', date: '2026-03-21T18:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc-fn-mar28-main', fighter1: 'Israel Adesanya', fighter2: 'Joe Pyfer', odds1: 1.40, odds2: 2.90, title: 'Middleweight Main Event', venue: 'Climate Pledge Arena, Seattle', date: '2026-03-29T01:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc-fn-mar28-co', fighter1: 'Dustin Poirier', fighter2: 'Benoit Saint-Denis', odds1: 1.75, odds2: 2.05, title: 'Lightweight', venue: 'Climate Pledge Arena, Seattle', date: '2026-03-29T00:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc-fn-apr04-main', fighter1: 'Renato Moicano', fighter2: 'Chris Duncan', odds1: 1.50, odds2: 2.50, title: 'Lightweight Main Event', venue: 'UFC APEX, Las Vegas', date: '2026-04-05T01:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc327-main', fighter1: 'Jiri Prochazka', fighter2: 'Carlos Ulberg', odds1: 1.55, odds2: 2.40, title: 'Vacant Light Heavyweight Title', venue: 'Kaseya Center, Miami', date: '2026-04-12T02:00:00Z', card: 'UFC 327' },
+      { id: 'ufc327-co', fighter1: 'Joshua Van', fighter2: 'Tatsuro Taira', odds1: 1.60, odds2: 2.30, title: 'Flyweight Championship', venue: 'Kaseya Center, Miami', date: '2026-04-12T01:00:00Z', card: 'UFC 327' },
+      { id: 'ufc327-3', fighter1: 'Patricio Pitbull', fighter2: 'Aaron Pico', odds1: 1.80, odds2: 2.00, title: 'Featherweight', venue: 'Kaseya Center, Miami', date: '2026-04-12T00:00:00Z', card: 'UFC 327' },
+      { id: 'ufc-fn-apr18-main', fighter1: 'Gilbert Burns', fighter2: 'Mike Malott', odds1: 1.45, odds2: 2.75, title: 'Welterweight Main Event', venue: 'Canada Life Centre, Winnipeg', date: '2026-04-19T02:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc328-main', fighter1: 'Islam Makhachev', fighter2: 'Arman Tsarukyan', odds1: 1.35, odds2: 3.10, title: 'Lightweight Championship', venue: 'Prudential Center, Newark', date: '2026-05-10T02:00:00Z', card: 'UFC 328' },
+      { id: 'ufc328-co', fighter1: 'Sean O\'Malley', fighter2: 'Merab Dvalishvili', odds1: 1.65, odds2: 2.20, title: 'Bantamweight Title Rematch', venue: 'Prudential Center, Newark', date: '2026-05-10T01:00:00Z', card: 'UFC 328' },
+      { id: 'ufc328-3', fighter1: 'Alex Pereira', fighter2: 'Magomed Ankalaev', odds1: 1.70, odds2: 2.10, title: 'Light Heavyweight', venue: 'Prudential Center, Newark', date: '2026-05-10T00:00:00Z', card: 'UFC 328' },
+      { id: 'ufc-fn-may23-main', fighter1: 'Robert Whittaker', fighter2: 'Khamzat Chimaev', odds1: 2.10, odds2: 1.72, title: 'Middleweight Main Event', venue: 'UFC APEX, Las Vegas', date: '2026-05-24T01:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc-freedom-main', fighter1: 'Jon Jones', fighter2: 'Tom Aspinall', odds1: 1.80, odds2: 2.00, title: 'Undisputed Heavyweight Championship', venue: 'Washington D.C.', date: '2026-06-14T23:00:00Z', card: 'UFC Freedom Fights 250' },
+      { id: 'ufc-freedom-co', fighter1: 'Conor McGregor', fighter2: 'Michael Chandler', odds1: 1.65, odds2: 2.20, title: 'Welterweight', venue: 'Washington D.C.', date: '2026-06-14T22:00:00Z', card: 'UFC Freedom Fights 250' },
+      { id: 'ufc-freedom-3', fighter1: 'Valentina Shevchenko', fighter2: 'Alexa Grasso', odds1: 1.55, odds2: 2.40, title: 'Women\'s Flyweight Title', venue: 'Washington D.C.', date: '2026-06-14T21:00:00Z', card: 'UFC Freedom Fights 250' },
+    ];
+
+    const now = new Date();
+    const upcomingFights = ufcFights.filter(f => new Date(f.date) > now);
+
+    return upcomingFights.map(fight => {
+      const drawOdds = parseFloat((15 + Math.random() * 10).toFixed(2));
+      return {
+        id: `mma_gen_${fight.id}`,
+        sportId: MMA_SPORT_ID,
+        leagueName: fight.card,
+        homeTeam: fight.fighter1,
+        awayTeam: fight.fighter2,
+        startTime: fight.date,
+        status: 'scheduled',
+        isLive: false,
+        markets: [{
+          id: 'match_winner',
+          name: 'Fight Winner',
+          outcomes: [
+            { id: 'fighter1', name: fight.fighter1, odds: fight.odds1, probability: 1 / fight.odds1 },
+            { id: 'fighter2', name: fight.fighter2, odds: fight.odds2, probability: 1 / fight.odds2 },
+          ]
+        }],
+        homeOdds: fight.odds1,
+        awayOdds: fight.odds2,
+        drawOdds,
+        venue: fight.venue,
+        eventTitle: fight.title,
       } as SportEvent;
     });
   }
