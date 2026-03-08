@@ -426,187 +426,13 @@ export class FreeSportsService {
       console.error(`[FreeSports] UFC generation error:`, error.message);
     }
 
-    if (allEvents.length > 0) {
-      cachedFreeSportsEvents = allEvents;
-      lastFetchTime = Date.now();
-      lastUpcomingFetchDate = getUTCDateString();
-      saveCacheToFile();
-      console.log(`[FreeSports] ✅ Total: ${allEvents.length} upcoming matches cached (locked until ${lastUpcomingFetchDate})`);
-    } else {
-      console.warn(`[FreeSports] ⚠️ Got 0 events - likely API rate limit. NOT overwriting cache. Will retry on next restart.`);
-    }
+    cachedFreeSportsEvents = allEvents;
+    lastUpcomingFetchDate = getUTCDateString();
+    lastFetchTime = Date.now();
+    saveCacheToFile();
+    console.log(`[FreeSports] ✅ Cache updated: ${allEvents.length} total events`);
+
     return allEvents;
-  }
-
-  private async fetchUpcomingForSingleDate(
-    sportSlug: string, 
-    config: typeof FREE_SPORTS_CONFIG[string],
-    fetchDate: Date
-  ): Promise<SportEvent[]> {
-    const dateStr = fetchDate.toISOString().split('T')[0];
-    
-    try {
-      const response = await axios.get(config.endpoint, {
-        params: {
-          date: dateStr,
-          timezone: 'UTC'
-        },
-        headers: {
-          'x-apisports-key': API_KEY,
-          'Accept': 'application/json'
-        },
-        timeout: 10000
-      });
-
-      if (response.data?.errors && Object.keys(response.data.errors).length > 0) {
-        const errorMsg = JSON.stringify(response.data.errors);
-        console.warn(`[FreeSports] API error for ${config.name} (${dateStr}): ${errorMsg}`);
-        
-        if (response.data.errors.requests && String(response.data.errors.requests).includes('request limit')) {
-          const err: any = new Error('API rate limit reached');
-          err.response = { status: 429 };
-          throw err;
-        }
-        if (response.data.errors.plan && String(response.data.errors.plan).includes('Free plans')) {
-          const err: any = new Error('Free plan date/season restriction');
-          err.response = { status: 429 };
-          throw err;
-        }
-        return [];
-      }
-
-      const games = response.data?.response || [];
-      
-      return games.map((game: any) => this.transformToSportEvent(game, sportSlug, config)).flat().filter(Boolean) as SportEvent[];
-    } catch (error: any) {
-      if (error.response?.status === 429) {
-        console.warn(`[FreeSports] Rate limited for ${config.name}, skipping`);
-      } else if (error.code === 'ENOTFOUND') {
-        console.warn(`[FreeSports] DNS error for ${config.name} (${config.endpoint}) - API host does not exist, skipping`);
-        return [];
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * Transform API response to SportEvent
-   */
-  private transformToSportEvent(
-    game: any, 
-    sportSlug: string, 
-    config: typeof FREE_SPORTS_CONFIG[string]
-  ): SportEvent | SportEvent[] | null {
-    try {
-      const gameId = String(game.id);
-      let homeTeam: string;
-      let awayTeam: string;
-      
-      if (sportSlug === 'mma' || sportSlug === 'boxing') {
-        homeTeam = game.fighters?.first?.name || game.fighters?.home?.name || game.home?.name || 'Fighter 1';
-        awayTeam = game.fighters?.second?.name || game.fighters?.away?.name || game.away?.name || 'Fighter 2';
-      } else if (sportSlug === 'tennis') {
-        homeTeam = game.players?.home?.name || game.teams?.home?.name || game.home?.name || 'Player 1';
-        awayTeam = game.players?.away?.name || game.teams?.away?.name || game.away?.name || 'Player 2';
-      } else if (sportSlug === 'formula-1') {
-        const gpName = game.competition?.name || game.circuit?.name || game.name || 'Grand Prix';
-        const circuitName = game.circuit?.name || game.competition?.name || gpName;
-        const startTime = game.date || (game.timestamp ? new Date(game.timestamp * 1000).toISOString() : new Date().toISOString());
-        return this.generateF1RaceEvent(gameId, gpName, circuitName, startTime, config.sportId);
-      } else {
-        homeTeam = game.teams?.home?.name || game.home?.name || 'Home Team';
-        awayTeam = game.teams?.away?.name || game.away?.name || 'Away Team';
-      }
-      
-      let league = game.league?.name || game.competition?.name || '';
-      if ((sportSlug === 'mma' || sportSlug === 'boxing') && !league) {
-        const slug = game.slug || '';
-        const colonIdx = slug.indexOf(':');
-        league = colonIdx > 0 ? slug.substring(0, colonIdx).trim() : (slug || 'MMA');
-      }
-      if (!league) league = 'Unknown League';
-      const startTime = game.date ? game.date : (game.timestamp ? new Date(game.timestamp * 1000).toISOString() : new Date().toISOString());
-
-      const gameHash = gameId.split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
-      const seededRand = (seed: number) => {
-        const x = Math.sin(seed) * 10000;
-        return x - Math.floor(x);
-      };
-
-      let homeProb: number;
-      let targetOverround: number;
-
-      if (sportSlug === 'mma' || sportSlug === 'boxing') {
-        targetOverround = 1.07;
-        const r = seededRand(gameHash);
-        homeProb = r < 0.15 ? 0.25 + seededRand(gameHash + 1) * 0.1
-                 : r < 0.30 ? 0.65 + seededRand(gameHash + 2) * 0.1
-                 : 0.35 + seededRand(gameHash + 3) * 0.30;
-      } else if (sportSlug === 'basketball') {
-        targetOverround = 1.05;
-        homeProb = 0.30 + seededRand(gameHash) * 0.40;
-      } else if (sportSlug === 'ice-hockey') {
-        targetOverround = 1.05;
-        homeProb = 0.33 + seededRand(gameHash) * 0.34;
-      } else if (sportSlug === 'baseball') {
-        targetOverround = 1.05;
-        homeProb = 0.32 + seededRand(gameHash) * 0.36;
-      } else {
-        targetOverround = 1.06;
-        homeProb = 0.28 + seededRand(gameHash) * 0.44;
-      }
-
-      const awayProb = 1 - homeProb;
-      const homeOdds = parseFloat(Math.max(1.12, 1 / (homeProb * targetOverround)).toFixed(2));
-      const awayOdds = parseFloat(Math.max(1.12, 1 / (awayProb * targetOverround)).toFixed(2));
-
-      const outcomes: OutcomeData[] = [
-        { id: 'home', name: homeTeam, odds: homeOdds, probability: 1 / homeOdds },
-        { id: 'away', name: awayTeam, odds: awayOdds, probability: 1 / awayOdds }
-      ];
-
-      const markets: MarketData[] = [
-        {
-          id: 'winner',
-          name: 'Match Winner',
-          outcomes
-        }
-      ];
-
-      let finalSportId = config.sportId;
-      let finalSlug = sportSlug;
-      
-      if (sportSlug === 'mma' && isBoxingFight(game)) {
-        finalSportId = 17;
-        finalSlug = 'boxing';
-      }
-
-      return {
-        id: `${finalSlug}_${gameId}`,
-        sportId: finalSportId,
-        leagueName: league,
-        homeTeam,
-        awayTeam,
-        startTime,
-        status: 'scheduled',
-        isLive: false,
-        markets,
-        homeOdds: parseFloat(homeOdds.toFixed(2)),
-        awayOdds: parseFloat(awayOdds.toFixed(2)),
-        drawOdds: config.hasDraws ? (() => {
-          const drawProb = 0.12 + seededRand(gameHash + 7) * 0.08;
-          const scale = targetOverround / (1 + drawProb * targetOverround);
-          outcomes[0].odds = parseFloat(Math.max(1.12, 1 / (homeProb * scale)).toFixed(2));
-          outcomes[0].probability = 1 / outcomes[0].odds;
-          outcomes[1].odds = parseFloat(Math.max(1.12, 1 / (awayProb * scale)).toFixed(2));
-          outcomes[1].probability = 1 / outcomes[1].odds;
-          return parseFloat(Math.max(2.80, 1 / (drawProb * targetOverround)).toFixed(2));
-        })() : undefined
-      };
-    } catch (error) {
-      console.error('[FreeSports] Error transforming game:', error);
-      return null;
-    }
   }
 
   /**
@@ -997,46 +823,6 @@ export class FreeSportsService {
         date: '2026-03-20T20:00:00Z', league: 'DAZN Boxing'
       },
       {
-        id: 'adames-williams', fighter1: 'Carlos Adames', fighter2: 'Austin Williams',
-        record1: '24-1-1 (18 KOs)', record2: '19-1 (13 KOs)',
-        odds1: 1.25, odds2: 3.50,
-        title: 'WBC Middleweight Title', venue: 'Caribe Royale, Orlando',
-        date: '2026-03-21T21:00:00Z', league: 'DAZN Boxing'
-      },
-      {
-        id: 'fundora-thurman', fighter1: 'Sebastian Fundora', fighter2: 'Keith Thurman',
-        record1: '23-1-1 (15 KOs)', record2: '31-1 (23 KOs)',
-        odds1: 1.25, odds2: 3.50,
-        title: 'WBC Junior Middleweight Title', venue: 'MGM Grand, Las Vegas',
-        date: '2026-03-28T21:00:00Z', league: 'PBC PPV on Prime Video'
-      },
-      {
-        id: 'sanchez-torrez', fighter1: 'Frank Sanchez', fighter2: 'Richard Torrez Jr.',
-        record1: '24-0 (17 KOs)', record2: '13-1 (11 KOs)',
-        odds1: 1.40, odds2: 2.90,
-        title: 'Heavyweight (12 Rounds)', venue: 'MGM Grand, Las Vegas',
-        date: '2026-03-28T20:00:00Z', league: 'PBC PPV on Prime Video'
-      },
-      {
-        id: 'itauma-franklin', fighter1: 'Moses Itauma', fighter2: 'Jermaine Franklin Jr.',
-        record1: '12-0 (10 KOs)', record2: '22-2 (14 KOs)',
-        odds1: 1.33, odds2: 3.00,
-        title: 'Heavyweight (10 Rounds)', venue: 'Co-op Live Arena, Manchester',
-        date: '2026-03-28T19:00:00Z', league: 'DAZN Boxing'
-      },
-      {
-        id: 'santiago-taniguchi', fighter1: 'Rene Santiago', fighter2: 'Masataka Taniguchi',
-        record1: '16-0 (10 KOs)', record2: '18-4 (10 KOs)',
-        odds1: 1.50, odds2: 2.50,
-        title: 'WBO/WBA Light Flyweight Titles', venue: 'Korakuen Hall, Tokyo',
-        date: '2026-04-03T11:00:00Z', league: 'World Championship Boxing'
-      },
-      {
-        id: 'wilder-chisora', fighter1: 'Deontay Wilder', fighter2: 'Derek Chisora',
-        record1: '43-2-1 (42 KOs)', record2: '34-13 (23 KOs)',
-        odds1: 1.22, odds2: 4.33,
-        title: 'Heavyweight (12 Rounds)', venue: 'O2 Arena, London',
-        date: '2026-04-04T20:00:00Z', league: 'DAZN Boxing'
       },
       {
         id: 'scotney-flores', fighter1: 'Ellie Scotney', fighter2: 'Mayelli Flores',
@@ -1743,20 +1529,21 @@ export class FreeSportsService {
 
     const tennisMatches: {
       id: string; player1: string; player2: string; ranking1: number; ranking2: number;
-      odds1: number; odds2: number; tournament: string; round: string;
-      date: string; surface: string; location: string;
+      odds1: number; odds2: number; tournament: string; round: string; date: string;
+      surface: string; location: string;
     }[] = [
-      { id: 'iw-alcaraz-sinner', player1: 'Carlos Alcaraz', player2: 'Jannik Sinner', ranking1: 1, ranking2: 2, odds1: 1.83, odds2: 1.95, tournament: 'BNP Paribas Open', round: 'Final', date: '2026-03-15T21:00:00Z', surface: 'Hard', location: 'Indian Wells, USA' },
-      { id: 'iw-djokovic-fritz', player1: 'Novak Djokovic', player2: 'Taylor Fritz', ranking1: 5, ranking2: 4, odds1: 1.55, odds2: 2.40, tournament: 'BNP Paribas Open', round: 'Semi-Final', date: '2026-03-14T20:00:00Z', surface: 'Hard', location: 'Indian Wells, USA' },
-      { id: 'iw-zverev-draper', player1: 'Alexander Zverev', player2: 'Jack Draper', ranking1: 3, ranking2: 8, odds1: 1.65, odds2: 2.20, tournament: 'BNP Paribas Open', round: 'Semi-Final', date: '2026-03-14T18:00:00Z', surface: 'Hard', location: 'Indian Wells, USA' },
-      { id: 'iw-medvedev-shelton', player1: 'Daniil Medvedev', player2: 'Ben Shelton', ranking1: 6, ranking2: 10, odds1: 1.72, odds2: 2.10, tournament: 'BNP Paribas Open', round: 'Quarter-Final', date: '2026-03-13T19:00:00Z', surface: 'Hard', location: 'Indian Wells, USA' },
-      { id: 'iw-rublev-musetti', player1: 'Andrey Rublev', player2: 'Lorenzo Musetti', ranking1: 9, ranking2: 15, odds1: 1.60, odds2: 2.30, tournament: 'BNP Paribas Open', round: 'Quarter-Final', date: '2026-03-13T17:00:00Z', surface: 'Hard', location: 'Indian Wells, USA' },
-      { id: 'miami-alcaraz-djokovic', player1: 'Carlos Alcaraz', player2: 'Novak Djokovic', ranking1: 1, ranking2: 5, odds1: 1.50, odds2: 2.55, tournament: 'Miami Open', round: 'Final', date: '2026-03-29T20:00:00Z', surface: 'Hard', location: 'Miami, USA' },
-      { id: 'miami-sinner-zverev', player1: 'Jannik Sinner', player2: 'Alexander Zverev', ranking1: 2, ranking2: 3, odds1: 1.65, odds2: 2.20, tournament: 'Miami Open', round: 'Semi-Final', date: '2026-03-28T19:00:00Z', surface: 'Hard', location: 'Miami, USA' },
-      { id: 'miami-fritz-draper', player1: 'Taylor Fritz', player2: 'Jack Draper', ranking1: 4, ranking2: 8, odds1: 1.80, odds2: 2.00, tournament: 'Miami Open', round: 'Semi-Final', date: '2026-03-28T17:00:00Z', surface: 'Hard', location: 'Miami, USA' },
-      { id: 'mc-alcaraz-sinner', player1: 'Carlos Alcaraz', player2: 'Jannik Sinner', ranking1: 1, ranking2: 2, odds1: 1.60, odds2: 2.25, tournament: 'Monte-Carlo Masters', round: 'Final', date: '2026-04-12T14:00:00Z', surface: 'Clay', location: 'Monte-Carlo, Monaco' },
-      { id: 'mc-djokovic-rublev', player1: 'Novak Djokovic', player2: 'Andrey Rublev', ranking1: 5, ranking2: 9, odds1: 1.45, odds2: 2.70, tournament: 'Monte-Carlo Masters', round: 'Semi-Final', date: '2026-04-11T14:00:00Z', surface: 'Clay', location: 'Monte-Carlo, Monaco' },
-      { id: 'mc-zverev-musetti', player1: 'Alexander Zverev', player2: 'Lorenzo Musetti', ranking1: 3, ranking2: 15, odds1: 1.40, odds2: 2.85, tournament: 'Monte-Carlo Masters', round: 'Quarter-Final', date: '2026-04-10T12:00:00Z', surface: 'Clay', location: 'Monte-Carlo, Monaco' },
+      { id: 'iw-alcaraz-sinner', player1: 'Carlos Alcaraz', player2: 'Jannik Sinner', ranking1: 1, ranking2: 2, odds1: 1.80, odds2: 2.00, tournament: 'BNP Paribas Open', round: 'Final', date: '2026-03-15T21:00:00Z', surface: 'Hard', location: 'Indian Wells, USA' },
+      { id: 'iw-djokovic-fritz', player1: 'Novak Djokovic', player2: 'Taylor Fritz', ranking1: 5, ranking2: 4, odds1: 1.65, odds2: 2.20, tournament: 'BNP Paribas Open', round: 'Semi-Final', date: '2026-03-14T21:00:00Z', surface: 'Hard', location: 'Indian Wells, USA' },
+      { id: 'iw-zverev-draper', player1: 'Alexander Zverev', player2: 'Jack Draper', ranking1: 3, ranking2: 8, odds1: 1.55, odds2: 2.40, tournament: 'BNP Paribas Open', round: 'Semi-Final', date: '2026-03-14T18:00:00Z', surface: 'Hard', location: 'Indian Wells, USA' },
+      { id: 'iw-medvedev-shelton', player1: 'Daniil Medvedev', player2: 'Ben Shelton', ranking1: 6, ranking2: 10, odds1: 1.60, odds2: 2.30, tournament: 'BNP Paribas Open', round: 'Quarter-Final', date: '2026-03-13T21:00:00Z', surface: 'Hard', location: 'Indian Wells, USA' },
+      { id: 'iw-rublev-musetti', player1: 'Andrey Rublev', player2: 'Lorenzo Musetti', ranking1: 9, ranking2: 15, odds1: 1.50, odds2: 2.55, tournament: 'BNP Paribas Open', round: 'Quarter-Final', date: '2026-03-13T18:00:00Z', surface: 'Hard', location: 'Indian Wells, USA' },
+      { id: 'miami-sinner-zverev', player1: 'Jannik Sinner', player2: 'Alexander Zverev', ranking1: 2, ranking2: 3, odds1: 1.70, odds2: 2.10, tournament: 'Miami Open', round: 'Final', date: '2026-03-29T20:00:00Z', surface: 'Hard', location: 'Miami, USA' },
+      { id: 'miami-alcaraz-fritz', player1: 'Carlos Alcaraz', player2: 'Taylor Fritz', ranking1: 1, ranking2: 4, odds1: 1.50, odds2: 2.55, tournament: 'Miami Open', round: 'Semi-Final', date: '2026-03-28T20:00:00Z', surface: 'Hard', location: 'Miami, USA' },
+      { id: 'miami-djokovic-shelton', player1: 'Novak Djokovic', player2: 'Ben Shelton', ranking1: 5, ranking2: 10, odds1: 1.55, odds2: 2.40, tournament: 'Miami Open', round: 'Semi-Final', date: '2026-03-28T17:00:00Z', surface: 'Hard', location: 'Miami, USA' },
+      { id: 'mc-alcaraz-djokovic', player1: 'Carlos Alcaraz', player2: 'Novak Djokovic', ranking1: 1, ranking2: 5, odds1: 1.60, odds2: 2.30, tournament: 'Monte-Carlo Masters', round: 'Final', date: '2026-04-12T14:00:00Z', surface: 'Clay', location: 'Monte-Carlo, Monaco' },
+      { id: 'mc-sinner-rublev', player1: 'Jannik Sinner', player2: 'Andrey Rublev', ranking1: 2, ranking2: 9, odds1: 1.40, odds2: 2.85, tournament: 'Monte-Carlo Masters', round: 'Semi-Final', date: '2026-04-11T14:00:00Z', surface: 'Clay', location: 'Monte-Carlo, Monaco' },
+      { id: 'madrid-sinner-alcaraz', player1: 'Jannik Sinner', player2: 'Carlos Alcaraz', ranking1: 2, ranking2: 1, odds1: 2.00, odds2: 1.80, tournament: 'Madrid Open', round: 'Final', date: '2026-05-03T16:00:00Z', surface: 'Clay', location: 'Madrid, Spain' },
+      { id: 'madrid-zverev-fritz', player1: 'Alexander Zverev', player2: 'Taylor Fritz', ranking1: 3, ranking2: 4, odds1: 1.55, odds2: 2.40, tournament: 'Madrid Open', round: 'Semi-Final', date: '2026-05-02T14:00:00Z', surface: 'Clay', location: 'Madrid, Spain' },
       { id: 'rome-sinner-alcaraz', player1: 'Jannik Sinner', player2: 'Carlos Alcaraz', ranking1: 2, ranking2: 1, odds1: 1.90, odds2: 1.90, tournament: 'Italian Open', round: 'Final', date: '2026-05-17T14:00:00Z', surface: 'Clay', location: 'Rome, Italy' },
       { id: 'rome-djokovic-zverev', player1: 'Novak Djokovic', player2: 'Alexander Zverev', ranking1: 5, ranking2: 3, odds1: 1.75, odds2: 2.05, tournament: 'Italian Open', round: 'Semi-Final', date: '2026-05-16T14:00:00Z', surface: 'Clay', location: 'Rome, Italy' },
       { id: 'rome-fritz-rublev', player1: 'Taylor Fritz', player2: 'Andrey Rublev', ranking1: 4, ranking2: 9, odds1: 1.85, odds2: 1.95, tournament: 'Italian Open', round: 'Semi-Final', date: '2026-05-16T11:00:00Z', surface: 'Clay', location: 'Rome, Italy' },
@@ -1869,9 +1656,9 @@ export class FreeSportsService {
               'canterbury': 64, 'auckland': 66, 'wellington': 63,
             };
             const rateTeam = (name: string) => {
-              const lower = name.toLowerCase();
+              const n = name.toLowerCase().trim();
               for (const [key, val] of Object.entries(cricketRatings)) {
-                if (lower.includes(key)) return val;
+                if (n.includes(key)) return val;
               }
               return 40;
             };
@@ -2387,21 +2174,8 @@ export class FreeSportsService {
       if (config) {
         return cachedFreeSportsEvents.filter(e => e.sportId === config.sportId);
       }
-      return [];
     }
     return cachedFreeSportsEvents;
-  }
-
-  /**
-   * Get all supported free sports
-   */
-  getSupportedSports(): string[] {
-    const sports = Object.keys(FREE_SPORTS_CONFIG);
-    if (!sports.includes('boxing')) sports.push('boxing');
-    if (!sports.includes('cricket')) sports.push('cricket');
-    if (!sports.includes('horse-racing')) sports.push('horse-racing');
-    if (!sports.includes('wwe')) sports.push('wwe');
-    return sports;
   }
 
   /**
