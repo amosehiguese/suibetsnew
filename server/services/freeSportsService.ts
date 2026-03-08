@@ -1365,15 +1365,32 @@ export class FreeSportsService {
       const events: SportEvent[] = [];
       const now = Date.now();
 
+      const fetchWithRetry = async (url: string, maxRetries = 3): Promise<any> => {
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          try {
+            const response = await axios.get(url, {
+              headers: {
+                'x-rapidapi-host': RACING_API_HOST,
+                'x-rapidapi-key': RAPIDAPI_KEY,
+                'Accept': 'application/json'
+              },
+              timeout: 15000
+            });
+            return response;
+          } catch (err: any) {
+            if (err.response?.status === 429 && attempt < maxRetries) {
+              const wait = Math.min(5000 * Math.pow(2, attempt), 30000);
+              console.log(`[FreeSports] 🏇 Rate limited (429), retrying in ${wait/1000}s (attempt ${attempt + 1}/${maxRetries})...`);
+              await new Promise(r => setTimeout(r, wait));
+              continue;
+            }
+            throw err;
+          }
+        }
+      };
+
       for (const day of ['today', 'tomorrow']) {
-        const response = await axios.get(`${RACING_API_BASE}/v1/racecards/free?day=${day}`, {
-          headers: {
-            'x-rapidapi-host': RACING_API_HOST,
-            'x-rapidapi-key': RAPIDAPI_KEY,
-            'Accept': 'application/json'
-          },
-          timeout: 15000
-        });
+        const response = await fetchWithRetry(`${RACING_API_BASE}/v1/racecards/free?day=${day}`);
 
         const racecards = response.data?.racecards || [];
 
@@ -1383,7 +1400,12 @@ export class FreeSportsService {
           const raceStart = new Date(race.off_dt).getTime();
           if (isNaN(raceStart) || raceStart < now) continue;
 
-          const runners = race.runners.slice(0, 20);
+          const runners = race.runners.filter((r: any) => {
+            const num = String(r.number || '').toUpperCase();
+            return num !== 'NR' && num !== 'N/R' && num !== 'SCR';
+          });
+
+          if (runners.length < 2) continue;
 
           const fieldSize = runners.length;
           const rawScores = runners.map((runner: any, idx: number) => {
