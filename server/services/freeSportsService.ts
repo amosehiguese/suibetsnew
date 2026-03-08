@@ -544,16 +544,16 @@ export class FreeSportsService {
                  : 0.35 + seededRand(gameHash + 3) * 0.30;
       } else if (sportSlug === 'basketball') {
         targetOverround = 1.05;
-        homeProb = 0.35 + seededRand(gameHash) * 0.30;
+        homeProb = 0.30 + seededRand(gameHash) * 0.40;
       } else if (sportSlug === 'ice-hockey') {
         targetOverround = 1.05;
-        homeProb = 0.38 + seededRand(gameHash) * 0.24;
+        homeProb = 0.33 + seededRand(gameHash) * 0.34;
       } else if (sportSlug === 'baseball') {
         targetOverround = 1.05;
-        homeProb = 0.36 + seededRand(gameHash) * 0.28;
+        homeProb = 0.32 + seededRand(gameHash) * 0.36;
       } else {
         targetOverround = 1.06;
-        homeProb = 0.35 + seededRand(gameHash) * 0.30;
+        homeProb = 0.28 + seededRand(gameHash) * 0.44;
       }
 
       const awayProb = 1 - homeProb;
@@ -740,17 +740,21 @@ export class FreeSportsService {
       { name: 'Valtteri Bottas', team: 'Cadillac', number: 77, rating: 67 },
     ];
 
-    const rawPowers = f1Grid.map(driver => {
-      const jitter = (Math.random() - 0.5) * 0.01;
-      return Math.max(0.005, Math.pow(driver.rating / 60, 6) + jitter);
+    const raceHash = raceId.split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
+    const seededRand = (seed: number) => { const x = Math.sin(seed) * 10000; return x - Math.floor(x); };
+
+    const rawPowers = f1Grid.map((driver, idx) => {
+      const basePower = Math.pow(driver.rating / 55, 10);
+      const jitter = (seededRand(raceHash + idx * 7) - 0.5) * 0.4 * basePower;
+      return Math.max(0.001, basePower + jitter);
     });
     const totalPower = rawPowers.reduce((s, v) => s + v, 0);
 
-    const TARGET_OVERROUND = 1.20;
+    const TARGET_OVERROUND = 1.15;
     const outcomes: OutcomeData[] = f1Grid.map((driver, idx) => {
       const fairProb = rawPowers[idx] / totalPower;
       const bookedProb = fairProb * TARGET_OVERROUND;
-      const odds = parseFloat(Math.max(1.50, 1 / bookedProb).toFixed(2));
+      const odds = parseFloat(Math.max(1.20, 1 / bookedProb).toFixed(2));
       return {
         id: `driver_${driver.number}`,
         name: driver.name,
@@ -875,17 +879,21 @@ export class FreeSportsService {
       { name: 'Joe Roberts', team: 'Pramac Yamaha', number: 16, rating: 69 },
     ];
 
-    const rawPowers = motoGPGrid.map(rider => {
-      const jitter = (Math.random() - 0.5) * 0.01;
-      return Math.max(0.005, Math.pow(rider.rating / 60, 6) + jitter);
+    const raceHash = raceId.split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
+    const seededRand = (seed: number) => { const x = Math.sin(seed) * 10000; return x - Math.floor(x); };
+
+    const rawPowers = motoGPGrid.map((rider, idx) => {
+      const basePower = Math.pow(rider.rating / 55, 10);
+      const jitter = (seededRand(raceHash + idx * 7) - 0.5) * 0.4 * basePower;
+      return Math.max(0.001, basePower + jitter);
     });
     const totalPower = rawPowers.reduce((s, v) => s + v, 0);
 
-    const TARGET_OVERROUND = 1.20;
+    const TARGET_OVERROUND = 1.15;
     const outcomes: OutcomeData[] = motoGPGrid.map((rider, idx) => {
       const fairProb = rawPowers[idx] / totalPower;
       const bookedProb = fairProb * TARGET_OVERROUND;
-      const odds = parseFloat(Math.max(1.50, 1 / bookedProb).toFixed(2));
+      const odds = parseFloat(Math.max(1.20, 1 / bookedProb).toFixed(2));
       return {
         id: `rider_${rider.number}`,
         name: rider.name,
@@ -1128,39 +1136,39 @@ export class FreeSportsService {
     ];
 
     const rawMatchups: [string, string, number, number, string][] = [
-      ['CM Punk', 'Gunther', 1.55, 2.40, 'World Heavyweight Championship Match'],
-      ['Seth Rollins', 'Drew McIntyre', 1.60, 2.30, 'Singles Match'],
-      ['Roman Reigns', 'Solo Sikoa', 1.40, 2.90, 'Tribal Combat'],
-      ['Brock Lesnar', 'Bronson Reed', 1.35, 3.10, 'Open Challenge'],
-      ['Cody Rhodes', 'Randy Orton', 1.85, 1.95, 'Championship Showdown'],
-      ['Jey Uso', 'Gunther', 1.70, 2.10, 'Intercontinental Title Match'],
-      ['Seth Rollins', 'Logan Paul', 1.45, 2.75, 'Celebrity Main Event'],
-      ['CM Punk', 'Seth Rollins', 1.85, 1.95, 'Dream Match'],
-      ['Roman Reigns', 'Drew McIntyre', 1.50, 2.50, 'Main Event Singles Match'],
-      ['Cody Rhodes', 'LA Knight', 1.55, 2.40, 'Undisputed Title Defense'],
+      ['CM Punk', 'Gunther', 1.36, 3.10, 'World Heavyweight Championship Match'],
+      ['Seth Rollins', 'Drew McIntyre', 1.57, 2.45, 'Singles Match'],
+      ['Roman Reigns', 'Solo Sikoa', 1.22, 4.50, 'Tribal Combat'],
+      ['Brock Lesnar', 'Bronson Reed', 1.18, 5.00, 'Open Challenge'],
+      ['Cody Rhodes', 'Randy Orton', 1.83, 2.00, 'Championship Showdown'],
+      ['Jey Uso', 'Gunther', 2.60, 1.50, 'Intercontinental Title Match'],
+      ['Seth Rollins', 'Logan Paul', 1.28, 3.75, 'Celebrity Main Event'],
+      ['CM Punk', 'Seth Rollins', 1.91, 1.91, 'Dream Match'],
+      ['Roman Reigns', 'Drew McIntyre', 1.33, 3.30, 'Main Event Singles Match'],
+      ['Cody Rhodes', 'LA Knight', 1.40, 3.00, 'Undisputed Title Defense'],
     ];
     const rawWomens: [string, string, number, number, string][] = [
-      ['Rhea Ripley', 'Liv Morgan', 1.60, 2.30, 'Women\'s World Title'],
-      ['Jade Cargill', 'Bianca Belair', 1.75, 2.05, 'Women\'s Tag Division'],
-      ['Liv Morgan', 'Becky Lynch', 1.70, 2.10, 'Women\'s Main Event'],
-      ['Rhea Ripley', 'Charlotte Flair', 1.55, 2.40, 'Women\'s Championship'],
-      ['Bayley', 'IYO SKY', 1.65, 2.20, 'Women\'s Division'],
+      ['Rhea Ripley', 'Liv Morgan', 1.44, 2.80, 'Women\'s World Title'],
+      ['Jade Cargill', 'Bianca Belair', 1.80, 2.05, 'Women\'s Tag Division'],
+      ['Liv Morgan', 'Becky Lynch', 1.67, 2.25, 'Women\'s Main Event'],
+      ['Rhea Ripley', 'Charlotte Flair', 1.53, 2.55, 'Women\'s Championship'],
+      ['Bayley', 'IYO SKY', 2.10, 1.77, 'Women\'s Division'],
     ];
     const sdMatchups: [string, string, number, number, string][] = [
-      ['Cody Rhodes', 'AJ Styles', 1.45, 2.75, 'Main Event'],
-      ['Randy Orton', 'LA Knight', 1.65, 2.20, 'Contender Match'],
-      ['Kevin Owens', 'Sami Zayn', 1.85, 1.95, 'Former Tag Partners Clash'],
-      ['Gunther', 'Sami Zayn', 1.55, 2.40, 'Intercontinental Title Match'],
-      ['AJ Styles', 'Carmelo Hayes', 1.65, 2.20, 'SmackDown Main Event'],
-      ['The Usos', 'The Bloodline', 1.60, 2.30, 'Tag Team Match'],
-      ['Cody Rhodes', 'Kevin Owens', 1.45, 2.75, 'Championship Confrontation'],
-      ['LA Knight', 'Santos Escobar', 1.50, 2.50, 'United States Title Match'],
+      ['Cody Rhodes', 'AJ Styles', 1.30, 3.50, 'Main Event'],
+      ['Randy Orton', 'LA Knight', 1.50, 2.60, 'Contender Match'],
+      ['Kevin Owens', 'Sami Zayn', 1.91, 1.91, 'Former Tag Partners Clash'],
+      ['Gunther', 'Sami Zayn', 1.36, 3.15, 'Intercontinental Title Match'],
+      ['AJ Styles', 'Carmelo Hayes', 1.45, 2.75, 'SmackDown Main Event'],
+      ['The Usos', 'The Bloodline', 1.57, 2.45, 'Tag Team Match'],
+      ['Cody Rhodes', 'Kevin Owens', 1.33, 3.30, 'Championship Confrontation'],
+      ['LA Knight', 'Santos Escobar', 1.28, 3.75, 'United States Title Match'],
     ];
     const sdWomens: [string, string, number, number, string][] = [
-      ['Rhea Ripley', 'Nia Jax', 1.50, 2.50, 'Women\'s Division'],
-      ['Bianca Belair', 'Naomi', 1.55, 2.40, 'Women\'s SmackDown'],
-      ['Charlotte Flair', 'Bayley', 1.60, 2.30, 'Women\'s Championship Contender'],
-      ['IYO SKY', 'Asuka', 1.70, 2.10, 'Women\'s Match'],
+      ['Rhea Ripley', 'Nia Jax', 1.36, 3.10, 'Women\'s Division'],
+      ['Bianca Belair', 'Naomi', 1.44, 2.80, 'Women\'s SmackDown'],
+      ['Charlotte Flair', 'Bayley', 1.57, 2.45, 'Women\'s Championship Contender'],
+      ['IYO SKY', 'Asuka', 1.80, 2.05, 'Women\'s Match'],
     ];
 
     const nowUtcDay = now.getUTCDay();
@@ -1541,24 +1549,24 @@ export class FreeSportsService {
       odds1: number; odds2: number; title: string; venue: string;
       date: string; card: string;
     }[] = [
-      { id: 'ufc-fn-mar14-main', fighter1: 'Josh Emmett', fighter2: 'Kevin Vallejos', odds1: 1.55, odds2: 2.40, title: 'Featherweight Main Event', venue: 'UFC APEX, Las Vegas', date: '2026-03-15T01:00:00Z', card: 'UFC Fight Night' },
-      { id: 'ufc-fn-mar14-co', fighter1: 'Amanda Lemos', fighter2: 'Virna Jandiroba', odds1: 1.65, odds2: 2.20, title: 'Women\'s Strawweight', venue: 'UFC APEX, Las Vegas', date: '2026-03-15T00:00:00Z', card: 'UFC Fight Night' },
-      { id: 'ufc-fn-mar21-main', fighter1: 'Movsar Evloev', fighter2: 'Lerone Murphy', odds1: 1.70, odds2: 2.10, title: 'Featherweight Main Event', venue: 'UFC APEX, Las Vegas', date: '2026-03-21T19:00:00Z', card: 'UFC Fight Night' },
-      { id: 'ufc-fn-mar21-co', fighter1: 'Jailton Almeida', fighter2: 'Alexandr Romanov', odds1: 1.45, odds2: 2.75, title: 'Heavyweight', venue: 'UFC APEX, Las Vegas', date: '2026-03-21T18:00:00Z', card: 'UFC Fight Night' },
-      { id: 'ufc-fn-mar28-main', fighter1: 'Israel Adesanya', fighter2: 'Joe Pyfer', odds1: 1.40, odds2: 2.90, title: 'Middleweight Main Event', venue: 'Climate Pledge Arena, Seattle', date: '2026-03-29T01:00:00Z', card: 'UFC Fight Night' },
-      { id: 'ufc-fn-mar28-co', fighter1: 'Dustin Poirier', fighter2: 'Benoit Saint-Denis', odds1: 1.75, odds2: 2.05, title: 'Lightweight', venue: 'Climate Pledge Arena, Seattle', date: '2026-03-29T00:00:00Z', card: 'UFC Fight Night' },
-      { id: 'ufc-fn-apr04-main', fighter1: 'Renato Moicano', fighter2: 'Chris Duncan', odds1: 1.50, odds2: 2.50, title: 'Lightweight Main Event', venue: 'UFC APEX, Las Vegas', date: '2026-04-05T01:00:00Z', card: 'UFC Fight Night' },
-      { id: 'ufc327-main', fighter1: 'Jiri Prochazka', fighter2: 'Carlos Ulberg', odds1: 1.55, odds2: 2.40, title: 'Vacant Light Heavyweight Title', venue: 'Kaseya Center, Miami', date: '2026-04-12T02:00:00Z', card: 'UFC 327' },
-      { id: 'ufc327-co', fighter1: 'Joshua Van', fighter2: 'Tatsuro Taira', odds1: 1.60, odds2: 2.30, title: 'Flyweight Championship', venue: 'Kaseya Center, Miami', date: '2026-04-12T01:00:00Z', card: 'UFC 327' },
-      { id: 'ufc327-3', fighter1: 'Patricio Pitbull', fighter2: 'Aaron Pico', odds1: 1.80, odds2: 2.00, title: 'Featherweight', venue: 'Kaseya Center, Miami', date: '2026-04-12T00:00:00Z', card: 'UFC 327' },
-      { id: 'ufc-fn-apr18-main', fighter1: 'Gilbert Burns', fighter2: 'Mike Malott', odds1: 1.45, odds2: 2.75, title: 'Welterweight Main Event', venue: 'Canada Life Centre, Winnipeg', date: '2026-04-19T02:00:00Z', card: 'UFC Fight Night' },
-      { id: 'ufc328-main', fighter1: 'Islam Makhachev', fighter2: 'Arman Tsarukyan', odds1: 1.35, odds2: 3.10, title: 'Lightweight Championship', venue: 'Prudential Center, Newark', date: '2026-05-10T02:00:00Z', card: 'UFC 328' },
-      { id: 'ufc328-co', fighter1: 'Sean O\'Malley', fighter2: 'Merab Dvalishvili', odds1: 1.65, odds2: 2.20, title: 'Bantamweight Title Rematch', venue: 'Prudential Center, Newark', date: '2026-05-10T01:00:00Z', card: 'UFC 328' },
-      { id: 'ufc328-3', fighter1: 'Alex Pereira', fighter2: 'Magomed Ankalaev', odds1: 1.70, odds2: 2.10, title: 'Light Heavyweight', venue: 'Prudential Center, Newark', date: '2026-05-10T00:00:00Z', card: 'UFC 328' },
-      { id: 'ufc-fn-may23-main', fighter1: 'Robert Whittaker', fighter2: 'Khamzat Chimaev', odds1: 2.10, odds2: 1.72, title: 'Middleweight Main Event', venue: 'UFC APEX, Las Vegas', date: '2026-05-24T01:00:00Z', card: 'UFC Fight Night' },
-      { id: 'ufc-freedom-main', fighter1: 'Jon Jones', fighter2: 'Tom Aspinall', odds1: 1.80, odds2: 2.00, title: 'Undisputed Heavyweight Championship', venue: 'Washington D.C.', date: '2026-06-14T23:00:00Z', card: 'UFC Freedom Fights 250' },
-      { id: 'ufc-freedom-co', fighter1: 'Conor McGregor', fighter2: 'Michael Chandler', odds1: 1.65, odds2: 2.20, title: 'Welterweight', venue: 'Washington D.C.', date: '2026-06-14T22:00:00Z', card: 'UFC Freedom Fights 250' },
-      { id: 'ufc-freedom-3', fighter1: 'Valentina Shevchenko', fighter2: 'Alexa Grasso', odds1: 1.55, odds2: 2.40, title: 'Women\'s Flyweight Title', venue: 'Washington D.C.', date: '2026-06-14T21:00:00Z', card: 'UFC Freedom Fights 250' },
+      { id: 'ufc-fn-mar14-main', fighter1: 'Josh Emmett', fighter2: 'Kevin Vallejos', odds1: 1.22, odds2: 4.50, title: 'Featherweight Main Event', venue: 'UFC APEX, Las Vegas', date: '2026-03-15T01:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc-fn-mar14-co', fighter1: 'Amanda Lemos', fighter2: 'Virna Jandiroba', odds1: 1.57, odds2: 2.45, title: 'Women\'s Strawweight', venue: 'UFC APEX, Las Vegas', date: '2026-03-15T00:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc-fn-mar21-main', fighter1: 'Movsar Evloev', fighter2: 'Lerone Murphy', odds1: 1.40, odds2: 3.00, title: 'Featherweight Main Event', venue: 'UFC APEX, Las Vegas', date: '2026-03-21T19:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc-fn-mar21-co', fighter1: 'Jailton Almeida', fighter2: 'Alexandr Romanov', odds1: 1.18, odds2: 5.25, title: 'Heavyweight', venue: 'UFC APEX, Las Vegas', date: '2026-03-21T18:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc-fn-mar28-main', fighter1: 'Israel Adesanya', fighter2: 'Joe Pyfer', odds1: 1.30, odds2: 3.60, title: 'Middleweight Main Event', venue: 'Climate Pledge Arena, Seattle', date: '2026-03-29T01:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc-fn-mar28-co', fighter1: 'Dustin Poirier', fighter2: 'Benoit Saint-Denis', odds1: 2.20, odds2: 1.72, title: 'Lightweight', venue: 'Climate Pledge Arena, Seattle', date: '2026-03-29T00:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc-fn-apr04-main', fighter1: 'Renato Moicano', fighter2: 'Chris Duncan', odds1: 1.35, odds2: 3.25, title: 'Lightweight Main Event', venue: 'UFC APEX, Las Vegas', date: '2026-04-05T01:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc327-main', fighter1: 'Jiri Prochazka', fighter2: 'Carlos Ulberg', odds1: 1.48, odds2: 2.75, title: 'Vacant Light Heavyweight Title', venue: 'Kaseya Center, Miami', date: '2026-04-12T02:00:00Z', card: 'UFC 327' },
+      { id: 'ufc327-co', fighter1: 'Joshua Van', fighter2: 'Tatsuro Taira', odds1: 2.30, odds2: 1.65, title: 'Flyweight Championship', venue: 'Kaseya Center, Miami', date: '2026-04-12T01:00:00Z', card: 'UFC 327' },
+      { id: 'ufc327-3', fighter1: 'Patricio Pitbull', fighter2: 'Aaron Pico', odds1: 1.91, odds2: 1.91, title: 'Featherweight', venue: 'Kaseya Center, Miami', date: '2026-04-12T00:00:00Z', card: 'UFC 327' },
+      { id: 'ufc-fn-apr18-main', fighter1: 'Gilbert Burns', fighter2: 'Mike Malott', odds1: 1.25, odds2: 4.00, title: 'Welterweight Main Event', venue: 'Canada Life Centre, Winnipeg', date: '2026-04-19T02:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc328-main', fighter1: 'Islam Makhachev', fighter2: 'Arman Tsarukyan', odds1: 1.14, odds2: 6.50, title: 'Lightweight Championship', venue: 'Prudential Center, Newark', date: '2026-05-10T02:00:00Z', card: 'UFC 328' },
+      { id: 'ufc328-co', fighter1: 'Sean O\'Malley', fighter2: 'Merab Dvalishvili', odds1: 1.83, odds2: 2.00, title: 'Bantamweight Title Rematch', venue: 'Prudential Center, Newark', date: '2026-05-10T01:00:00Z', card: 'UFC 328' },
+      { id: 'ufc328-3', fighter1: 'Alex Pereira', fighter2: 'Magomed Ankalaev', odds1: 1.53, odds2: 2.55, title: 'Light Heavyweight', venue: 'Prudential Center, Newark', date: '2026-05-10T00:00:00Z', card: 'UFC 328' },
+      { id: 'ufc-fn-may23-main', fighter1: 'Robert Whittaker', fighter2: 'Khamzat Chimaev', odds1: 2.90, odds2: 1.43, title: 'Middleweight Main Event', venue: 'UFC APEX, Las Vegas', date: '2026-05-24T01:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc-freedom-main', fighter1: 'Jon Jones', fighter2: 'Tom Aspinall', odds1: 2.40, odds2: 1.60, title: 'Undisputed Heavyweight Championship', venue: 'Washington D.C.', date: '2026-06-14T23:00:00Z', card: 'UFC Freedom Fights 250' },
+      { id: 'ufc-freedom-co', fighter1: 'Conor McGregor', fighter2: 'Michael Chandler', odds1: 2.50, odds2: 1.56, title: 'Welterweight', venue: 'Washington D.C.', date: '2026-06-14T22:00:00Z', card: 'UFC Freedom Fights 250' },
+      { id: 'ufc-freedom-3', fighter1: 'Valentina Shevchenko', fighter2: 'Alexa Grasso', odds1: 1.67, odds2: 2.25, title: 'Women\'s Flyweight Title', venue: 'Washington D.C.', date: '2026-06-14T21:00:00Z', card: 'UFC Freedom Fights 250' },
     ];
 
     const now = new Date();
@@ -1711,13 +1719,23 @@ export class FreeSportsService {
               'bangladesh': 68, 'afghanistan': 66, 'zimbabwe': 58, 'ireland': 55,
               'netherlands': 50, 'scotland': 48, 'nepal': 45, 'oman': 42,
               'usa': 44, 'uae': 43, 'namibia': 46, 'kenya': 40,
+              'canada': 41, 'hong kong': 38, 'papua new guinea': 36, 'jersey': 35,
+              'bermuda': 33, 'italy': 34, 'germany': 32, 'denmark': 31,
+              'singapore': 30, 'malaysia': 29, 'uganda': 37, 'tanzania': 28,
+              'mexico': 25, 'argentina': 26, 'brazil': 24, 'chile': 23,
+              'peru': 22, 'suriname': 27, 'cayman': 20, 'bahamas': 21,
+              'belize': 19, 'costa rica': 18, 'panama': 17, 'samoa': 28,
+              'vanuatu': 30, 'fiji': 29, 'japan': 35, 'china': 20,
+              'thailand': 32, 'philippines': 22, 'myanmar': 18,
+              'central districts': 65, 'northern districts': 63, 'otago': 62,
+              'canterbury': 64, 'auckland': 66, 'wellington': 63,
             };
             const rateTeam = (name: string) => {
               const lower = name.toLowerCase();
               for (const [key, val] of Object.entries(cricketRatings)) {
                 if (lower.includes(key)) return val;
               }
-              return 70;
+              return 40;
             };
             const rH = rateTeam(homeTeam);
             const rA = rateTeam(awayTeam);
