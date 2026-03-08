@@ -821,7 +821,7 @@ export class FreeSportsService {
     const MOTOGP_SPORT_ID = 19;
     const motoGPSchedule2026: { id: string; gpName: string; circuit: string; date: string }[] = [
       { id: 'thai-gp', gpName: 'Thai Grand Prix', circuit: 'Chang International Circuit, Buriram', date: '2026-03-01T09:00:00Z' },
-      { id: 'brazilian-gp', gpName: 'Brazilian Grand Prix', circuit: 'Autódromo de Goiânia, Brazil', date: '2026-03-22T18:00:00Z' },
+      { id: 'brazilian-gp', gpName: 'Brazilian Grand Prix', circuit: 'Autódromo Ayrton Senna, Goiânia', date: '2026-03-22T18:00:00Z' },
       { id: 'americas-gp', gpName: 'Grand Prix of the Americas', circuit: 'Circuit of The Americas, Austin', date: '2026-03-29T19:00:00Z' },
       { id: 'qatar-gp', gpName: 'Qatar Grand Prix', circuit: 'Lusail International Circuit', date: '2026-04-12T17:00:00Z' },
       { id: 'spanish-gp', gpName: 'Spanish Grand Prix', circuit: 'Circuito de Jerez, Spain', date: '2026-04-26T13:00:00Z' },
@@ -830,15 +830,14 @@ export class FreeSportsService {
       { id: 'italian-gp', gpName: 'Italian Grand Prix', circuit: 'Autodromo del Mugello, Italy', date: '2026-05-31T13:00:00Z' },
       { id: 'hungarian-gp', gpName: 'Hungarian Grand Prix', circuit: 'Balaton Park Circuit, Hungary', date: '2026-06-07T13:00:00Z' },
       { id: 'czech-gp', gpName: 'Czech Grand Prix', circuit: 'Automotodrom Brno, Czech Republic', date: '2026-06-21T13:00:00Z' },
-      { id: 'german-gp', gpName: 'German Grand Prix', circuit: 'Sachsenring, Germany', date: '2026-06-28T13:00:00Z' },
-      { id: 'dutch-gp', gpName: 'Dutch Grand Prix', circuit: 'TT Circuit Assen, Netherlands', date: '2026-07-12T13:00:00Z' },
-      { id: 'british-gp', gpName: 'British Grand Prix', circuit: 'Silverstone Circuit, UK', date: '2026-08-02T13:00:00Z' },
-      { id: 'austrian-gp', gpName: 'Austrian Grand Prix', circuit: 'Red Bull Ring, Spielberg', date: '2026-08-16T13:00:00Z' },
-      { id: 'aragon-gp', gpName: 'Aragon Grand Prix', circuit: 'MotorLand Aragón, Spain', date: '2026-08-30T13:00:00Z' },
-      { id: 'san-marino-gp', gpName: 'San Marino Grand Prix', circuit: 'Misano World Circuit, Italy', date: '2026-09-13T13:00:00Z' },
-      { id: 'indonesian-gp', gpName: 'Indonesian Grand Prix', circuit: 'Mandalika Circuit, Lombok', date: '2026-09-27T08:00:00Z' },
-      { id: 'japanese-gp', gpName: 'Japanese Grand Prix', circuit: 'Mobility Resort Motegi, Japan', date: '2026-10-04T06:00:00Z' },
-      { id: 'australian-gp', gpName: 'Australian Grand Prix', circuit: 'Phillip Island Circuit, Australia', date: '2026-10-18T05:00:00Z' },
+      { id: 'german-gp', gpName: 'German Grand Prix', circuit: 'Sachsenring, Hohenstein-Ernstthal', date: '2026-06-28T13:00:00Z' },
+      { id: 'british-gp', gpName: 'British Grand Prix', circuit: 'Silverstone Circuit, UK', date: '2026-08-16T13:00:00Z' },
+      { id: 'aragon-gp', gpName: 'Aragon Grand Prix', circuit: 'MotorLand Aragón, Alcañiz', date: '2026-08-30T13:00:00Z' },
+      { id: 'austrian-gp', gpName: 'Austrian Grand Prix', circuit: 'Red Bull Ring, Spielberg', date: '2026-09-06T13:00:00Z' },
+      { id: 'san-marino-gp', gpName: 'San Marino Grand Prix', circuit: 'Misano World Circuit, Misano Adriatico', date: '2026-09-20T13:00:00Z' },
+      { id: 'japanese-gp', gpName: 'Japanese Grand Prix', circuit: 'Twin Ring Motegi, Japan', date: '2026-10-04T06:00:00Z' },
+      { id: 'indonesian-gp', gpName: 'Indonesian Grand Prix', circuit: 'Mandalika Circuit, Lombok', date: '2026-10-11T08:00:00Z' },
+      { id: 'australian-gp', gpName: 'Australian Grand Prix', circuit: 'Phillip Island Circuit, Australia', date: '2026-10-25T05:00:00Z' },
       { id: 'malaysian-gp', gpName: 'Malaysian Grand Prix', circuit: 'Sepang International Circuit', date: '2026-11-01T08:00:00Z' },
       { id: 'portuguese-gp', gpName: 'Portuguese Grand Prix', circuit: 'Autódromo do Algarve, Portimão', date: '2026-11-08T14:00:00Z' },
       { id: 'valencia-gp', gpName: 'Valencian Grand Prix', circuit: 'Circuit Ricardo Tormo, Valencia', date: '2026-11-15T14:00:00Z' },
@@ -970,11 +969,32 @@ export class FreeSportsService {
         date: '2026-03-08T21:00:00Z', league: 'Zuffa Boxing'
       },
       {
-        id: 'dickens-cacace', fighter1: 'Jazza Dickens', fighter2: 'Anthony Cacace',
+        id: 'dickens-cacace', fighter1: 'James Dickens', fighter2: 'Anthony Cacace',
         record1: '36-4 (15 KOs)', record2: '23-1 (10 KOs)',
         odds1: 2.75, odds2: 1.45,
         title: 'WBA Super Featherweight Title', venue: '3Arena, Dublin',
         date: '2026-03-14T20:00:00Z', league: 'DAZN Boxing'
+      },
+      {
+        id: 'donaire-masuda', fighter1: 'Nonito Donaire', fighter2: 'Riku Masuda',
+        record1: '42-7 (28 KOs)', record2: '10-1 (6 KOs)',
+        odds1: 1.35, odds2: 3.20,
+        title: 'Bantamweight (10 Rounds)', venue: 'Yokohama Buntai, Yokohama',
+        date: '2026-03-15T10:00:00Z', league: 'Japanese Boxing Commission'
+      },
+      {
+        id: 'olascuaga-iimura', fighter1: 'Anthony Olascuaga', fighter2: 'Jukiya Iimura',
+        record1: '7-1 (5 KOs)', record2: '11-0 (7 KOs)',
+        odds1: 2.00, odds2: 1.80,
+        title: 'WBO Flyweight Title', venue: 'Yokohama Buntai, Yokohama',
+        date: '2026-03-15T09:00:00Z', league: 'Japanese Boxing Commission'
+      },
+      {
+        id: 'conlan-walsh', fighter1: 'Michael Conlan', fighter2: 'Kevin Walsh',
+        record1: '19-3 (9 KOs)', record2: '13-1 (5 KOs)',
+        odds1: 1.30, odds2: 3.50,
+        title: 'Featherweight (10 Rounds)', venue: 'SSE Arena, Belfast',
+        date: '2026-03-20T20:00:00Z', league: 'DAZN Boxing'
       },
       {
         id: 'adames-williams', fighter1: 'Carlos Adames', fighter2: 'Austin Williams',
@@ -987,15 +1007,36 @@ export class FreeSportsService {
         id: 'fundora-thurman', fighter1: 'Sebastian Fundora', fighter2: 'Keith Thurman',
         record1: '23-1-1 (15 KOs)', record2: '31-1 (23 KOs)',
         odds1: 1.25, odds2: 3.50,
-        title: 'WBC Super Welterweight Title', venue: 'MGM Grand, Las Vegas',
+        title: 'WBC Junior Middleweight Title', venue: 'MGM Grand, Las Vegas',
         date: '2026-03-28T21:00:00Z', league: 'PBC PPV on Prime Video'
       },
       {
-        id: 'itauma-franklin', fighter1: 'Moses Itauma', fighter2: 'Jermaine Franklin',
+        id: 'sanchez-torrez', fighter1: 'Frank Sanchez', fighter2: 'Richard Torrez Jr.',
+        record1: '24-0 (17 KOs)', record2: '13-1 (11 KOs)',
+        odds1: 1.40, odds2: 2.90,
+        title: 'Heavyweight (12 Rounds)', venue: 'MGM Grand, Las Vegas',
+        date: '2026-03-28T20:00:00Z', league: 'PBC PPV on Prime Video'
+      },
+      {
+        id: 'itauma-franklin', fighter1: 'Moses Itauma', fighter2: 'Jermaine Franklin Jr.',
         record1: '12-0 (10 KOs)', record2: '22-2 (14 KOs)',
         odds1: 1.33, odds2: 3.00,
-        title: 'Heavyweight', venue: 'Co-op Live Arena, Manchester',
-        date: '2026-03-28T20:00:00Z', league: 'DAZN Boxing'
+        title: 'Heavyweight (10 Rounds)', venue: 'Co-op Live Arena, Manchester',
+        date: '2026-03-28T19:00:00Z', league: 'DAZN Boxing'
+      },
+      {
+        id: 'santiago-taniguchi', fighter1: 'Rene Santiago', fighter2: 'Masataka Taniguchi',
+        record1: '16-0 (10 KOs)', record2: '18-4 (10 KOs)',
+        odds1: 1.50, odds2: 2.50,
+        title: 'WBO/WBA Light Flyweight Titles', venue: 'Korakuen Hall, Tokyo',
+        date: '2026-04-03T11:00:00Z', league: 'World Championship Boxing'
+      },
+      {
+        id: 'wilder-chisora', fighter1: 'Deontay Wilder', fighter2: 'Derek Chisora',
+        record1: '43-2-1 (42 KOs)', record2: '34-13 (23 KOs)',
+        odds1: 1.22, odds2: 4.33,
+        title: 'Heavyweight (12 Rounds)', venue: 'O2 Arena, London',
+        date: '2026-04-04T20:00:00Z', league: 'DAZN Boxing'
       },
       {
         id: 'scotney-flores', fighter1: 'Ellie Scotney', fighter2: 'Mayelli Flores',
@@ -1008,64 +1049,36 @@ export class FreeSportsService {
         id: 'dubois-harper', fighter1: 'Caroline Dubois', fighter2: 'Terri Harper',
         record1: '12-0 (4 KOs)', record2: '15-3-2 (6 KOs)',
         odds1: 1.36, odds2: 2.90,
-        title: 'World Title Unification', venue: 'Olympia, London',
+        title: 'Women\'s World Title Unification', venue: 'Olympia, London',
         date: '2026-04-05T18:00:00Z', league: 'Sky Sports Boxing'
       },
       {
-        id: 'santiago-taniguchi', fighter1: 'Rene Santiago', fighter2: 'Masataka Taniguchi',
-        record1: '16-0 (10 KOs)', record2: '18-4 (10 KOs)',
-        odds1: 1.50, odds2: 2.50,
-        title: 'WBO/WBA Light Flyweight Titles', venue: 'Korakuen Hall, Tokyo',
-        date: '2026-04-03T11:00:00Z', league: 'World Championship Boxing'
+        id: 'fury-makhmudov', fighter1: 'Tyson Fury', fighter2: 'Arslanbek Makhmudov',
+        record1: '34-1-1 (24 KOs)', record2: '18-1 (18 KOs)',
+        odds1: 1.18, odds2: 5.00,
+        title: 'Heavyweight (12 Rounds)', venue: 'Tottenham Hotspur Stadium, London',
+        date: '2026-04-11T20:00:00Z', league: 'Netflix Boxing'
+      },
+      {
+        id: 'baumgardner-shin', fighter1: 'Alycia Baumgardner', fighter2: 'Bo Mi Re Shin',
+        record1: '16-1 (7 KOs)', record2: '15-2 (4 KOs)',
+        odds1: 1.30, odds2: 3.40,
+        title: 'IBF/WBO/WBA Women\'s Jr. Lightweight Titles', venue: 'Madison Square Garden, New York',
+        date: '2026-04-17T22:00:00Z', league: 'ESPN Boxing'
       },
       {
         id: 'ramirez-benavidez', fighter1: 'Gilberto Ramirez', fighter2: 'David Benavidez',
         record1: '46-1 (30 KOs)', record2: '29-0 (24 KOs)',
         odds1: 2.80, odds2: 1.42,
         title: 'WBO & WBA Cruiserweight Titles', venue: 'T-Mobile Arena, Las Vegas',
-        date: '2026-05-02T21:00:00Z', league: 'DAZN Boxing'
-      },
-      {
-        id: 'wardley-dubois', fighter1: 'Fabio Wardley', fighter2: 'Daniel Dubois',
-        record1: '18-0 (17 KOs)', record2: '22-2 (21 KOs)',
-        odds1: 2.10, odds2: 1.72,
-        title: 'WBO Heavyweight Title', venue: 'Co-op Live Arena, Manchester',
-        date: '2026-05-09T20:00:00Z', league: 'DAZN PPV'
-      },
-      {
-        id: 'usyk-verhoeven', fighter1: 'Oleksandr Usyk', fighter2: 'Rico Verhoeven',
-        record1: '22-0 (14 KOs)', record2: '1-0 (Boxing)',
-        odds1: 1.18, odds2: 4.50,
-        title: 'WBC Heavyweight Title', venue: 'Pyramids of Giza, Egypt',
-        date: '2026-05-23T20:00:00Z', league: 'DAZN Boxing'
+        date: '2026-05-02T21:00:00Z', league: 'Prime Video PPV'
       },
       {
         id: 'smith-puello', fighter1: 'Dalton Smith', fighter2: 'Alberto Puello',
         record1: '18-0 (13 KOs)', record2: '24-1 (12 KOs)',
         odds1: 1.45, odds2: 2.70,
-        title: 'WBC Super Lightweight Title', venue: 'Sheffield Arena, UK',
+        title: 'WBC Super Lightweight Title', venue: 'Sheffield Arena, Sheffield',
         date: '2026-06-06T20:00:00Z', league: 'DAZN Boxing'
-      },
-      {
-        id: 'crawford-spence', fighter1: 'Terence Crawford', fighter2: 'Errol Spence Jr.',
-        record1: '41-0 (31 KOs)', record2: '28-1 (22 KOs)',
-        odds1: 1.40, odds2: 2.85,
-        title: 'WBA Super Middleweight Title', venue: 'T-Mobile Arena, Las Vegas',
-        date: '2026-07-11T21:00:00Z', league: 'PBC PPV on Prime Video'
-      },
-      {
-        id: 'inoue-nery2', fighter1: 'Naoya Inoue', fighter2: 'Luis Nery',
-        record1: '29-0 (25 KOs)', record2: '35-2 (27 KOs)',
-        odds1: 1.15, odds2: 5.00,
-        title: 'Undisputed Super Bantamweight', venue: 'Tokyo Dome, Japan',
-        date: '2026-07-25T10:00:00Z', league: 'Top Rank Boxing'
-      },
-      {
-        id: 'bivol-beterbiev2', fighter1: 'Dmitry Bivol', fighter2: 'Artur Beterbiev',
-        record1: '24-1 (12 KOs)', record2: '21-0 (20 KOs)',
-        odds1: 2.20, odds2: 1.65,
-        title: 'Undisputed Light Heavyweight Rematch', venue: 'Kingdom Arena, Riyadh',
-        date: '2026-08-15T20:00:00Z', league: 'Riyadh Season Boxing'
       },
       {
         id: 'mayweather-pacquiao2', fighter1: 'Floyd Mayweather', fighter2: 'Manny Pacquiao',
@@ -1463,7 +1476,7 @@ export class FreeSportsService {
         odds2: 2.40,
         title: 'World Heavyweight Championship',
         venue: 'Benchmark International Arena, Tampa',
-        date: '2026-05-09T23:00:00Z',
+        date: '2026-05-03T23:00:00Z',
         show: 'Backlash 2026',
         matchType: 'Singles Match'
       },
@@ -1475,7 +1488,7 @@ export class FreeSportsService {
         odds2: 2.30,
         title: 'WWE Women\'s Championship',
         venue: 'Benchmark International Arena, Tampa',
-        date: '2026-05-09T22:00:00Z',
+        date: '2026-05-03T22:00:00Z',
         show: 'Backlash 2026',
         matchType: 'Singles Match'
       },
@@ -1487,7 +1500,7 @@ export class FreeSportsService {
         odds2: 2.10,
         title: 'Tag Team Championship',
         venue: 'Benchmark International Arena, Tampa',
-        date: '2026-05-09T21:00:00Z',
+        date: '2026-05-03T21:00:00Z',
         show: 'Backlash 2026',
         matchType: 'Tag Team Match'
       },
@@ -1575,6 +1588,30 @@ export class FreeSportsService {
         show: 'Money in the Bank 2026',
         matchType: 'Ladder Match'
       },
+      {
+        id: 'survivor2026-main',
+        wrestler1: 'Team Raw',
+        wrestler2: 'Team SmackDown',
+        odds1: 1.75,
+        odds2: 2.05,
+        title: 'Men\'s WarGames Match',
+        venue: 'Pechanga Arena, San Diego',
+        date: '2026-11-29T23:00:00Z',
+        show: 'Survivor Series 2026',
+        matchType: 'WarGames Match'
+      },
+      {
+        id: 'survivor2026-womens',
+        wrestler1: 'Team Raw Women',
+        wrestler2: 'Team SmackDown Women',
+        odds1: 1.85,
+        odds2: 1.95,
+        title: 'Women\'s WarGames Match',
+        venue: 'Pechanga Arena, San Diego',
+        date: '2026-11-29T22:00:00Z',
+        show: 'Survivor Series 2026',
+        matchType: 'WarGames Match'
+      },
       ...this.generateWeeklyWWEShows(),
     ];
 
@@ -1610,6 +1647,7 @@ export class FreeSportsService {
   private generateF1Schedule(): SportEvent[] {
     const F1_SPORT_ID = 11;
     const f1Races2026: { id: string; gpName: string; circuit: string; date: string }[] = [
+      { id: 'australia-gp', gpName: 'Australian Grand Prix', circuit: 'Albert Park Circuit, Melbourne', date: '2026-03-08T05:00:00Z' },
       { id: 'china-gp', gpName: 'Chinese Grand Prix', circuit: 'Shanghai International Circuit', date: '2026-03-15T07:00:00Z' },
       { id: 'japan-gp', gpName: 'Japanese Grand Prix', circuit: 'Suzuka Circuit', date: '2026-03-29T06:00:00Z' },
       { id: 'bahrain-gp', gpName: 'Bahrain Grand Prix', circuit: 'Bahrain International Circuit', date: '2026-04-12T15:00:00Z' },
@@ -1617,20 +1655,20 @@ export class FreeSportsService {
       { id: 'miami-gp', gpName: 'Miami Grand Prix', circuit: 'Miami International Autodrome', date: '2026-05-03T19:30:00Z' },
       { id: 'canada-gp', gpName: 'Canadian Grand Prix', circuit: 'Circuit Gilles Villeneuve, Montréal', date: '2026-05-24T18:00:00Z' },
       { id: 'monaco-gp', gpName: 'Monaco Grand Prix', circuit: 'Circuit de Monaco, Monte Carlo', date: '2026-06-07T13:00:00Z' },
-      { id: 'spain-gp', gpName: 'Spanish Grand Prix', circuit: 'Circuit de Barcelona-Catalunya', date: '2026-06-14T13:00:00Z' },
+      { id: 'barcelona-gp', gpName: 'Barcelona-Catalunya Grand Prix', circuit: 'Circuit de Barcelona-Catalunya', date: '2026-06-14T13:00:00Z' },
       { id: 'austria-gp', gpName: 'Austrian Grand Prix', circuit: 'Red Bull Ring, Spielberg', date: '2026-06-28T13:00:00Z' },
       { id: 'britain-gp', gpName: 'British Grand Prix', circuit: 'Silverstone Circuit', date: '2026-07-05T14:00:00Z' },
-      { id: 'belgium-gp', gpName: 'Belgian Grand Prix', circuit: 'Spa-Francorchamps', date: '2026-07-19T13:00:00Z' },
+      { id: 'belgium-gp', gpName: 'Belgian Grand Prix', circuit: 'Circuit de Spa-Francorchamps', date: '2026-07-19T13:00:00Z' },
       { id: 'hungary-gp', gpName: 'Hungarian Grand Prix', circuit: 'Hungaroring, Budapest', date: '2026-07-26T13:00:00Z' },
       { id: 'netherlands-gp', gpName: 'Dutch Grand Prix', circuit: 'Circuit Zandvoort', date: '2026-08-23T13:00:00Z' },
       { id: 'italy-gp', gpName: 'Italian Grand Prix', circuit: 'Autodromo Nazionale Monza', date: '2026-09-06T13:00:00Z' },
-      { id: 'madrid-gp', gpName: 'Madrid Grand Prix', circuit: 'IFEMA Madrid Street Circuit', date: '2026-09-13T13:00:00Z' },
+      { id: 'madrid-gp', gpName: 'Spanish Grand Prix', circuit: 'IFEMA Madrid Street Circuit', date: '2026-09-13T13:00:00Z' },
       { id: 'azerbaijan-gp', gpName: 'Azerbaijan Grand Prix', circuit: 'Baku City Circuit', date: '2026-09-26T12:00:00Z' },
       { id: 'singapore-gp', gpName: 'Singapore Grand Prix', circuit: 'Marina Bay Street Circuit', date: '2026-10-11T12:00:00Z' },
       { id: 'usa-gp', gpName: 'United States Grand Prix', circuit: 'Circuit of the Americas, Austin', date: '2026-10-25T18:00:00Z' },
       { id: 'mexico-gp', gpName: 'Mexico City Grand Prix', circuit: 'Autódromo Hermanos Rodríguez', date: '2026-11-01T19:00:00Z' },
-      { id: 'brazil-gp', gpName: 'São Paulo Grand Prix', circuit: 'Autódromo José Carlos Pace', date: '2026-11-08T17:00:00Z' },
-      { id: 'lasvegas-gp', gpName: 'Las Vegas Grand Prix', circuit: 'Las Vegas Street Circuit', date: '2026-11-21T06:00:00Z' },
+      { id: 'brazil-gp', gpName: 'São Paulo Grand Prix', circuit: 'Autódromo José Carlos Pace, Interlagos', date: '2026-11-08T17:00:00Z' },
+      { id: 'lasvegas-gp', gpName: 'Las Vegas Grand Prix', circuit: 'Las Vegas Strip Circuit', date: '2026-11-21T06:00:00Z' },
       { id: 'qatar-f1-gp', gpName: 'Qatar Grand Prix', circuit: 'Losail International Circuit', date: '2026-11-29T15:00:00Z' },
       { id: 'abudhabi-gp', gpName: 'Abu Dhabi Grand Prix', circuit: 'Yas Marina Circuit', date: '2026-12-06T13:00:00Z' },
     ];
@@ -1651,24 +1689,24 @@ export class FreeSportsService {
       odds1: number; odds2: number; title: string; venue: string;
       date: string; card: string;
     }[] = [
+      { id: 'ufc326-main', fighter1: 'Max Holloway', fighter2: 'Charles Oliveira', odds1: 1.65, odds2: 2.25, title: 'BMF Title', venue: 'UFC APEX, Las Vegas', date: '2026-03-08T01:00:00Z', card: 'UFC 326' },
       { id: 'ufc-fn-mar14-main', fighter1: 'Josh Emmett', fighter2: 'Kevin Vallejos', odds1: 1.22, odds2: 4.50, title: 'Featherweight Main Event', venue: 'UFC APEX, Las Vegas', date: '2026-03-15T01:00:00Z', card: 'UFC Fight Night' },
       { id: 'ufc-fn-mar14-co', fighter1: 'Amanda Lemos', fighter2: 'Virna Jandiroba', odds1: 1.57, odds2: 2.45, title: 'Women\'s Strawweight', venue: 'UFC APEX, Las Vegas', date: '2026-03-15T00:00:00Z', card: 'UFC Fight Night' },
-      { id: 'ufc-fn-mar21-main', fighter1: 'Movsar Evloev', fighter2: 'Lerone Murphy', odds1: 1.40, odds2: 3.00, title: 'Featherweight Main Event', venue: 'UFC APEX, Las Vegas', date: '2026-03-21T19:00:00Z', card: 'UFC Fight Night' },
-      { id: 'ufc-fn-mar21-co', fighter1: 'Jailton Almeida', fighter2: 'Alexandr Romanov', odds1: 1.18, odds2: 5.25, title: 'Heavyweight', venue: 'UFC APEX, Las Vegas', date: '2026-03-21T18:00:00Z', card: 'UFC Fight Night' },
-      { id: 'ufc-fn-mar28-main', fighter1: 'Israel Adesanya', fighter2: 'Joe Pyfer', odds1: 1.30, odds2: 3.60, title: 'Middleweight Main Event', venue: 'Climate Pledge Arena, Seattle', date: '2026-03-29T01:00:00Z', card: 'UFC Fight Night' },
-      { id: 'ufc-fn-mar28-co', fighter1: 'Dustin Poirier', fighter2: 'Benoit Saint-Denis', odds1: 2.20, odds2: 1.72, title: 'Lightweight', venue: 'Climate Pledge Arena, Seattle', date: '2026-03-29T00:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc-fn-mar21-main', fighter1: 'Movsar Evloev', fighter2: 'Lerone Murphy', odds1: 1.40, odds2: 3.00, title: 'Featherweight Main Event', venue: 'UFC APEX, Las Vegas', date: '2026-03-22T01:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc-fn-mar21-co', fighter1: 'Jailton Almeida', fighter2: 'Alexandr Romanov', odds1: 1.18, odds2: 5.25, title: 'Heavyweight', venue: 'UFC APEX, Las Vegas', date: '2026-03-22T00:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc-fn-mar28-main', fighter1: 'Israel Adesanya', fighter2: 'Joe Pyfer', odds1: 1.30, odds2: 3.60, title: 'Middleweight Main Event', venue: 'UFC APEX, Las Vegas', date: '2026-03-29T01:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc-fn-mar28-co', fighter1: 'Dustin Poirier', fighter2: 'Benoit Saint-Denis', odds1: 2.20, odds2: 1.72, title: 'Lightweight Co-Main', venue: 'UFC APEX, Las Vegas', date: '2026-03-29T00:00:00Z', card: 'UFC Fight Night' },
       { id: 'ufc-fn-apr04-main', fighter1: 'Renato Moicano', fighter2: 'Chris Duncan', odds1: 1.35, odds2: 3.25, title: 'Lightweight Main Event', venue: 'UFC APEX, Las Vegas', date: '2026-04-05T01:00:00Z', card: 'UFC Fight Night' },
-      { id: 'ufc327-main', fighter1: 'Jiri Prochazka', fighter2: 'Carlos Ulberg', odds1: 1.48, odds2: 2.75, title: 'Vacant Light Heavyweight Title', venue: 'Kaseya Center, Miami', date: '2026-04-12T02:00:00Z', card: 'UFC 327' },
-      { id: 'ufc327-co', fighter1: 'Joshua Van', fighter2: 'Tatsuro Taira', odds1: 2.30, odds2: 1.65, title: 'Flyweight Championship', venue: 'Kaseya Center, Miami', date: '2026-04-12T01:00:00Z', card: 'UFC 327' },
-      { id: 'ufc327-3', fighter1: 'Patricio Pitbull', fighter2: 'Aaron Pico', odds1: 1.91, odds2: 1.91, title: 'Featherweight', venue: 'Kaseya Center, Miami', date: '2026-04-12T00:00:00Z', card: 'UFC 327' },
-      { id: 'ufc-fn-apr18-main', fighter1: 'Gilbert Burns', fighter2: 'Mike Malott', odds1: 1.25, odds2: 4.00, title: 'Welterweight Main Event', venue: 'Canada Life Centre, Winnipeg', date: '2026-04-19T02:00:00Z', card: 'UFC Fight Night' },
-      { id: 'ufc328-main', fighter1: 'Islam Makhachev', fighter2: 'Arman Tsarukyan', odds1: 1.14, odds2: 6.50, title: 'Lightweight Championship', venue: 'Prudential Center, Newark', date: '2026-05-10T02:00:00Z', card: 'UFC 328' },
-      { id: 'ufc328-co', fighter1: 'Sean O\'Malley', fighter2: 'Merab Dvalishvili', odds1: 1.83, odds2: 2.00, title: 'Bantamweight Title Rematch', venue: 'Prudential Center, Newark', date: '2026-05-10T01:00:00Z', card: 'UFC 328' },
-      { id: 'ufc328-3', fighter1: 'Alex Pereira', fighter2: 'Magomed Ankalaev', odds1: 1.53, odds2: 2.55, title: 'Light Heavyweight', venue: 'Prudential Center, Newark', date: '2026-05-10T00:00:00Z', card: 'UFC 328' },
-      { id: 'ufc-fn-may23-main', fighter1: 'Robert Whittaker', fighter2: 'Khamzat Chimaev', odds1: 2.90, odds2: 1.43, title: 'Middleweight Main Event', venue: 'UFC APEX, Las Vegas', date: '2026-05-24T01:00:00Z', card: 'UFC Fight Night' },
-      { id: 'ufc-freedom-main', fighter1: 'Jon Jones', fighter2: 'Tom Aspinall', odds1: 2.40, odds2: 1.60, title: 'Undisputed Heavyweight Championship', venue: 'Washington D.C.', date: '2026-06-14T23:00:00Z', card: 'UFC Freedom Fights 250' },
-      { id: 'ufc-freedom-co', fighter1: 'Conor McGregor', fighter2: 'Michael Chandler', odds1: 2.50, odds2: 1.56, title: 'Welterweight', venue: 'Washington D.C.', date: '2026-06-14T22:00:00Z', card: 'UFC Freedom Fights 250' },
-      { id: 'ufc-freedom-3', fighter1: 'Valentina Shevchenko', fighter2: 'Alexa Grasso', odds1: 1.67, odds2: 2.25, title: 'Women\'s Flyweight Title', venue: 'Washington D.C.', date: '2026-06-14T21:00:00Z', card: 'UFC Freedom Fights 250' },
+      { id: 'ufc327-main', fighter1: 'Jiri Prochazka', fighter2: 'Carlos Ulberg', odds1: 1.48, odds2: 2.75, title: 'Vacant Light Heavyweight Championship', venue: 'Kaseya Center, Miami', date: '2026-04-12T01:00:00Z', card: 'UFC 327' },
+      { id: 'ufc327-co', fighter1: 'Joshua Van', fighter2: 'Tatsuro Taira', odds1: 2.30, odds2: 1.65, title: 'Flyweight Championship', venue: 'Kaseya Center, Miami', date: '2026-04-12T00:00:00Z', card: 'UFC 327' },
+      { id: 'ufc327-3', fighter1: 'Patricio Pitbull', fighter2: 'Aaron Pico', odds1: 1.91, odds2: 1.91, title: 'Featherweight', venue: 'Kaseya Center, Miami', date: '2026-04-11T23:00:00Z', card: 'UFC 327' },
+      { id: 'ufc327-4', fighter1: 'Dominick Reyes', fighter2: 'Johnny Walker', odds1: 1.80, odds2: 2.05, title: 'Light Heavyweight', venue: 'Kaseya Center, Miami', date: '2026-04-11T22:30:00Z', card: 'UFC 327' },
+      { id: 'ufc327-5', fighter1: 'Curtis Blaydes', fighter2: 'Josh Hokit', odds1: 1.25, odds2: 4.00, title: 'Heavyweight', venue: 'Kaseya Center, Miami', date: '2026-04-11T22:00:00Z', card: 'UFC 327' },
+      { id: 'ufc327-6', fighter1: 'Tatiana Suarez', fighter2: 'Loopy Godinez', odds1: 1.40, odds2: 3.00, title: 'Women\'s Strawweight', venue: 'Kaseya Center, Miami', date: '2026-04-11T21:30:00Z', card: 'UFC 327' },
+      { id: 'ufc-fn-apr24-main', fighter1: 'Sean Brady', fighter2: 'Joaquin Buckley', odds1: 1.65, odds2: 2.25, title: 'Welterweight Main Event', venue: 'UFC APEX, Las Vegas', date: '2026-04-24T20:30:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc-fn-may02-main', fighter1: 'Jack Della Maddalena', fighter2: 'Carlos Prates', odds1: 1.55, odds2: 2.50, title: 'Welterweight Main Event', venue: 'UFC APEX, Las Vegas', date: '2026-05-02T11:00:00Z', card: 'UFC Fight Night' },
+      { id: 'ufc328-main', fighter1: 'Alexander Volkov', fighter2: 'Waldo Cortes-Acosta', odds1: 1.40, odds2: 3.00, title: 'Heavyweight Main Event', venue: 'Prudential Center, Newark', date: '2026-05-10T02:00:00Z', card: 'UFC 328' },
+      { id: 'ufc328-co', fighter1: 'Jan Blachowicz', fighter2: 'Bogdan Guskov', odds1: 1.70, odds2: 2.15, title: 'Light Heavyweight', venue: 'Prudential Center, Newark', date: '2026-05-10T01:00:00Z', card: 'UFC 328' },
     ];
 
     const now = new Date();
@@ -1716,9 +1754,9 @@ export class FreeSportsService {
       { id: 'miami-alcaraz-djokovic', player1: 'Carlos Alcaraz', player2: 'Novak Djokovic', ranking1: 1, ranking2: 5, odds1: 1.50, odds2: 2.55, tournament: 'Miami Open', round: 'Final', date: '2026-03-29T20:00:00Z', surface: 'Hard', location: 'Miami, USA' },
       { id: 'miami-sinner-zverev', player1: 'Jannik Sinner', player2: 'Alexander Zverev', ranking1: 2, ranking2: 3, odds1: 1.65, odds2: 2.20, tournament: 'Miami Open', round: 'Semi-Final', date: '2026-03-28T19:00:00Z', surface: 'Hard', location: 'Miami, USA' },
       { id: 'miami-fritz-draper', player1: 'Taylor Fritz', player2: 'Jack Draper', ranking1: 4, ranking2: 8, odds1: 1.80, odds2: 2.00, tournament: 'Miami Open', round: 'Semi-Final', date: '2026-03-28T17:00:00Z', surface: 'Hard', location: 'Miami, USA' },
-      { id: 'mc-alcaraz-sinner', player1: 'Carlos Alcaraz', player2: 'Jannik Sinner', ranking1: 1, ranking2: 2, odds1: 1.60, odds2: 2.25, tournament: 'Monte-Carlo Masters', round: 'Final', date: '2026-04-19T14:00:00Z', surface: 'Clay', location: 'Monte-Carlo, Monaco' },
-      { id: 'mc-djokovic-rublev', player1: 'Novak Djokovic', player2: 'Andrey Rublev', ranking1: 5, ranking2: 9, odds1: 1.45, odds2: 2.70, tournament: 'Monte-Carlo Masters', round: 'Semi-Final', date: '2026-04-18T14:00:00Z', surface: 'Clay', location: 'Monte-Carlo, Monaco' },
-      { id: 'mc-zverev-musetti', player1: 'Alexander Zverev', player2: 'Lorenzo Musetti', ranking1: 3, ranking2: 15, odds1: 1.40, odds2: 2.85, tournament: 'Monte-Carlo Masters', round: 'Quarter-Final', date: '2026-04-17T12:00:00Z', surface: 'Clay', location: 'Monte-Carlo, Monaco' },
+      { id: 'mc-alcaraz-sinner', player1: 'Carlos Alcaraz', player2: 'Jannik Sinner', ranking1: 1, ranking2: 2, odds1: 1.60, odds2: 2.25, tournament: 'Monte-Carlo Masters', round: 'Final', date: '2026-04-12T14:00:00Z', surface: 'Clay', location: 'Monte-Carlo, Monaco' },
+      { id: 'mc-djokovic-rublev', player1: 'Novak Djokovic', player2: 'Andrey Rublev', ranking1: 5, ranking2: 9, odds1: 1.45, odds2: 2.70, tournament: 'Monte-Carlo Masters', round: 'Semi-Final', date: '2026-04-11T14:00:00Z', surface: 'Clay', location: 'Monte-Carlo, Monaco' },
+      { id: 'mc-zverev-musetti', player1: 'Alexander Zverev', player2: 'Lorenzo Musetti', ranking1: 3, ranking2: 15, odds1: 1.40, odds2: 2.85, tournament: 'Monte-Carlo Masters', round: 'Quarter-Final', date: '2026-04-10T12:00:00Z', surface: 'Clay', location: 'Monte-Carlo, Monaco' },
       { id: 'rome-sinner-alcaraz', player1: 'Jannik Sinner', player2: 'Carlos Alcaraz', ranking1: 2, ranking2: 1, odds1: 1.90, odds2: 1.90, tournament: 'Italian Open', round: 'Final', date: '2026-05-17T14:00:00Z', surface: 'Clay', location: 'Rome, Italy' },
       { id: 'rome-djokovic-zverev', player1: 'Novak Djokovic', player2: 'Alexander Zverev', ranking1: 5, ranking2: 3, odds1: 1.75, odds2: 2.05, tournament: 'Italian Open', round: 'Semi-Final', date: '2026-05-16T14:00:00Z', surface: 'Clay', location: 'Rome, Italy' },
       { id: 'rome-fritz-rublev', player1: 'Taylor Fritz', player2: 'Andrey Rublev', ranking1: 4, ranking2: 9, odds1: 1.85, odds2: 1.95, tournament: 'Italian Open', round: 'Semi-Final', date: '2026-05-16T11:00:00Z', surface: 'Clay', location: 'Rome, Italy' },
