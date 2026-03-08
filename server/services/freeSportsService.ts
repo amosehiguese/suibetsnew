@@ -1080,7 +1080,6 @@ export class FreeSportsService {
     const upcomingFights = boxingFights.filter(f => new Date(f.date) > now);
 
     return upcomingFights.map(fight => {
-      const drawOdds = parseFloat((15 + Math.random() * 10).toFixed(2));
       return {
         id: `boxing_${fight.id}`,
         sportId: BOXING_SPORT_ID,
@@ -1100,7 +1099,6 @@ export class FreeSportsService {
         }],
         homeOdds: fight.odds1,
         awayOdds: fight.odds2,
-        drawOdds,
         homeRecord: fight.record1,
         awayRecord: fight.record2,
         venue: fight.venue,
@@ -1135,7 +1133,7 @@ export class FreeSportsService {
       'Target Center, Minneapolis', 'Moda Center, Portland', 'KeyBank Center, Buffalo',
     ];
 
-    const rawMatchups: [string, string, number, number, string][] = [
+    const rawMain: [string, string, number, number, string][] = [
       ['CM Punk', 'Gunther', 1.36, 3.10, 'World Heavyweight Championship Match'],
       ['Seth Rollins', 'Drew McIntyre', 1.57, 2.45, 'Singles Match'],
       ['Roman Reigns', 'Solo Sikoa', 1.22, 4.50, 'Tribal Combat'],
@@ -1154,7 +1152,27 @@ export class FreeSportsService {
       ['Rhea Ripley', 'Charlotte Flair', 1.53, 2.55, 'Women\'s Championship'],
       ['Bayley', 'IYO SKY', 2.10, 1.77, 'Women\'s Division'],
     ];
-    const sdMatchups: [string, string, number, number, string][] = [
+    const rawMid: [string, string, number, number, string][] = [
+      ['Jey Uso', 'Pete Dunne', 1.33, 3.25, 'Midcard Singles'],
+      ['Bronson Reed', 'Braun Strowman', 1.75, 2.10, 'Hoss Fight'],
+      ['Chad Gable', 'Otis', 1.65, 2.25, 'Alpha Academy Rivalry'],
+      ['Damian Priest', 'Dominik Mysterio', 1.40, 3.00, 'Judgment Day Fallout'],
+      ['Kofi Kingston', 'Xavier Woods', 1.91, 1.91, 'Tag Team Breakup'],
+      ['Sheamus', 'Ludwig Kaiser', 1.50, 2.60, 'Physical Encounter'],
+      ['Dragon Lee', 'Ricochet', 1.85, 2.00, 'Cruiserweight Showcase'],
+      ['R-Truth', 'Karrion Kross', 2.80, 1.43, 'Open Challenge'],
+    ];
+    const rawTag: [string, string, number, number, string][] = [
+      ['The Judgment Day', 'The LWO', 1.44, 2.80, 'Tag Team Match'],
+      ['DIY', 'The Creed Brothers', 1.60, 2.35, 'Tag Team Contenders'],
+      ['Awesome Truth', 'Alpha Academy', 1.50, 2.60, 'Tag Title Match'],
+      ['War Raiders', 'The New Day', 1.36, 3.10, 'Tag Division'],
+      ['Imperium', 'Street Profits', 1.53, 2.55, 'Tag Team Action'],
+      ['The Usos', 'Pretty Deadly', 1.28, 3.75, 'Tag Team Showcase'],
+      ['Authors of Pain', 'American Alpha', 1.67, 2.25, 'Tag Team Battle'],
+      ['Motor City Machine Guns', 'Legado del Fantasma', 1.45, 2.75, 'Tag Team Classic'],
+    ];
+    const sdMain: [string, string, number, number, string][] = [
       ['Cody Rhodes', 'AJ Styles', 1.30, 3.50, 'Main Event'],
       ['Randy Orton', 'LA Knight', 1.50, 2.60, 'Contender Match'],
       ['Kevin Owens', 'Sami Zayn', 1.91, 1.91, 'Former Tag Partners Clash'],
@@ -1170,6 +1188,26 @@ export class FreeSportsService {
       ['Charlotte Flair', 'Bayley', 1.57, 2.45, 'Women\'s Championship Contender'],
       ['IYO SKY', 'Asuka', 1.80, 2.05, 'Women\'s Match'],
     ];
+    const sdMid: [string, string, number, number, string][] = [
+      ['Carmelo Hayes', 'Andrade', 1.70, 2.15, 'Midcard Singles'],
+      ['Apollo Crews', 'Baron Corbin', 1.55, 2.50, 'SmackDown Clash'],
+      ['Grayson Waller', 'Austin Theory', 1.91, 1.91, 'A-Town Down Under Split'],
+      ['Angel Garza', 'Santos Escobar', 2.20, 1.72, 'LDF Rivalry'],
+      ['Montez Ford', 'Angelo Dawkins', 1.83, 2.00, 'Street Profits Clash'],
+      ['Pretty Deadly', 'Legado del Fantasma', 1.57, 2.45, 'Tag Action'],
+      ['Nick Aldis', 'Solo Sikoa', 2.60, 1.50, 'Authority vs Bloodline'],
+      ['Bobby Lashley', 'Bron Breakker', 1.65, 2.25, 'Powerhouse Match'],
+    ];
+    const sdTag: [string, string, number, number, string][] = [
+      ['Street Profits', 'B-Fab & Jade', 1.45, 2.75, 'Mixed Tag Match'],
+      ['DIY', 'The Bloodline', 1.70, 2.15, 'Tag Team Match'],
+      ['Legado del Fantasma', 'Los Lotharios', 1.36, 3.10, 'Lucha Tag Team'],
+      ['The Usos', 'Pretty Deadly', 1.33, 3.25, 'Tag Title Contenders'],
+      ['Alpha Academy', 'A-Town Down Under', 1.57, 2.45, 'Tag Team Clash'],
+      ['Motor City Machine Guns', 'DIY', 1.91, 1.91, 'Tag Team Classic'],
+      ['Imperium', 'Brawling Brutes', 1.50, 2.60, 'European Tag Match'],
+      ['New Catch Republic', 'The Creed Brothers', 1.60, 2.35, 'Tag Division Match'],
+    ];
 
     const nowUtcDay = now.getUTCDay();
     const nowUtcDate = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
@@ -1179,47 +1217,38 @@ export class FreeSportsService {
       if (daysUntilMonday === 0) daysUntilMonday = 7;
       const mondayMs = nowUtcDate + (daysUntilMonday + weekOffset * 7) * 86400000;
 
-      const mainIdx = weekOffset % rawMatchups.length;
-      const womenIdx = weekOffset % rawWomens.length;
       const venueIdx = weekOffset % rawVenues.length;
-      const [w1, w2, o1, o2, title] = rawMatchups[mainIdx];
-      const [ww1, ww2, wo1, wo2, wtitle] = rawWomens[womenIdx];
+      const rawDateStr = new Date(mondayMs + 3600000).toISOString().split('T')[0];
+      const rv = rawVenues[venueIdx];
 
-      const rawMainDate = new Date(mondayMs + 1 * 3600000);
-      const rawCoMainDate = new Date(mondayMs);
-      const rawDateStr = rawMainDate.toISOString().split('T')[0];
-      events.push({
-        id: `raw-${rawDateStr}-main`, wrestler1: w1, wrestler2: w2, odds1: o1, odds2: o2,
-        title, venue: rawVenues[venueIdx], date: rawMainDate.toISOString(),
-        show: 'Monday Night Raw', matchType: 'Singles Match'
-      });
-      events.push({
-        id: `raw-${rawDateStr}-women`, wrestler1: ww1, wrestler2: ww2, odds1: wo1, odds2: wo2,
-        title: wtitle, venue: rawVenues[venueIdx], date: rawCoMainDate.toISOString(),
-        show: 'Monday Night Raw', matchType: 'Singles Match'
-      });
+      const [m1, m2, mo1, mo2, mt] = rawMain[weekOffset % rawMain.length];
+      events.push({ id: `raw-${rawDateStr}-main`, wrestler1: m1, wrestler2: m2, odds1: mo1, odds2: mo2, title: mt, venue: rv, date: new Date(mondayMs + 3 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Singles Match' });
+
+      const [w1, w2, wo1, wo2, wt] = rawWomens[weekOffset % rawWomens.length];
+      events.push({ id: `raw-${rawDateStr}-women`, wrestler1: w1, wrestler2: w2, odds1: wo1, odds2: wo2, title: wt, venue: rv, date: new Date(mondayMs + 2.5 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Singles Match' });
+
+      const [md1, md2, mdo1, mdo2, mdt] = rawMid[weekOffset % rawMid.length];
+      events.push({ id: `raw-${rawDateStr}-mid`, wrestler1: md1, wrestler2: md2, odds1: mdo1, odds2: mdo2, title: mdt, venue: rv, date: new Date(mondayMs + 2 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Singles Match' });
+
+      const [t1, t2, to1, to2, tt] = rawTag[weekOffset % rawTag.length];
+      events.push({ id: `raw-${rawDateStr}-tag`, wrestler1: t1, wrestler2: t2, odds1: to1, odds2: to2, title: tt, venue: rv, date: new Date(mondayMs + 1.5 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Tag Team Match' });
 
       const fridayMs = mondayMs + 4 * 86400000;
-
-      const sdMainIdx = weekOffset % sdMatchups.length;
-      const sdWomenIdx = weekOffset % sdWomens.length;
       const sdVenueIdx = weekOffset % sdVenues.length;
-      const [sw1, sw2, so1, so2, stitle] = sdMatchups[sdMainIdx];
-      const [sww1, sww2, swo1, swo2, swtitle] = sdWomens[sdWomenIdx];
+      const sdDateStr = new Date(fridayMs + 3600000).toISOString().split('T')[0];
+      const sv = sdVenues[sdVenueIdx];
 
-      const sdMainDate = new Date(fridayMs + 1 * 3600000);
-      const sdCoMainDate = new Date(fridayMs);
-      const sdDateStr = sdMainDate.toISOString().split('T')[0];
-      events.push({
-        id: `sd-${sdDateStr}-main`, wrestler1: sw1, wrestler2: sw2, odds1: so1, odds2: so2,
-        title: stitle, venue: sdVenues[sdVenueIdx], date: sdMainDate.toISOString(),
-        show: 'Friday Night SmackDown', matchType: 'Singles Match'
-      });
-      events.push({
-        id: `sd-${sdDateStr}-women`, wrestler1: sww1, wrestler2: sww2, odds1: swo1, odds2: swo2,
-        title: swtitle, venue: sdVenues[sdVenueIdx], date: sdCoMainDate.toISOString(),
-        show: 'Friday Night SmackDown', matchType: 'Singles Match'
-      });
+      const [s1, s2, so1, so2, st] = sdMain[weekOffset % sdMain.length];
+      events.push({ id: `sd-${sdDateStr}-main`, wrestler1: s1, wrestler2: s2, odds1: so1, odds2: so2, title: st, venue: sv, date: new Date(fridayMs + 3 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Singles Match' });
+
+      const [sw1, sw2, swo1, swo2, swt] = sdWomens[weekOffset % sdWomens.length];
+      events.push({ id: `sd-${sdDateStr}-women`, wrestler1: sw1, wrestler2: sw2, odds1: swo1, odds2: swo2, title: swt, venue: sv, date: new Date(fridayMs + 2.5 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Singles Match' });
+
+      const [smd1, smd2, smdo1, smdo2, smdt] = sdMid[weekOffset % sdMid.length];
+      events.push({ id: `sd-${sdDateStr}-mid`, wrestler1: smd1, wrestler2: smd2, odds1: smdo1, odds2: smdo2, title: smdt, venue: sv, date: new Date(fridayMs + 2 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Singles Match' });
+
+      const [st1, st2, sto1, sto2, stt] = sdTag[weekOffset % sdTag.length];
+      events.push({ id: `sd-${sdDateStr}-tag`, wrestler1: st1, wrestler2: st2, odds1: sto1, odds2: sto2, title: stt, venue: sv, date: new Date(fridayMs + 1.5 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Tag Team Match' });
     }
 
     return events;
@@ -1475,10 +1504,6 @@ export class FreeSportsService {
     const upcomingEvents = wweEvents.filter(e => new Date(e.date) > now);
 
     return upcomingEvents.map(event => {
-      const drawOdds = event.matchType === 'Ladder Match'
-        ? parseFloat((4.00 + Math.random() * 3).toFixed(2))
-        : parseFloat((8.00 + Math.random() * 12).toFixed(2));
-
       return {
         id: `wwe_${event.id}`,
         sportId: WWE_SPORT_ID,
@@ -1498,7 +1523,6 @@ export class FreeSportsService {
         }],
         homeOdds: event.odds1,
         awayOdds: event.odds2,
-        drawOdds,
         venue: event.venue,
         eventTitle: event.title,
       } as SportEvent;
@@ -1573,7 +1597,6 @@ export class FreeSportsService {
     const upcomingFights = ufcFights.filter(f => new Date(f.date) > now);
 
     return upcomingFights.map(fight => {
-      const drawOdds = parseFloat((15 + Math.random() * 10).toFixed(2));
       return {
         id: `mma_gen_${fight.id}`,
         sportId: MMA_SPORT_ID,
@@ -1593,7 +1616,6 @@ export class FreeSportsService {
         }],
         homeOdds: fight.odds1,
         awayOdds: fight.odds2,
-        drawOdds,
         venue: fight.venue,
         eventTitle: fight.title,
       } as SportEvent;
