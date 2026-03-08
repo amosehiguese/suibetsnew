@@ -6,9 +6,10 @@ import { Transaction } from '@mysten/sui/transactions';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 const SUI_NETWORK = (import.meta.env.VITE_SUI_NETWORK as string) || 'mainnet';
-const SUI_PROVER_URLS = SUI_NETWORK === 'mainnet'
-  ? ['https://prover.mystenlabs.com/v1']
-  : ['https://prover-dev.mystenlabs.com/v1'];
+const SUI_PROVER_URLS = [
+  'https://prover-dev.mystenlabs.com/v1',
+  'https://prover.mystenlabs.com/v1',
+];
 
 const suiClient = new SuiClient({ url: getFullnodeUrl(SUI_NETWORK as any) });
 
