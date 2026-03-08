@@ -424,15 +424,25 @@ export default function SportPage() {
           }
         }
         
-        // For Tennis and other non-football sports, adapt the data structure but don't replace real API data
+        const NO_DRAW_SPORTS = new Set([2, 3, 5, 6, 7, 11, 17, 18, 19, 20, 24]);
+        if (NO_DRAW_SPORTS.has(sportId!)) {
+          filteredData = filteredData.map((event: any) => ({
+            ...event,
+            drawOdds: null,
+            markets: event.markets?.map((market: any) => ({
+              ...market,
+              outcomes: market.outcomes?.filter((o: any) => o.name !== 'Draw') || []
+            })) || []
+          }));
+        }
+
         if (sportId === 3) { // Tennis
           console.log(`Adapting ${filteredData.length} events for tennis`);
           
-          // Just modify market types and remove draw odds for tennis
           const adaptedEvents = filteredData.map((event: any) => {
             return {
               ...event,
-              drawOdds: null, // Tennis has no draws
+              drawOdds: null,
               // Convert any "Match Result" markets to "Match Winner" for tennis terminology
               markets: event.markets?.map((market: any) => {
                 if (market.name === "Match Result") {

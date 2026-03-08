@@ -1173,11 +1173,12 @@ function CompactEventCard({ event, favorites, toggleFavorite }: CompactEventCard
     }
   }, [event?.id, event?.homeTeam, event?.awayTeam, event?.sportId, event?.homeScore, event?.awayScore, event?.score, event?.isLive, minuteNum, isMarketClosed]);
   
+  const NO_DRAW_SPORTS = new Set([2, 3, 5, 6, 7, 11, 17, 18, 19, 20, 24]);
   const hasRealOdds = !!(event?.homeOdds !== null && event?.homeOdds !== undefined && event?.homeOdds > 0)
     || ((event as any).oddsSource === 'live-fallback');
   const odds = {
     home: event?.homeOdds || null,
-    draw: event?.drawOdds || null,
+    draw: NO_DRAW_SPORTS.has(event?.sportId) ? null : (event?.drawOdds || null),
     away: event?.awayOdds || null
   };
   
@@ -1539,12 +1540,14 @@ function EventCard({ event }: EventCardProps) {
   const isBettingClosed = isLiveMatch && matchMinute !== null && matchMinute >= 45;
 
   const getOddsFromMarkets = () => {
-    const defaultOdds = { home: 2.05, draw: 3.40, away: 3.00 };
+    const NO_DRAW_SPORTS = new Set([2, 3, 5, 6, 7, 11, 17, 18, 19, 20, 24]);
+    const sportHasDraws = !NO_DRAW_SPORTS.has(event.sportId);
+    const defaultOdds = { home: 2.05, draw: sportHasDraws ? 3.40 : null, away: 3.00 };
     
     if (!event.markets || event.markets.length === 0) {
       return { 
         home: event.homeOdds || defaultOdds.home, 
-        draw: event.drawOdds || defaultOdds.draw, 
+        draw: sportHasDraws ? (event.drawOdds || defaultOdds.draw) : null, 
         away: event.awayOdds || defaultOdds.away 
       };
     }
@@ -1552,11 +1555,11 @@ function EventCard({ event }: EventCardProps) {
     const matchWinner = event.markets.find(m => m.name === "Match Result" || m.name === "Match Winner");
     if (matchWinner && matchWinner.outcomes && matchWinner.outcomes.length > 0) {
       const homeOutcome = matchWinner.outcomes.find(o => o.name === event.homeTeam);
-      const drawOutcome = matchWinner.outcomes.find(o => o.name === "Draw");
+      const drawOutcome = sportHasDraws ? matchWinner.outcomes.find(o => o.name === "Draw") : null;
       const awayOutcome = matchWinner.outcomes.find(o => o.name === event.awayTeam);
       return {
         home: (homeOutcome?.odds && !isNaN(homeOutcome.odds)) ? homeOutcome.odds : defaultOdds.home,
-        draw: (drawOutcome?.odds && !isNaN(drawOutcome.odds)) ? drawOutcome.odds : defaultOdds.draw,
+        draw: sportHasDraws && drawOutcome?.odds && !isNaN(drawOutcome.odds) ? drawOutcome.odds : defaultOdds.draw,
         away: (awayOutcome?.odds && !isNaN(awayOutcome.odds)) ? awayOutcome.odds : defaultOdds.away
       };
     }

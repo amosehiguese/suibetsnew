@@ -325,7 +325,8 @@ export function AuthenticEventsDisplay({ sportId, sportName, selectedTab }: Auth
                   {(() => {
                     const homeOdds = (event as any).homeOdds || event.odds?.homeWin || event.odds?.home;
                     const awayOdds = (event as any).awayOdds || event.odds?.awayWin || event.odds?.away;
-                    const drawOdds = (event as any).drawOdds || event.odds?.draw;
+                    const NO_DRAW_SPORTS = new Set([2, 3, 5, 6, 7, 11, 17, 18, 19, 20, 24]);
+                    const drawOdds = NO_DRAW_SPORTS.has(sportId) ? null : ((event as any).drawOdds || event.odds?.draw);
                     if (!homeOdds && !awayOdds) return null;
                     const hasDraws = !!drawOdds;
                     return (
