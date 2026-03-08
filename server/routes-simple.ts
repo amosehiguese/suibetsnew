@@ -767,6 +767,82 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
     }
   });
 
+  app.post("/api/admin/settle-event", async (req: Request, res: Response) => {
+    try {
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.replace('Bearer ', '');
+      
+      if (!token || !isValidAdminSession(token)) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const { eventId, winnerId, winnerName } = req.body;
+      
+      if (!eventId) {
+        return res.status(400).json({ message: "Missing required field: eventId" });
+      }
+      if (!winnerId && !winnerName) {
+        return res.status(400).json({ message: "Must provide winnerId or winnerName" });
+      }
+      
+      const allBets = await storage.getAllBets('pending');
+      const eventBets = allBets.filter(b => 
+        b.eventId === eventId || 
+        b.externalEventId === eventId ||
+        String(b.eventId) === String(eventId)
+      );
+      
+      if (eventBets.length === 0) {
+        return res.json({ success: true, message: "No pending bets found for this event", settled: 0 });
+      }
+      
+      const results = [];
+      for (const bet of eventBets) {
+        try {
+          const selectedOutcome = (bet.selectedOutcome || bet.selection || '').trim().toLowerCase();
+          const winnerNorm = (winnerName || '').trim().toLowerCase();
+          const isWinner = winnerId 
+            ? (selectedOutcome === winnerId || bet.selectedOutcomeId === winnerId || selectedOutcome === winnerId.toLowerCase())
+            : (selectedOutcome === winnerNorm ||
+               (bet.homeTeam && bet.homeTeam.trim().toLowerCase() === winnerNorm && selectedOutcome.includes('home')) ||
+               (bet.awayTeam && bet.awayTeam.trim().toLowerCase() === winnerNorm && selectedOutcome.includes('away')) ||
+               (bet.homeTeam && bet.homeTeam.trim().toLowerCase() === winnerNorm && selectedOutcome === bet.homeTeam.trim().toLowerCase()) ||
+               (bet.awayTeam && bet.awayTeam.trim().toLowerCase() === winnerNorm && selectedOutcome === bet.awayTeam.trim().toLowerCase()));
+          
+          const outcome = isWinner ? 'won' : 'lost';
+          const statusUpdated = await storage.updateBetStatus(bet.id, outcome);
+          
+          if (statusUpdated) {
+            const currency = (bet.currency === 'SBETS' || bet.feeCurrency === 'SBETS') ? 'SBETS' : 'SUI';
+            const walletId = bet.walletAddress || String(bet.userId);
+            const stake = bet.stake || bet.betAmount || 0;
+            const potentialPayout = bet.potentialWin || bet.potentialPayout || 0;
+            
+            if (outcome === 'won') {
+              const profit = potentialPayout - stake;
+              const platformFee = profit > 0 ? profit * 0.01 : 0;
+              const netPayout = potentialPayout - platformFee;
+              await balanceService.addWinnings(walletId, netPayout, currency);
+              if (platformFee > 0) await balanceService.addRevenue(platformFee, currency);
+            } else {
+              await balanceService.addRevenue(stake, currency);
+            }
+            results.push({ betId: bet.id, outcome, selection: selectedOutcome });
+          }
+        } catch (err) {
+          results.push({ betId: bet.id, status: 'error', error: String(err) });
+        }
+      }
+      
+      const won = results.filter(r => r.outcome === 'won').length;
+      const lost = results.filter(r => r.outcome === 'lost').length;
+      console.log(`✅ ADMIN EVENT SETTLE: ${eventId} - ${won} won, ${lost} lost (winner: ${winnerName || winnerId})`);
+      res.json({ success: true, eventId, winner: winnerName || winnerId, settled: results.length, won, lost, results });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // API error statistics
   app.get("/api/admin/error-stats", async (req: Request, res: Response) => {
     try {
