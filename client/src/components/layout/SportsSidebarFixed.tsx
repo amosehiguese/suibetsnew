@@ -187,16 +187,24 @@ export default function SportsSidebarFixed() {
     autoReconnect: true
   });
 
-  // Calculate event counts by sport - FIXED
+  const { data: apiCounts = {} } = useQuery<Record<string, number>>({
+    queryKey: ['events', 'counts'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/events/counts', undefined, { timeout: 10000 });
+      if (!response.ok) return {};
+      return await response.json();
+    },
+    staleTime: 30000,
+    refetchInterval: 30000,
+  });
+
   useEffect(() => {
     const counts: Record<number, { live: number, upcoming: number }> = {};
     
-    // Initialize counts for all sports
     sports.forEach(sport => {
-      counts[sport.id] = { live: 0, upcoming: 0 };
+      counts[sport.id] = { live: 0, upcoming: apiCounts[String(sport.id)] || 0 };
     });
     
-    // Count live events by sportId
     if (Array.isArray(liveEvents)) {
       liveEvents.forEach(event => {
         if (event?.sportId && typeof event.sportId === 'number') {
@@ -208,21 +216,8 @@ export default function SportsSidebarFixed() {
       });
     }
     
-    // Count upcoming events by sportId
-    if (Array.isArray(upcomingEvents)) {
-      upcomingEvents.forEach(event => {
-        if (event?.sportId && typeof event.sportId === 'number') {
-          if (!counts[event.sportId]) {
-            counts[event.sportId] = { live: 0, upcoming: 0 };
-          }
-          counts[event.sportId].upcoming++;
-        }
-      });
-    }
-    
     setSportEventCounts(counts);
-    console.log("Updated sport event counts:", counts);
-  }, [liveEvents, upcomingEvents, sports]);
+  }, [liveEvents, apiCounts, sports]);
 
   const activeSports = useMemo(() => {
     return sports.filter(sport => sport.isActive !== false);

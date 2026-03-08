@@ -2502,6 +2502,37 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
     }
   });
 
+  app.get("/api/events/counts", async (req: Request, res: Response) => {
+    try {
+      const counts: Record<number, number> = {};
+      const seen = new Set<string>();
+      const now = Date.now();
+
+      const addEvent = (e: any) => {
+        if (e.startTime && new Date(e.startTime).getTime() <= now) return;
+        const key = String(e.id);
+        if (seen.has(key)) return;
+        seen.add(key);
+        counts[e.sportId] = (counts[e.sportId] || 0) + 1;
+      };
+
+      const freeSportsEvents = freeSportsService.getUpcomingEvents();
+      freeSportsEvents.forEach(addEvent);
+
+      const esportsEvents = esportsService.getUpcomingEvents();
+      esportsEvents.forEach(addEvent);
+
+      const snapshot = getUpcomingSnapshot();
+      if (snapshot.events.length > 0) {
+        snapshot.events.forEach(addEvent);
+      }
+
+      res.json(counts);
+    } catch (error) {
+      res.json({});
+    }
+  });
+
   app.get("/api/free-sports/events", async (req: Request, res: Response) => {
     try {
       const sportSlug = req.query.sport as string | undefined;

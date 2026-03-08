@@ -201,26 +201,18 @@ export default function CleanHome() {
   const { data: liveEvents = [], isLoading: liveLoading, refetch: refetchLive } = useLiveEvents(selectedSport);
   const { data: upcomingEvents = [], isLoading: upcomingLoading, refetch: refetchUpcoming } = useUpcomingEvents(selectedSport);
 
-  const { data: allUpcomingForCounts = [] } = useQuery<any[]>({
-    queryKey: ['events', 'upcoming', 'counts'],
+  const { data: sportEventCounts = {} } = useQuery<Record<number, number>>({
+    queryKey: ['events', 'counts'],
     queryFn: async () => {
-      const response = await fetch('/api/events?isLive=false', { credentials: 'include' });
-      if (!response.ok) throw new Error('Failed to fetch events for counts');
-      const data = await response.json();
-      return Array.isArray(data) ? data : [];
+      const response = await fetch('/api/events/counts', { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch counts');
+      return await response.json();
     },
-    staleTime: 60000,
+    staleTime: 30000,
     gcTime: 120000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
   });
-  const sportEventCounts = useMemo(() => {
-    const counts: Record<number, number> = {};
-    allUpcomingForCounts.forEach((e: any) => {
-      const sid = e.sportId;
-      if (sid) counts[sid] = (counts[sid] || 0) + 1;
-    });
-    return counts;
-  }, [allUpcomingForCounts]);
 
   const rawEvents = activeTab === "live" ? liveEvents : upcomingEvents;
   const isLoading = activeTab === "live" ? liveLoading : upcomingLoading;
