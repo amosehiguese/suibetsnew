@@ -375,6 +375,12 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
     });
   });
 
+  app.get("/api/config/public", (req: Request, res: Response) => {
+    res.json({
+      googleClientId: process.env.VITE_GOOGLE_CLIENT_ID || '',
+    });
+  });
+
   // Health check endpoint
   app.get("/api/health", async (req: Request, res: Response) => {
     const report = monitoringService.getHealthReport();

@@ -4,7 +4,7 @@ import { generateNonce, generateRandomness, jwtToAddress, getExtendedEphemeralPu
 import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
 import { Transaction } from '@mysten/sui/transactions';
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+let GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 const SUI_NETWORK = (import.meta.env.VITE_SUI_NETWORK as string) || 'mainnet';
 const SUI_PROVER_URLS = [
   'https://prover-dev.mystenlabs.com/v1',
@@ -109,6 +109,7 @@ export function ZkLoginProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<ZkLoginSession | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [runtimeClientId, setRuntimeClientId] = useState(GOOGLE_CLIENT_ID);
 
   useEffect(() => {
     const existingSession = loadSession();
@@ -116,6 +117,19 @@ export function ZkLoginProvider({ children }: { children: ReactNode }) {
       console.log('[zkLogin] Restored session for:', existingSession.address?.substring(0, 10));
       setSession(existingSession);
       setZkLoginAddress(existingSession.address);
+    }
+
+    if (!GOOGLE_CLIENT_ID) {
+      fetch('/api/config/public')
+        .then(res => res.json())
+        .then(data => {
+          if (data.googleClientId) {
+            GOOGLE_CLIENT_ID = data.googleClientId;
+            setRuntimeClientId(data.googleClientId);
+            console.log('[zkLogin] Loaded Google Client ID from server config');
+          }
+        })
+        .catch(() => {});
     }
   }, []);
 
@@ -357,7 +371,7 @@ export function ZkLoginProvider({ children }: { children: ReactNode }) {
         signAndExecuteZkLogin,
         logout,
         isSessionValid,
-        googleClientId: GOOGLE_CLIENT_ID,
+        googleClientId: runtimeClientId,
       }}
     >
       {children}
