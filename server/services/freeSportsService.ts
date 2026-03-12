@@ -851,8 +851,6 @@ export class FreeSportsService {
         date: '2026-03-20T20:00:00Z', league: 'DAZN Boxing'
       },
       {
-      },
-      {
         id: 'scotney-flores', fighter1: 'Ellie Scotney', fighter2: 'Mayelli Flores',
         record1: '10-0 (2 KOs)', record2: '18-2 (5 KOs)',
         odds1: 1.20, odds2: 4.00,
