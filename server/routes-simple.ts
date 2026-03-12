@@ -805,15 +805,23 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       const results = [];
       for (const bet of eventBets) {
         try {
-          const selectedOutcome = (bet.selectedOutcome || bet.selection || '').trim().toLowerCase();
+          const selectedOutcome = (bet.prediction || bet.selectedOutcome || bet.selection || '').trim().toLowerCase();
           const winnerNorm = (winnerName || '').trim().toLowerCase();
+          const homeNorm = (bet.homeTeam || '').trim().toLowerCase();
+          const awayNorm = (bet.awayTeam || '').trim().toLowerCase();
+          
+          if (!selectedOutcome) {
+            results.push({ betId: bet.id, status: 'skipped', reason: 'empty selection' });
+            continue;
+          }
+          
           const isWinner = winnerId 
             ? (selectedOutcome === winnerId || bet.selectedOutcomeId === winnerId || selectedOutcome === winnerId.toLowerCase())
             : (selectedOutcome === winnerNorm ||
-               (bet.homeTeam && bet.homeTeam.trim().toLowerCase() === winnerNorm && selectedOutcome.includes('home')) ||
-               (bet.awayTeam && bet.awayTeam.trim().toLowerCase() === winnerNorm && selectedOutcome.includes('away')) ||
-               (bet.homeTeam && bet.homeTeam.trim().toLowerCase() === winnerNorm && selectedOutcome === bet.homeTeam.trim().toLowerCase()) ||
-               (bet.awayTeam && bet.awayTeam.trim().toLowerCase() === winnerNorm && selectedOutcome === bet.awayTeam.trim().toLowerCase()));
+               (homeNorm && homeNorm === winnerNorm && (selectedOutcome.includes('home') || selectedOutcome === homeNorm)) ||
+               (awayNorm && awayNorm === winnerNorm && (selectedOutcome.includes('away') || selectedOutcome === awayNorm)) ||
+               (homeNorm && selectedOutcome === homeNorm && homeNorm === winnerNorm) ||
+               (awayNorm && selectedOutcome === awayNorm && awayNorm === winnerNorm));
           
           const outcome = isWinner ? 'won' : 'lost';
           const statusUpdated = await storage.updateBetStatus(bet.id, outcome);
@@ -824,14 +832,20 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
             const stake = bet.stake || bet.betAmount || 0;
             const potentialPayout = bet.potentialWin || bet.potentialPayout || 0;
             
-            if (outcome === 'won') {
-              const profit = potentialPayout - stake;
-              const platformFee = profit > 0 ? profit * 0.01 : 0;
-              const netPayout = potentialPayout - platformFee;
-              await balanceService.addWinnings(walletId, netPayout, currency);
-              if (platformFee > 0) await balanceService.addRevenue(platformFee, currency);
-            } else {
-              await balanceService.addRevenue(stake, currency);
+            try {
+              if (outcome === 'won') {
+                const profit = potentialPayout - stake;
+                const platformFee = profit > 0 ? profit * 0.01 : 0;
+                const netPayout = potentialPayout - platformFee;
+                await balanceService.addWinnings(walletId, netPayout, currency);
+                if (platformFee > 0) await balanceService.addRevenue(platformFee, currency);
+              } else {
+                await balanceService.addRevenue(stake, currency);
+              }
+            } catch (balanceErr) {
+              await storage.updateBetStatus(bet.id, 'pending');
+              results.push({ betId: bet.id, status: 'error', error: `Balance update failed, reverted to pending: ${balanceErr}` });
+              continue;
             }
             results.push({ betId: bet.id, outcome, selection: selectedOutcome });
           }

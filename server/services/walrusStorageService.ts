@@ -1,7 +1,16 @@
 import { createHash } from 'crypto';
 
-const WALRUS_PUBLISHER = 'https://publisher.walrus-mainnet.walrus.space/v1/blobs';
-const WALRUS_AGGREGATOR = 'https://aggregator.walrus-mainnet.walrus.space/v1/blobs';
+const WALRUS_PUBLISHERS = [
+  'https://publisher.walrus-mainnet.walrus.space/v1/blobs',
+  'https://walrus-publisher.staketab.org/v1/blobs',
+  'https://publisher.walrus.space/v1/blobs',
+  'https://walrus-publisher-mainnet.nodes.guru/v1/blobs',
+];
+const WALRUS_AGGREGATORS = [
+  'https://aggregator.walrus-mainnet.walrus.space/v1/blobs',
+  'https://walrus-aggregator.staketab.org/v1/blobs',
+  'https://aggregator.walrus.space/v1/blobs',
+];
 const STORE_EPOCHS = 5;
 
 interface BetReceiptData {
@@ -63,43 +72,41 @@ function extractBlobId(result: any): string | null {
   return null;
 }
 
-async function storeViaHttpOnce(receiptJson: string): Promise<{ blobId: string } | null> {
-  const url = `${WALRUS_PUBLISHER}?epochs=${STORE_EPOCHS}&send=true`;
-  const response = await fetch(url, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/octet-stream' },
-    body: receiptJson,
-    signal: AbortSignal.timeout(30000),
-  });
+async function tryPublisher(publisherUrl: string, receiptJson: string): Promise<{ blobId: string; publisher: string } | null> {
+  try {
+    const url = `${publisherUrl}?epochs=${STORE_EPOCHS}&send=true`;
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: receiptJson,
+      signal: AbortSignal.timeout(20000),
+    });
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    console.warn(`[Walrus HTTP] Publisher returned ${response.status}: ${text.slice(0, 200)}`);
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      console.warn(`[Walrus] Publisher ${publisherUrl} returned ${response.status}: ${text.slice(0, 200)}`);
+      return null;
+    }
+
+    const result = await response.json();
+    const blobId = extractBlobId(result);
+
+    if (blobId) {
+      return { blobId, publisher: publisherUrl };
+    }
+
+    console.warn(`[Walrus] No blobId from ${publisherUrl}:`, JSON.stringify(result).slice(0, 300));
+    return null;
+  } catch (err: any) {
+    console.warn(`[Walrus] Publisher ${publisherUrl} failed: ${err.message}`);
     return null;
   }
-
-  const result = await response.json();
-  const blobId = extractBlobId(result);
-
-  if (blobId) {
-    return { blobId };
-  }
-
-  console.warn(`[Walrus HTTP] No blobId in response:`, JSON.stringify(result).slice(0, 300));
-  return null;
 }
 
-async function storeViaHttp(receiptJson: string, retries = 2): Promise<{ blobId: string } | null> {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const result = await storeViaHttpOnce(receiptJson);
-      if (result) return result;
-    } catch (err: any) {
-      console.warn(`[Walrus HTTP] Attempt ${attempt + 1} failed: ${err.message}`);
-    }
-    if (attempt < retries) {
-      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-    }
+async function storeViaHttp(receiptJson: string): Promise<{ blobId: string; publisher: string } | null> {
+  for (const publisherUrl of WALRUS_PUBLISHERS) {
+    const result = await tryPublisher(publisherUrl, receiptJson);
+    if (result) return result;
   }
   return null;
 }
@@ -111,35 +118,37 @@ export async function storeBetReceipt(data: BetReceiptData): Promise<WalrusStore
   const result = await storeViaHttp(receiptJson);
 
   if (result) {
-    console.log(`🐋 Walrus MAINNET receipt stored via HTTP: ${result.blobId}`);
-    return { blobId: result.blobId, receiptJson, receiptHash, publisherUsed: 'walrus-http-mainnet' };
+    console.log(`🐋 Walrus MAINNET receipt stored: ${result.blobId} (via ${result.publisher})`);
+    return { blobId: result.blobId, receiptJson, receiptHash, publisherUsed: result.publisher };
   }
 
-  console.warn(`[Walrus] HTTP store failed — receipt stored locally (hash: ${receiptHash})`);
-  return { blobId: null, receiptJson, receiptHash, error: 'Walrus HTTP store failed' };
+  console.warn(`[Walrus] All publishers failed — receipt stored locally (hash: ${receiptHash})`);
+  return { blobId: null, receiptJson, receiptHash, error: 'All Walrus publishers unreachable' };
 }
 
 export async function getBetReceipt(blobId: string): Promise<any | null> {
-  try {
-    const response = await fetch(`${WALRUS_AGGREGATOR}/${blobId}`, {
-      signal: AbortSignal.timeout(10000),
-    });
-
-    if (!response.ok) return null;
-
-    const text = await response.text();
+  for (const aggregatorBase of WALRUS_AGGREGATORS) {
     try {
-      return JSON.parse(text);
-    } catch {
-      return { raw: text, format: 'text' };
+      const response = await fetch(`${aggregatorBase}/${blobId}`, {
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!response.ok) continue;
+
+      const text = await response.text();
+      try {
+        return JSON.parse(text);
+      } catch {
+        return { raw: text, format: 'text' };
+      }
+    } catch (err: any) {
+      console.warn(`[Walrus] Aggregator ${aggregatorBase} failed for ${blobId}: ${err.message}`);
     }
-  } catch (err: any) {
-    console.warn(`[Walrus] Fetch failed for ${blobId}: ${err.message}`);
   }
 
   return null;
 }
 
 export function getWalrusAggregatorUrl(blobId: string): string {
-  return `${WALRUS_AGGREGATOR}/${blobId}`;
+  return `${WALRUS_AGGREGATORS[0]}/${blobId}`;
 }

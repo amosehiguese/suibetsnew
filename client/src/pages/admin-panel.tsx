@@ -122,6 +122,10 @@ export default function AdminPanel() {
   const [loadingChallenges, setLoadingChallenges] = useState(false);
   const [resolvingPrediction, setResolvingPrediction] = useState<number | null>(null);
   const [cancellingPrediction, setCancellingPrediction] = useState<number | null>(null);
+  const [settleEventId, setSettleEventId] = useState('');
+  const [settleWinnerName, setSettleWinnerName] = useState('');
+  const [settlingEvent, setSettlingEvent] = useState(false);
+  const [settleEventResult, setSettleEventResult] = useState<any>(null);
 
   const isAdminWallet = currentAccount?.address?.toLowerCase() === ADMIN_WALLET.toLowerCase();
 
@@ -825,6 +829,41 @@ export default function AdminPanel() {
     }
   };
 
+  const settleEvent = async () => {
+    if (!settleEventId.trim()) {
+      toast({ title: 'Missing Event ID', description: 'Please enter an event ID to settle', variant: 'destructive' });
+      return;
+    }
+    if (!settleWinnerName.trim()) {
+      toast({ title: 'Missing Winner', description: 'Please enter the winner name', variant: 'destructive' });
+      return;
+    }
+    setSettlingEvent(true);
+    setSettleEventResult(null);
+    try {
+      const response = await fetch('/api/admin/settle-event', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${getToken()}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ eventId: settleEventId.trim(), winnerName: settleWinnerName.trim() })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setSettleEventResult(data);
+        toast({ title: 'Event Settled', description: `${data.settled} bets settled (${data.won} won, ${data.lost} lost)` });
+        fetchBets();
+      } else {
+        toast({ title: 'Settlement Failed', description: data.message || 'Unknown error', variant: 'destructive' });
+      }
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message || 'Failed to settle event', variant: 'destructive' });
+    } finally {
+      setSettlingEvent(false);
+    }
+  };
+
   const resetOnChainLiability = async (currency: 'SUI' | 'SBETS') => {
     setResettingLiability(true);
     setResetLiabilityResult(null);
@@ -1340,6 +1379,79 @@ export default function AdminPanel() {
                           <p className="text-xs text-gray-500 mt-1">{voidResult.errors.slice(0, 3).join('; ')}</p>
                         </div>
                       )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Manual Event Settlement */}
+                <div className="border-t border-cyan-500/20 pt-6 mt-6" data-testid="section-settle-event">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-green-400" />
+                    Manual Event Settlement
+                  </h3>
+                  <p className="text-gray-400 text-sm mb-4">
+                    Settle all pending bets for a specific event. Use for generated sports (WWE, F1, MotoGP, Boxing, Tennis, Horse Racing, Cricket) 
+                    that require manual settlement after results are known.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label className="text-sm text-gray-400 mb-1 block">Event ID</label>
+                      <Input
+                        value={settleEventId}
+                        onChange={(e) => setSettleEventId(e.target.value)}
+                        placeholder="e.g. wwe_1234 or f1_2026_australia"
+                        className="bg-black/40 border-gray-700 text-white"
+                        data-testid="input-settle-event-id"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-400 mb-1 block">Winner Name</label>
+                      <Input
+                        value={settleWinnerName}
+                        onChange={(e) => setSettleWinnerName(e.target.value)}
+                        placeholder="e.g. Max Verstappen or Cody Rhodes"
+                        className="bg-black/40 border-gray-700 text-white"
+                        data-testid="input-settle-winner-name"
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    onClick={settleEvent}
+                    disabled={settlingEvent || !settleEventId.trim() || !settleWinnerName.trim()}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    data-testid="button-settle-event"
+                  >
+                    {settlingEvent ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Settling...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Settle Event
+                      </>
+                    )}
+                  </Button>
+                  {settleEventResult && (
+                    <div className="mt-4 p-4 rounded-lg bg-green-500/10 border border-green-500/30">
+                      <p className="text-sm font-medium text-green-400">
+                        Settled {settleEventResult.settled} bets for event {settleEventResult.eventId}
+                      </p>
+                      <div className="mt-2 grid grid-cols-3 gap-3">
+                        <div className="bg-black/40 rounded p-2">
+                          <p className="text-xs text-gray-500">Winner</p>
+                          <p className="text-sm font-bold text-white" data-testid="text-settle-winner">{settleEventResult.winner}</p>
+                        </div>
+                        <div className="bg-black/40 rounded p-2">
+                          <p className="text-xs text-gray-500">Won</p>
+                          <p className="text-lg font-bold text-green-400" data-testid="text-settle-won">{settleEventResult.won}</p>
+                        </div>
+                        <div className="bg-black/40 rounded p-2">
+                          <p className="text-xs text-gray-500">Lost</p>
+                          <p className="text-lg font-bold text-red-400" data-testid="text-settle-lost">{settleEventResult.lost}</p>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
