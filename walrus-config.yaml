@@ -1,0 +1,22 @@
+system_object: "0x77cb5bfab2a14024ca68509cb08fd26cd07dd8df2b4e0ba3afc3b82b8c3e7777"
+staking_object: "0x37c0e4d7b36a2f64d51bba262a1791f844cfd88f31379f1b7c04244061d43914"
+exchange_objects:
+  - "0x0e60a946a527902c90bbc71240435728cd6dc26b9e8debc69f09b71671c3029b"
+
+communication_config:
+  max_concurrent_writes: 5
+  max_concurrent_sliver_reads: 5
+  max_concurrent_metadata_reads: 5
+  max_data_in_flight: 524288000
+  reqwest_config:
+    total_timeout:
+      secs: 120
+      nanos: 0
+    pool_idle_timeout: null
+    http2_keep_alive_timeout:
+      secs: 5
+      nanos: 0
+    http2_keep_alive_interval:
+      secs: 30
+      nanos: 0
+    http2_keep_alive_while_idle: true

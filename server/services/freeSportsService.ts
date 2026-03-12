@@ -892,13 +892,6 @@ export class FreeSportsService {
         title: 'WBC Super Lightweight Title', venue: 'Sheffield Arena, Sheffield',
         date: '2026-06-06T20:00:00Z', league: 'DAZN Boxing'
       },
-      {
-        id: 'mayweather-pacquiao2', fighter1: 'Floyd Mayweather', fighter2: 'Manny Pacquiao',
-        record1: '50-0 (27 KOs)', record2: '62-8-2 (39 KOs)',
-        odds1: 1.55, odds2: 2.40,
-        title: 'Exhibition Bout', venue: 'The Sphere, Las Vegas',
-        date: '2026-09-19T21:00:00Z', league: 'Netflix Boxing PPV'
-      },
     ];
 
     const now = new Date();

@@ -1,0 +1,10 @@
+package: 0x26eb7ee8688da02c5f671679524e379f0b837a12f1d1d799f255b7eea260ad27
+staking_object: 0x10b9d30c28448939ce6c4d6c6e0ffce4a7f8a4ada8248bdad09ef8b70e4a3904
+general:
+   wallet_env: mainnet
+   walrus_context: mainnet
+   walrus_binary: /home/runner/.local/bin/walrus
+   walrus_config: /home/runner/.config/walrus/client_config.yaml
+   wallet: /home/runner/.sui/sui_config/client.yaml
+   rpc_url: https://fullnode.mainnet.sui.io:443
+   gas_budget: 500000000

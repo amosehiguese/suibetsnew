@@ -29,11 +29,17 @@ const allowedOrigins = [
   'https://suibets-production.up.railway.app',
   'https://suibets.io',
   'https://www.suibets.io',
+  'https://www.suibets.com',
+  'https://suibets.com',
   'http://localhost:5000',
   'http://localhost:5173',
 ].filter(Boolean) as string[];
 
-// Railway dynamic domain patterns
+const walrusDomainPatterns = [
+  /^https:\/\/.*\.walrus\.site$/,
+  /^https:\/\/.*\.wal\.app$/,
+];
+
 const railwayDomainPatterns = [
   /^https:\/\/.*\.up\.railway\.app$/,
   /^https:\/\/.*\.railway\.app$/,
@@ -59,10 +65,10 @@ app.use(cors({
       origin === allowed || origin.startsWith(allowed)
     );
     
-    // Also allow any Railway domain
     const isRailwayDomain = railwayDomainPatterns.some(pattern => pattern.test(origin));
+    const isWalrusDomain = walrusDomainPatterns.some(pattern => pattern.test(origin));
     
-    if (isAllowed || isRailwayDomain) {
+    if (isAllowed || isRailwayDomain || isWalrusDomain) {
       return callback(null, true);
     }
     

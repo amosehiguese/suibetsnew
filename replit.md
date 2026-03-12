@@ -73,5 +73,9 @@ Preferred communication style: Simple, everyday language.
 ### Infrastructure
 - **PostgreSQL**: Primary database.
 - **WebSocket**: Real-time communication.
-- **Railway**: Hosting for PostgreSQL and deployment.
+- **Railway**: Hosting for PostgreSQL and backend deployment.
+- **Walrus Sites**: Frontend deployed to Walrus decentralized storage (mainnet). Site Object ID: `0x222038af8d8af92796691f4d0f31ea5e460622f16e8ec484faf1473144a8bd07`. Base36: `umba2e2onuq889migay8x468pfnz4y95pbtxbywjvxysgr75z`. Requires SuiNS name pointed at the site object to browse via `wal.app` portal (e.g., `suibets.wal.app`). Built with `VITE_API_BASE_URL=https://www.suibets.com` so frontend API calls route to the Railway backend. Site-builder config: `walrus-sites-config.yaml`. Walrus CLI config: `~/.config/walrus/client_config.yaml`. To update: `VITE_API_BASE_URL=https://www.suibets.com npx vite build && site-builder --config walrus-sites-config.yaml update --epochs 5 <SITE_OBJECT_ID> dist/public`.
 - **Vercel**: Alternative for serverless functions and static assets.
+- **API Base URL**: Frontend uses `VITE_API_BASE_URL` env var (empty in dev for same-origin, set to `https://www.suibets.com` for Walrus Sites build). A global fetch interceptor in `queryClient.ts` prefixes all `/api/` calls with this base URL.
+- **CORS**: Backend allows Walrus Sites domains (`*.walrus.site`, `*.wal.app`), Railway domains, and `suibets.com`/`suibets.io`.
+- **Runtime Config**: GET `/api/config/public` serves Google Client ID at runtime (for Railway/Walrus deployments where build-time env vars may not be set).

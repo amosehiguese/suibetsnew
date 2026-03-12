@@ -1,5 +1,17 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+
+if (API_BASE) {
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+    if (typeof input === 'string' && input.startsWith('/api/')) {
+      return originalFetch(`${API_BASE}${input}`, init);
+    }
+    return originalFetch(input, init);
+  };
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     let errorMessage = res.statusText;
@@ -104,7 +116,6 @@ export async function apiRequest(
           headers["Cache-Control"] = "no-cache, no-store";
         }
         
-        // Make the fetch request with proper options
         const res = await fetch(url, {
           method,
           headers,
