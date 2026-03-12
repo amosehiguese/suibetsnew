@@ -399,9 +399,11 @@ export class FreeSportsService {
       if (wweEvents.length > 0) {
         allEvents.push(...wweEvents);
         console.log(`[FreeSports] 🎭 WWE Entertainment: ${wweEvents.length} upcoming events generated`);
+      } else {
+        console.log(`[FreeSports] 🎭 WWE Entertainment: 0 events returned from generator`);
       }
     } catch (error: any) {
-      console.error(`[FreeSports] WWE generation error:`, error.message);
+      console.error(`[FreeSports] WWE generation error:`, error.message, error.stack);
     }
 
     try {
