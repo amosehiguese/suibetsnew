@@ -31,6 +31,8 @@ const allowedOrigins = [
   'https://www.suibets.io',
   'https://www.suibets.com',
   'https://suibets.com',
+  'https://suibets.wal.app',
+  'https://suibets.walrus.site',
   'http://localhost:5000',
   'http://localhost:5173',
 ].filter(Boolean) as string[];
