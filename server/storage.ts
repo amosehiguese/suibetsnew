@@ -243,8 +243,50 @@ export class DatabaseStorage implements IStorage {
       if (typeof betId === 'number') {
         [bet] = await db.select().from(bets).where(eq(bets.id, betId));
       } else {
-        // String ID - search by wurlusBetId field
-        [bet] = await db.select().from(bets).where(eq(bets.wurlusBetId, betId));
+        const results = await db.select().from(bets).where(eq(bets.wurlusBetId, betId));
+        bet = results[0];
+        if (!bet && /^\d+$/.test(betId)) {
+          const numResults = await db.execute(sql`SELECT * FROM bets WHERE id = ${parseInt(betId, 10)} LIMIT 1`);
+          const rows = Array.isArray(numResults) ? numResults : (numResults.rows || []);
+          if (rows[0]) {
+            const r = rows[0] as any;
+            bet = {
+              id: r.id,
+              userId: r.user_id,
+              walletAddress: r.wallet_address,
+              eventId: r.event_id,
+              marketId: r.market_id,
+              outcomeId: r.outcome_id,
+              betAmount: r.bet_amount,
+              odds: r.odds,
+              potentialPayout: r.potential_payout,
+              status: r.status,
+              prediction: r.prediction,
+              txHash: r.tx_hash,
+              createdAt: r.created_at,
+              settledAt: r.settled_at,
+              payout: r.payout,
+              currency: r.currency,
+              feeCurrency: r.fee_currency,
+              platformFee: r.platform_fee,
+              networkFee: r.network_fee,
+              externalEventId: r.external_event_id,
+              eventName: r.event_name,
+              homeTeam: r.home_team,
+              awayTeam: r.away_team,
+              betType: r.bet_type,
+              wurlusBetId: r.wurlus_bet_id,
+              betObjectId: r.bet_object_id,
+              onChainBetId: r.on_chain_bet_id,
+              settlementTxHash: r.settlement_tx_hash,
+              winningsWithdrawn: r.winnings_withdrawn,
+              walrusBlobId: r.walrus_blob_id,
+              walrusReceiptData: r.walrus_receipt_data,
+              giftedTo: r.gifted_to,
+              giftedFrom: r.gifted_from,
+            };
+          }
+        }
       }
       
       if (!bet) return undefined;
@@ -545,14 +587,15 @@ export class DatabaseStorage implements IStorage {
       const settledAt = (status === 'won' || status === 'lost' || status === 'cashed_out' || status === 'void') 
         ? new Date().toISOString() : null;
       
+      const isNumericBetId = /^\d+$/.test(betId);
       if (isRollback) {
-        // ROLLBACK PATH: Allow reverting from any terminal state back to pending
-        // This is used when payout fails after status was already updated
         const rollbackResult = await db.execute(sql`
           UPDATE bets 
           SET status = 'pending',
               settled_at = NULL
-          WHERE wurlus_bet_id = ${betId}
+          WHERE (wurlus_bet_id = ${betId}
+                 OR (${isNumericBetId ? sql`id = ${parseInt(betId, 10)}` : sql`FALSE`})
+                 OR bet_object_id = ${betId})
             AND status IN ('won', 'lost', 'void', 'cashed_out')
           RETURNING id
         `);
@@ -569,9 +612,7 @@ export class DatabaseStorage implements IStorage {
         return true;
       }
       
-      // NORMAL SETTLEMENT PATH: Only allow transitions from settable states
-      // Support both wurlus_bet_id lookup AND numeric id lookup for legacy bets
-      const isNumericId = /^\d+$/.test(betId);
+      const isNumericId = isNumericBetId;
       const result = await db.execute(sql`
         WITH old_bet AS (
           SELECT id, status as old_status 
