@@ -2545,10 +2545,10 @@ export class FreeSportsService {
     };
   }
 
-  /**
-   * Look up a specific event by ID for validation
-   * Returns event data including startTime for betting cutoff enforcement
-   */
+  getCachedEvents(): SportEvent[] {
+    return cachedFreeSportsEvents;
+  }
+
   lookupEvent(eventId: string): { found: boolean; event?: SportEvent; shouldBeLive: boolean } {
     const event = cachedFreeSportsEvents.find(e => String(e.id) === String(eventId));
     if (!event) {
