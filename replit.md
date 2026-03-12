@@ -36,7 +36,7 @@ Preferred communication style: Simple, everyday language.
 - **Social Network Effect Engine ("Predict Anything")**: Standalone /network page with custom prediction markets, viral challenges, public profiles, live chat, follow system, and leaderboard integration. Features on-chain prediction bets and challenge stakes, atomic pool updates, and automated resolution/settlement with anti-exploit security.
 - **Live Streaming Section**: Proxies `streamed.pk` API for live and upcoming football matches with embedded playback.
 - **zkLogin (Google OAuth)**: Full Sui zkLogin implementation for seedless wallet login via Google, integrated with on-chain betting.
-- **Walrus Decentralized Storage**: Stores bet receipts on Walrus Protocol (mainnet) via HTTP PUT to `publisher.walrus-mainnet.walrus.space/v1/blobs`. Service: `server/services/walrusStorageService.ts`. Aggregator: `aggregator.walrus-mainnet.walrus.space`. Each bet receipt gets a Walrus blob ID stored in `bets.walrus_blob_id`. Receipt JSON cached in `bets.walrus_receipt_data`. Frontend shows "Verify on Walrus" link in both bet history page and sidebar. Non-blocking: if Walrus upload fails, bet still works with local receipt hash fallback.
+- **Walrus Decentralized Storage**: Stores bet receipts on Walrus Protocol (mainnet) with multi-publisher fallback (publisher.walrus-mainnet.walrus.space, walrus-publisher.nodes.guru, publisher.walrus.space). Service: `server/services/walrusStorageService.ts`. Aggregators: aggregator.walrus-mainnet.walrus.space, aggregator.walrus.space. Receipt format v2.0 includes SuiBets branding (colors, logo, website links), bet details, blockchain info, and SHA-256 verification hash. Each bet receipt gets a Walrus blob ID stored in `bets.walrus_blob_id`. Receipt JSON cached in `bets.walrus_receipt_data`. Frontend shows "Verify on Walrus" link. Receipt viewer at `/api/walrus/receipt/:blobId` serves branded HTML page (XSS-safe) or JSON with `?json=true`. DNS for Walrus publishers doesn't resolve from Replit — works on Railway (production). Non-blocking: if all publishers fail, bet uses `local_<hash>` fallback.
 - **SuiNS Integration**: Resolves wallet addresses to `.sui` domain names for enhanced UI.
 
 ### Architecture Model
@@ -65,7 +65,7 @@ Preferred communication style: Simple, everyday language.
 - **Welcome Bonus**: 1,000 SBETS for new users.
 - **Referral System**: 1,000 SBETS reward per qualified referral.
 - **Loyalty Program**: Tier-based system with points earned per wager.
-- **SBETS Staking**: 1-Week and 3-Month lock plans with APY, daily reward withdrawals, and hourly accrual.
+- **SBETS Staking**: 1-Week and 3-Month lock plans with APY, daily reward withdrawals, and hourly accrual. Force unstake and claim-rewards have atomic deactivation-before-credit with rollback on failure to prevent fund loss or double-pay.
 
 ### Payment Integration
 - **Stripe**: Optional fiat payment processing.

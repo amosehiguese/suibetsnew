@@ -1808,13 +1808,30 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       const totalRewards = Math.max(liveRewards, stake.accumulatedRewards || 0);
       const payoutAmount = Math.floor(principal + totalRewards);
 
-      await db.update(wurlusStaking)
+      const walletAddr = (stake.walletAddress || '').trim();
+      if (!walletAddr) {
+        return res.status(400).json({ success: false, message: "Stake has no wallet address" });
+      }
+
+      const deactivateResult = await db.update(wurlusStaking)
         .set({ isActive: false, unstakingDate: new Date(), accumulatedRewards: Math.floor(totalRewards) })
-        .where(eq(wurlusStaking.id, stakeId));
+        .where(and(eq(wurlusStaking.id, stakeId), eq(wurlusStaking.isActive, true)));
 
-      await storage.updateUserBalance(stake.walletAddress!, 0, payoutAmount);
+      const deactivatedRows = Array.isArray(deactivateResult) ? deactivateResult.length : ((deactivateResult as any)?.rowCount ?? (deactivateResult as any)?.rows?.length ?? 1);
+      if (deactivatedRows === 0) {
+        return res.status(409).json({ success: false, message: "Stake already deactivated (concurrent request)" });
+      }
 
-      console.log(`[Admin] Force unstaked ID ${stakeId}: ${principal} + ${Math.floor(totalRewards)} rewards = ${payoutAmount} SBETS to ${stake.walletAddress?.slice(0, 10)}`);
+      const creditSuccess = await storage.updateUserBalance(walletAddr, 0, payoutAmount);
+      if (!creditSuccess) {
+        await db.update(wurlusStaking)
+          .set({ isActive: true, unstakingDate: null })
+          .where(eq(wurlusStaking.id, stakeId));
+        console.error(`[Admin] Force unstake FAILED: could not credit ${payoutAmount} SBETS to ${walletAddr.slice(0, 10)}... — stake reactivated`);
+        return res.status(500).json({ success: false, message: `Failed to credit SBETS. Stake has been preserved.` });
+      }
+
+      console.log(`[Admin] Force unstaked ID ${stakeId}: ${principal} + ${Math.floor(totalRewards)} rewards = ${payoutAmount} SBETS to ${walletAddr.slice(0, 10)}`);
       
       res.json({ 
         success: true, 
@@ -6514,7 +6531,6 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         maxAnnualReward
       });
       
-      // Atomically mark as inactive - double-check isActive to prevent race conditions
       const updateResult = await db.update(wurlusStaking)
         .set({ 
           isActive: false, 
@@ -6523,13 +6539,25 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         })
         .where(and(
           eq(wurlusStaking.id, stakeId),
-          eq(wurlusStaking.isActive, true) // Ensures atomicity
+          eq(wurlusStaking.isActive, true)
         ));
+      
+      const updatedRows = Array.isArray(updateResult) ? updateResult.length : ((updateResult as any)?.rowCount ?? (updateResult as any)?.rows?.length ?? 1);
+      if (updatedRows === 0) {
+        return res.status(409).json({ error: 'Stake already processed by a concurrent request' });
+      }
       
       const totalReturn = principal + totalRewards;
       const payoutAmount = Math.floor(totalReturn);
       
-      await storage.updateUserBalance(walletAddress, 0, payoutAmount);
+      const creditSuccess = await storage.updateUserBalance(walletAddress, 0, payoutAmount);
+      if (!creditSuccess) {
+        await db.update(wurlusStaking)
+          .set({ isActive: true, unstakingDate: null })
+          .where(eq(wurlusStaking.id, stakeId));
+        console.error(`[STAKING] ❌ CRITICAL: Failed to credit ${payoutAmount} SBETS to ${walletAddress.slice(0, 10)}... — stake reactivated`);
+        return res.status(500).json({ error: 'Failed to credit SBETS to your balance. Stake has been preserved. Please try again.' });
+      }
       console.log(`[STAKING] ✅ User ${walletAddress.slice(0, 10)}... unstaked ${stake.amountStaked?.toLocaleString()} SBETS + ${Math.floor(totalRewards).toLocaleString()} rewards = ${payoutAmount.toLocaleString()} SBETS - ADDED to DB balance`);
       
       res.json({ 
@@ -6603,17 +6631,6 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         });
         
         totalClaimed += totalRewards;
-        
-        // Reset staking date and rewards atomically
-        await db.update(wurlusStaking)
-          .set({ 
-            accumulatedRewards: 0,
-            stakingDate: claimTimestamp
-          })
-          .where(and(
-            eq(wurlusStaking.id, stake.id),
-            eq(wurlusStaking.isActive, true)
-          ));
       }
       
       console.log(`[STAKING] Claim calculation for ${walletAddress.slice(0, 10)}:`, JSON.stringify(claimDetails));
@@ -6657,8 +6674,18 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       }
       
       if (!onChainSuccess) {
-        await storage.updateUserBalance(walletAddress, 0, claimAmount);
+        const creditOk = await storage.updateUserBalance(walletAddress, 0, claimAmount);
+        if (!creditOk) {
+          console.error(`[STAKING] ❌ CRITICAL: Failed to credit ${claimAmount} SBETS rewards to ${walletAddress.slice(0, 10)}... — rewards NOT reset`);
+          return res.status(500).json({ error: 'Failed to credit rewards to your balance. Please try again.' });
+        }
         console.log(`[STAKING] ✅ User ${walletAddress.slice(0, 10)}... claimed ${claimAmount.toLocaleString()} SBETS rewards - ADDED to DB balance (on-chain unavailable)`);
+      }
+      
+      for (const detail of claimDetails) {
+        await db.update(wurlusStaking)
+          .set({ accumulatedRewards: 0, stakingDate: claimTimestamp })
+          .where(and(eq(wurlusStaking.id, detail.stakeId), eq(wurlusStaking.isActive, true)));
       }
       
       res.json({ 
@@ -7664,6 +7691,9 @@ setTimeout(function(){l.classList.add('h');},6000);
         return res.status(400).json({ message: "Missing blobId" });
       }
 
+      let receipt: any = null;
+      let source = 'walrus';
+
       if (blobId.startsWith('local_')) {
         const { bets: betsTable } = await import('@shared/schema');
         const { db: receiptDb } = await import('./db');
@@ -7673,18 +7703,103 @@ setTimeout(function(){l.classList.add('h');},6000);
           .where(receiptEq(betsTable.walrusBlobId, blobId))
           .limit(1);
         if (rows.length > 0 && rows[0].walrusReceiptData) {
-          const receipt = JSON.parse(rows[0].walrusReceiptData);
-          return res.json({ receipt, source: 'local', verified: true });
+          receipt = JSON.parse(rows[0].walrusReceiptData);
+          source = 'local';
         }
+      } else {
+        const { getBetReceipt, getWalrusAggregatorUrl } = await import('./services/walrusStorageService');
+        receipt = await getBetReceipt(blobId);
+      }
+
+      if (!receipt) {
         return res.status(404).json({ message: "Receipt not found" });
       }
 
-      const { getBetReceipt, getWalrusAggregatorUrl } = await import('./services/walrusStorageService');
-      const receipt = await getBetReceipt(blobId);
-      if (!receipt) {
-        return res.status(404).json({ message: "Receipt not found on Walrus" });
+      if (req.accepts('html') && !req.query.json) {
+        const bet = receipt.bet || receipt;
+        const brand = receipt.branding || {};
+        const blockchain = receipt.blockchain || {};
+        const esc = (s: any) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SuiBets Bet Receipt</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0e1a;color:#e5e7eb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;justify-content:center;padding:24px;min-height:100vh}
+.receipt{max-width:480px;width:100%;background:linear-gradient(135deg,#111827 0%,#1a1f35 100%);border:1px solid #06b6d4;border-radius:16px;overflow:hidden;box-shadow:0 0 40px rgba(6,182,212,0.15)}
+.header{background:linear-gradient(135deg,#06b6d4 0%,#8b5cf6 100%);padding:24px;text-align:center}
+.header h1{font-size:28px;font-weight:800;color:#fff;letter-spacing:1px}
+.header p{color:rgba(255,255,255,0.8);font-size:13px;margin-top:4px}
+.badge{display:inline-block;background:rgba(255,255,255,0.2);color:#fff;padding:4px 12px;border-radius:20px;font-size:11px;margin-top:8px;font-weight:600}
+.body{padding:24px}
+.event{background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.2);border-radius:12px;padding:16px;margin-bottom:16px;text-align:center}
+.event h2{color:#06b6d4;font-size:18px;font-weight:700}
+.event .teams{color:#9ca3af;font-size:14px;margin-top:4px}
+.prediction{background:linear-gradient(135deg,rgba(139,92,246,0.15),rgba(6,182,212,0.15));border:1px solid rgba(139,92,246,0.3);border-radius:12px;padding:16px;margin-bottom:16px;text-align:center}
+.prediction .label{color:#9ca3af;font-size:12px;text-transform:uppercase;letter-spacing:1px}
+.prediction .value{color:#8b5cf6;font-size:22px;font-weight:800;margin-top:4px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.stat{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;text-align:center}
+.stat .label{color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+.stat .val{color:#fff;font-size:18px;font-weight:700;margin-top:2px}
+.stat .val.cyan{color:#06b6d4}.stat .val.purple{color:#8b5cf6}.stat .val.green{color:#10b981}.stat .val.amber{color:#f59e0b}
+.chain{border-top:1px solid rgba(255,255,255,0.08);padding-top:16px;margin-top:8px}
+.chain .row{display:flex;justify-content:space-between;padding:6px 0;font-size:12px}
+.chain .row .k{color:#6b7280}.chain .row .v{color:#9ca3af;font-family:monospace;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chain .row a{color:#06b6d4;text-decoration:none}
+.chain .row a:hover{text-decoration:underline}
+.footer{background:rgba(6,182,212,0.05);border-top:1px solid rgba(6,182,212,0.15);padding:16px;text-align:center}
+.footer p{color:#6b7280;font-size:11px}
+.footer a{color:#06b6d4;text-decoration:none}
+.verified{display:inline-flex;align-items:center;gap:6px;color:#10b981;font-size:12px;font-weight:600;margin-top:8px}
+.verified svg{width:16px;height:16px}
+</style></head><body>
+<div class="receipt">
+<div class="header">
+<h1>SuiBets</h1>
+<p>Decentralized Sports Betting on Sui</p>
+<span class="badge">${source === 'walrus' ? '🐋 Stored on Walrus' : '📋 Local Receipt'}</span>
+</div>
+<div class="body">
+<div class="event">
+<h2>${esc(bet.eventName || 'Sports Event')}</h2>
+${bet.homeTeam && bet.awayTeam ? `<p class="teams">${esc(bet.homeTeam)} vs ${esc(bet.awayTeam)}</p>` : ''}
+</div>
+<div class="prediction">
+<p class="label">Prediction</p>
+<p class="value">${esc(bet.prediction || bet.selection || '—')}</p>
+</div>
+<div class="grid">
+<div class="stat"><p class="label">Stake</p><p class="val cyan">${esc(bet.stake || bet.betAmount || 0)} ${esc(bet.currency || 'SUI')}</p></div>
+<div class="stat"><p class="label">Odds</p><p class="val amber">${esc(bet.odds || '—')}x</p></div>
+<div class="stat"><p class="label">Potential Payout</p><p class="val green">${esc(bet.potentialPayout || bet.potentialWin || '—')} ${esc(bet.currency || 'SUI')}</p></div>
+<div class="stat"><p class="label">Currency</p><p class="val purple">${esc(bet.currency || 'SUI')}</p></div>
+</div>
+<div class="chain">
+<div class="row"><span class="k">Bet ID</span><span class="v">${esc(bet.id || bet.betId || blobId)}</span></div>
+<div class="row"><span class="k">Wallet</span><span class="v">${esc(bet.walletAddress || '—')}</span></div>
+<div class="row"><span class="k">Chain</span><span class="v">${esc(blockchain.chain || receipt.chain || 'sui:mainnet')}</span></div>
+${(bet.txHash || blockchain.txHash) ? `<div class="row"><span class="k">TX Hash</span><span class="v"><a href="https://suiscan.xyz/mainnet/tx/${esc(bet.txHash || blockchain.txHash)}" target="_blank">${esc((bet.txHash || blockchain.txHash || '').slice(0, 20))}...</a></span></div>` : ''}
+<div class="row"><span class="k">Placed</span><span class="v">${esc(new Date(bet.placedAt || receipt.storage?.storedAt || receipt.storedAt || Date.now()).toLocaleString())}</span></div>
+<div class="row"><span class="k">Storage</span><span class="v">${source === 'walrus' ? 'Walrus Protocol (Mainnet)' : 'Local Database'}</span></div>
+</div>
+${receipt.verification ? `<div class="verified"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/></svg> Receipt Verified (SHA-256)</div>` : ''}
+</div>
+<div class="footer">
+<p><a href="https://www.suibets.com" target="_blank">www.suibets.com</a> | <a href="https://suibets.wal.app" target="_blank">suibets.wal.app</a></p>
+<p style="margin-top:4px">&copy; ${new Date().getFullYear()} SuiBets — Built on Sui Blockchain</p>
+</div>
+</div></body></html>`;
+        return res.type('html').send(html);
       }
-      res.json({ receipt, aggregatorUrl: getWalrusAggregatorUrl(blobId), source: 'walrus', verified: true });
+
+      const { getWalrusAggregatorUrl } = await import('./services/walrusStorageService');
+      res.json({ 
+        receipt, 
+        source, 
+        verified: true,
+        ...(source === 'walrus' ? { aggregatorUrl: getWalrusAggregatorUrl(blobId) } : {})
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to fetch receipt" });
     }
