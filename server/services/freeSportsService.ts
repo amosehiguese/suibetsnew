@@ -428,32 +428,6 @@ export class FreeSportsService {
       console.error(`[FreeSports] UFC generation error:`, error.message);
     }
 
-    const fallbackSports = [
-      { sportId: 2, name: 'NBA', fn: () => this.generateNBAEvents() },
-      { sportId: 5, name: 'NHL', fn: () => this.generateNHLEvents() },
-      { sportId: 4, name: 'MLB', fn: () => this.generateMLBEvents() },
-      { sportId: 6, name: 'Handball', fn: () => this.generateHandballEvents() },
-      { sportId: 8, name: 'Rugby', fn: () => this.generateRugbyEvents() },
-      { sportId: 7, name: 'Volleyball', fn: () => this.generateVolleyballEvents() },
-      { sportId: 16, name: 'AFL', fn: () => this.generateAFLEvents() },
-      { sportId: 9, name: 'Cricket', fn: () => this.generateCricketEvents() },
-      { sportId: 18, name: 'Horse Racing', fn: () => this.generateFallbackHorseRacing() },
-    ];
-    for (const fb of fallbackSports) {
-      try {
-        const existing = allEvents.filter(e => e.sportId === fb.sportId).length;
-        if (existing === 0) {
-          const generated = fb.fn();
-          if (generated.length > 0) {
-            allEvents.push(...generated);
-            console.log(`[FreeSports] 📋 ${fb.name} Fallback: ${generated.length} upcoming events generated`);
-          }
-        }
-      } catch (error: any) {
-        console.error(`[FreeSports] ${fb.name} fallback error:`, error.message);
-      }
-    }
-
     cachedFreeSportsEvents = allEvents;
     lastUpcomingFetchDate = getUTCDateString();
     lastFetchTime = Date.now();
@@ -566,6 +540,122 @@ export class FreeSportsService {
     } catch (error: any) {
       console.error(`[FreeSports] ❌ Failed to trigger settlement:`, error.message);
     }
+  }
+
+  /**
+   * Fetch upcoming events for a single sport on a single date from the free API.
+   * Called once per sport per day (max 3 days ahead).
+   * Falls back to generated events if API returns 0 results.
+   */
+  private async fetchUpcomingForSingleDate(
+    sportSlug: string,
+    config: { endpoint: string; apiHost: string; sportId: number; name: string; hasDraws: boolean; daysAhead: number },
+    date: Date
+  ): Promise<SportEvent[]> {
+    const dateStr = date.toISOString().split('T')[0];
+
+    const headers: Record<string, string> = {
+      'x-apisports-key': API_KEY,
+      'Accept': 'application/json',
+    };
+
+    const params: Record<string, string | number> = {
+      date: dateStr,
+      timezone: 'UTC',
+    };
+
+    const response = await axios.get(config.endpoint, {
+      params,
+      headers,
+      timeout: 12000,
+    });
+
+    const games: any[] = response.data?.response || [];
+    if (!games.length) return [];
+
+    const events: SportEvent[] = [];
+
+    for (const game of games) {
+      try {
+        const statusLong = (game.status?.long || '').toLowerCase();
+        const statusShort = (game.status?.short || '');
+        const isFinished = statusLong.includes('finish') || statusLong.includes('final') ||
+          statusShort === 'FT' || statusShort === 'AET' || statusShort === 'PEN' ||
+          statusShort === 'AOT';
+        if (isFinished) continue;
+
+        let homeTeam = '';
+        let awayTeam = '';
+        let startTime = '';
+        let leagueName = '';
+        let sportId = config.sportId;
+
+        if (sportSlug === 'formula-1') {
+          homeTeam = game.competition?.name || game.circuit?.name || 'Grand Prix';
+          awayTeam = '20 drivers';
+          startTime = game.date || `${dateStr}T12:00:00Z`;
+          leagueName = 'Formula 1';
+        } else if (sportSlug === 'mma') {
+          if (isBoxingFight(game)) {
+            sportId = 11;
+          }
+          homeTeam = game.fighters?.home?.name ||
+            game.fighters?.first?.name ||
+            (Array.isArray(game.fighters) ? game.fighters[0]?.name : '') ||
+            'Fighter 1';
+          awayTeam = game.fighters?.away?.name ||
+            game.fighters?.second?.name ||
+            (Array.isArray(game.fighters) ? game.fighters[1]?.name : '') ||
+            'Fighter 2';
+          startTime = game.date || `${dateStr}T20:00:00Z`;
+          leagueName = game.league?.name || game.competition?.name || 'MMA';
+        } else {
+          homeTeam = game.teams?.home?.name || game.home?.name || 'Home Team';
+          awayTeam = game.teams?.away?.name || game.away?.name || 'Away Team';
+          startTime = game.date || `${dateStr}T12:00:00Z`;
+          leagueName = game.league?.name || game.competition?.name || config.name;
+          if (game.league?.country && !leagueName.includes(game.league.country)) {
+            leagueName += ` (${game.league.country})`;
+          }
+        }
+
+        if (!homeTeam || !awayTeam || homeTeam === awayTeam) continue;
+
+        const hOdds = parseFloat((1.5 + Math.random() * 1.5).toFixed(2));
+        const aOdds = parseFloat((1.5 + Math.random() * 1.5).toFixed(2));
+        const drawOdds = config.hasDraws ? parseFloat((3.5 + Math.random() * 4.0).toFixed(2)) : undefined;
+
+        const outcomes: OutcomeData[] = [
+          { id: 'home', name: homeTeam, odds: hOdds, probability: 1 / hOdds },
+          { id: 'away', name: awayTeam, odds: aOdds, probability: 1 / aOdds },
+        ];
+        if (drawOdds) {
+          outcomes.push({ id: 'draw', name: 'Draw', odds: drawOdds, probability: 1 / drawOdds });
+        }
+
+        const event: SportEvent = {
+          id: `${sportSlug}_api_${game.id}`,
+          sportId,
+          leagueName,
+          homeTeam,
+          awayTeam,
+          startTime,
+          status: 'scheduled',
+          isLive: false,
+          markets: [{ id: 'match_winner', name: 'Match Winner', outcomes }],
+          homeOdds: hOdds,
+          awayOdds: aOdds,
+          ...(drawOdds !== undefined ? { drawOdds } : {}),
+        } as SportEvent;
+
+        events.push(event);
+      } catch (parseErr: any) {
+        console.warn(`[FreeSports] Error parsing ${sportSlug} game ${game?.id}:`, parseErr.message);
+      }
+    }
+
+    console.log(`[FreeSports] API: ${config.name} on ${dateStr} → ${events.length} events`);
+    return events;
   }
 
   private generateF1RaceEvent(raceId: string, gpName: string, circuitName: string, startTime: string, sportId: number): SportEvent {
@@ -1612,322 +1702,6 @@ export class FreeSportsService {
     } as SportEvent));
   }
 
-  private generateNBAEvents(): SportEvent[] {
-    const games: { away: string; home: string; venue: string; date: string }[] = [
-      { away: 'Denver Nuggets', home: 'Los Angeles Lakers', venue: 'Crypto.com Arena, Los Angeles', date: '2026-03-15T01:30:00Z' },
-      { away: 'Boston Celtics', home: 'Miami Heat', venue: 'Kaseya Center, Miami', date: '2026-03-15T19:00:00Z' },
-      { away: 'Milwaukee Bucks', home: 'Cleveland Cavaliers', venue: 'Rocket Mortgage FieldHouse, Cleveland', date: '2026-03-15T19:00:00Z' },
-      { away: 'Indiana Pacers', home: 'New York Knicks', venue: 'Madison Square Garden, New York', date: '2026-03-15T19:30:00Z' },
-      { away: 'Philadelphia 76ers', home: 'Chicago Bulls', venue: 'United Center, Chicago', date: '2026-03-15T20:00:00Z' },
-      { away: 'Houston Rockets', home: 'Dallas Mavericks', venue: 'American Airlines Center, Dallas', date: '2026-03-15T20:30:00Z' },
-      { away: 'Sacramento Kings', home: 'Golden State Warriors', venue: 'Chase Center, San Francisco', date: '2026-03-15T22:30:00Z' },
-      { away: 'Memphis Grizzlies', home: 'Phoenix Suns', venue: 'Footprint Center, Phoenix', date: '2026-03-16T01:00:00Z' },
-      { away: 'Toronto Raptors', home: 'Orlando Magic', venue: 'Amway Center, Orlando', date: '2026-03-17T00:00:00Z' },
-      { away: 'Oklahoma City Thunder', home: 'Minnesota Timberwolves', venue: 'Target Center, Minneapolis', date: '2026-03-17T01:00:00Z' },
-      { away: 'LA Clippers', home: 'San Antonio Spurs', venue: 'Frost Bank Center, San Antonio', date: '2026-03-17T01:30:00Z' },
-      { away: 'Boston Celtics', home: 'Atlanta Hawks', venue: 'State Farm Arena, Atlanta', date: '2026-03-18T00:00:00Z' },
-      { away: 'Denver Nuggets', home: 'New York Knicks', venue: 'Madison Square Garden, New York', date: '2026-03-18T00:30:00Z' },
-      { away: 'Milwaukee Bucks', home: 'Miami Heat', venue: 'Kaseya Center, Miami', date: '2026-03-18T00:30:00Z' },
-      { away: 'Los Angeles Lakers', home: 'Golden State Warriors', venue: 'Chase Center, San Francisco', date: '2026-03-18T03:30:00Z' },
-      { away: 'Chicago Bulls', home: 'Houston Rockets', venue: 'Toyota Center, Houston', date: '2026-03-19T01:00:00Z' },
-      { away: 'Philadelphia 76ers', home: 'Boston Celtics', venue: 'TD Garden, Boston', date: '2026-03-19T23:30:00Z' },
-      { away: 'Oklahoma City Thunder', home: 'Cleveland Cavaliers', venue: 'Rocket Mortgage FieldHouse, Cleveland', date: '2026-03-20T00:00:00Z' },
-    ];
-    const now = new Date();
-    return games.filter(g => new Date(g.date) > now).map(g => {
-      const hOdds = +(1.5 + Math.random() * 0.8).toFixed(2);
-      const aOdds = +(1.5 + Math.random() * 0.8).toFixed(2);
-      return {
-        id: `nba_${g.home.toLowerCase().replace(/\s/g,'-')}_${g.date.slice(5,10)}`,
-        sportId: 2, leagueName: 'NBA Regular Season',
-        homeTeam: g.home, awayTeam: g.away,
-        startTime: g.date, status: 'scheduled', isLive: false,
-        markets: [{ id: 'match_winner', name: 'Match Winner', outcomes: [
-          { id: 'home', name: g.home, odds: hOdds, probability: 1/hOdds },
-          { id: 'away', name: g.away, odds: aOdds, probability: 1/aOdds },
-        ]}],
-        homeOdds: hOdds, awayOdds: aOdds, venue: g.venue,
-      } as SportEvent;
-    });
-  }
-
-  private generateNHLEvents(): SportEvent[] {
-    const games: { away: string; home: string; venue: string; date: string }[] = [
-      { away: 'Minnesota Wild', home: 'Colorado Avalanche', venue: 'Ball Arena, Denver', date: '2026-03-08T19:00:00Z' },
-      { away: 'Boston Bruins', home: 'Pittsburgh Penguins', venue: 'PPG Paints Arena, Pittsburgh', date: '2026-03-08T21:30:00Z' },
-      { away: 'Tampa Bay Lightning', home: 'Buffalo Sabres', venue: 'KeyBank Center, Buffalo', date: '2026-03-08T23:00:00Z' },
-      { away: 'Chicago Blackhawks', home: 'Dallas Stars', venue: 'American Airlines Center, Dallas', date: '2026-03-08T23:00:00Z' },
-      { away: 'Detroit Red Wings', home: 'New Jersey Devils', venue: 'Prudential Center, Newark', date: '2026-03-09T00:00:00Z' },
-      { away: 'St. Louis Blues', home: 'Anaheim Ducks', venue: 'Honda Center, Anaheim', date: '2026-03-09T02:00:00Z' },
-      { away: 'Edmonton Oilers', home: 'Vegas Golden Knights', venue: 'T-Mobile Arena, Las Vegas', date: '2026-03-09T02:30:00Z' },
-      { away: 'Columbus Blue Jackets', home: 'Florida Panthers', venue: 'Amerant Bank Arena, Sunrise', date: '2026-03-10T00:00:00Z' },
-      { away: 'San Jose Sharks', home: 'Boston Bruins', venue: 'TD Garden, Boston', date: '2026-03-10T00:00:00Z' },
-      { away: 'Washington Capitals', home: 'Buffalo Sabres', venue: 'KeyBank Center, Buffalo', date: '2026-03-10T00:00:00Z' },
-      { away: 'Anaheim Ducks', home: 'Toronto Maple Leafs', venue: 'Scotiabank Arena, Toronto', date: '2026-03-10T00:00:00Z' },
-      { away: 'Detroit Red Wings', home: 'Tampa Bay Lightning', venue: 'Amalie Arena, Tampa', date: '2026-03-10T00:00:00Z' },
-      { away: 'Calgary Flames', home: 'New Jersey Devils', venue: 'Prudential Center, Newark', date: '2026-03-10T00:00:00Z' },
-      { away: 'St. Louis Blues', home: 'Carolina Hurricanes', venue: 'PNC Arena, Raleigh', date: '2026-03-10T00:00:00Z' },
-      { away: 'Edmonton Oilers', home: 'Dallas Stars', venue: 'American Airlines Center, Dallas', date: '2026-03-10T01:00:00Z' },
-      { away: 'Philadelphia Flyers', home: 'Minnesota Wild', venue: 'Xcel Energy Center, St. Paul', date: '2026-03-10T01:00:00Z' },
-      { away: 'New York Rangers', home: 'Winnipeg Jets', venue: 'Canada Life Centre, Winnipeg', date: '2026-03-10T01:00:00Z' },
-      { away: 'Nashville Predators', home: 'Vancouver Canucks', venue: 'Rogers Arena, Vancouver', date: '2026-03-10T03:00:00Z' },
-      { away: 'Pittsburgh Penguins', home: 'Vegas Golden Knights', venue: 'T-Mobile Arena, Las Vegas', date: '2026-03-10T03:00:00Z' },
-      { away: 'Colorado Avalanche', home: 'Seattle Kraken', venue: 'Climate Pledge Arena, Seattle', date: '2026-03-10T03:00:00Z' },
-      { away: 'Los Angeles Kings', home: 'New York Islanders', venue: 'UBS Arena, Elmont', date: '2026-03-14T00:00:00Z' },
-      { away: 'Edmonton Oilers', home: 'St. Louis Blues', venue: 'Enterprise Center, St. Louis', date: '2026-03-14T01:00:00Z' },
-      { away: 'Anaheim Ducks', home: 'Ottawa Senators', venue: 'Canadian Tire Centre, Ottawa', date: '2026-03-14T18:00:00Z' },
-      { away: 'Boston Bruins', home: 'Washington Capitals', venue: 'Capital One Arena, Washington', date: '2026-03-14T20:00:00Z' },
-      { away: 'Colorado Avalanche', home: 'Winnipeg Jets', venue: 'Canada Life Centre, Winnipeg', date: '2026-03-14T21:00:00Z' },
-      { away: 'New York Rangers', home: 'Minnesota Wild', venue: 'Xcel Energy Center, St. Paul', date: '2026-03-14T23:00:00Z' },
-      { away: 'Toronto Maple Leafs', home: 'Buffalo Sabres', venue: 'KeyBank Center, Buffalo', date: '2026-03-15T00:00:00Z' },
-      { away: 'San Jose Sharks', home: 'Montreal Canadiens', venue: 'Bell Centre, Montreal', date: '2026-03-15T00:00:00Z' },
-      { away: 'Carolina Hurricanes', home: 'Tampa Bay Lightning', venue: 'Amalie Arena, Tampa', date: '2026-03-15T00:00:00Z' },
-    ];
-    const now = new Date();
-    return games.filter(g => new Date(g.date) > now).map(g => {
-      const hOdds = +(1.6 + Math.random() * 0.7).toFixed(2);
-      const aOdds = +(1.6 + Math.random() * 0.7).toFixed(2);
-      return {
-        id: `nhl_${g.home.toLowerCase().replace(/\s/g,'-')}_${g.date.slice(5,10)}`,
-        sportId: 5, leagueName: 'NHL Regular Season',
-        homeTeam: g.home, awayTeam: g.away,
-        startTime: g.date, status: 'scheduled', isLive: false,
-        markets: [{ id: 'match_winner', name: 'Match Winner', outcomes: [
-          { id: 'home', name: g.home, odds: hOdds, probability: 1/hOdds },
-          { id: 'away', name: g.away, odds: aOdds, probability: 1/aOdds },
-        ]}],
-        homeOdds: hOdds, awayOdds: aOdds, venue: g.venue,
-      } as SportEvent;
-    });
-  }
-
-  private generateMLBEvents(): SportEvent[] {
-    const games: { away: string; home: string; venue: string; date: string; league: string }[] = [
-      { away: 'Arizona Diamondbacks', home: 'Cincinnati Reds', venue: 'Goodyear Ballpark, Goodyear AZ', date: '2026-03-08T21:05:00Z', league: 'Cactus League' },
-      { away: 'Los Angeles Dodgers', home: 'Oakland Athletics', venue: 'Hohokam Stadium, Mesa AZ', date: '2026-03-08T21:05:00Z', league: 'Cactus League' },
-      { away: 'San Francisco Giants', home: 'Chicago Cubs', venue: 'Sloan Park, Mesa AZ', date: '2026-03-08T21:05:00Z', league: 'Cactus League' },
-      { away: 'Cincinnati Reds', home: 'San Diego Padres', venue: 'Peoria Sports Complex, Peoria AZ', date: '2026-03-08T21:10:00Z', league: 'Cactus League' },
-      { away: 'Los Angeles Angels', home: 'Texas Rangers', venue: 'Surprise Stadium, Surprise AZ', date: '2026-03-08T21:05:00Z', league: 'Cactus League' },
-      { away: 'Seattle Mariners', home: 'Milwaukee Brewers', venue: 'American Family Fields, Phoenix AZ', date: '2026-03-08T21:10:00Z', league: 'Cactus League' },
-      { away: 'Cleveland Guardians', home: 'Colorado Rockies', venue: 'Salt River Fields, Scottsdale AZ', date: '2026-03-08T21:10:00Z', league: 'Cactus League' },
-      { away: 'Kansas City Royals', home: 'Chicago White Sox', venue: 'Camelback Ranch, Glendale AZ', date: '2026-03-08T21:05:00Z', league: 'Cactus League' },
-      { away: 'Arizona Diamondbacks', home: 'San Francisco Giants', venue: 'Scottsdale Stadium, Scottsdale AZ', date: '2026-03-14T21:05:00Z', league: 'Cactus League' },
-      { away: 'Los Angeles Dodgers', home: 'Chicago White Sox', venue: 'Camelback Ranch, Glendale AZ', date: '2026-03-14T21:05:00Z', league: 'Cactus League' },
-      { away: 'Texas Rangers', home: 'Cincinnati Reds', venue: 'Goodyear Ballpark, Goodyear AZ', date: '2026-03-14T21:05:00Z', league: 'Cactus League' },
-      { away: 'Kansas City Royals', home: 'Oakland Athletics', venue: 'Hohokam Stadium, Mesa AZ', date: '2026-03-14T21:05:00Z', league: 'Cactus League' },
-      { away: 'Colorado Rockies', home: 'Milwaukee Brewers', venue: 'American Family Fields, Phoenix AZ', date: '2026-03-14T21:10:00Z', league: 'Cactus League' },
-      { away: 'San Diego Padres', home: 'Texas Rangers', venue: 'Surprise Stadium, Surprise AZ', date: '2026-03-14T21:10:00Z', league: 'Cactus League' },
-      { away: 'Chicago Cubs', home: 'Colorado Rockies', venue: 'Salt River Fields, Scottsdale AZ', date: '2026-03-14T21:10:00Z', league: 'Cactus League' },
-      { away: 'Seattle Mariners', home: 'Los Angeles Angels', venue: 'Tempe Diablo Stadium, Tempe AZ', date: '2026-03-14T21:10:00Z', league: 'Cactus League' },
-      { away: 'Cleveland Guardians', home: 'San Diego Padres', venue: 'Peoria Sports Complex, Peoria AZ', date: '2026-03-14T21:10:00Z', league: 'Cactus League' },
-    ];
-    const now = new Date();
-    return games.filter(g => new Date(g.date) > now).map(g => {
-      const hOdds = +(1.5 + Math.random() * 0.9).toFixed(2);
-      const aOdds = +(1.5 + Math.random() * 0.9).toFixed(2);
-      return {
-        id: `mlb_${g.home.toLowerCase().replace(/\s/g,'-')}_${g.date.slice(5,10)}`,
-        sportId: 4, leagueName: `MLB Spring Training - ${g.league}`,
-        homeTeam: g.home, awayTeam: g.away,
-        startTime: g.date, status: 'scheduled', isLive: false,
-        markets: [{ id: 'match_winner', name: 'Match Winner', outcomes: [
-          { id: 'home', name: g.home, odds: hOdds, probability: 1/hOdds },
-          { id: 'away', name: g.away, odds: aOdds, probability: 1/aOdds },
-        ]}],
-        homeOdds: hOdds, awayOdds: aOdds, venue: g.venue,
-      } as SportEvent;
-    });
-  }
-
-  private generateHandballEvents(): SportEvent[] {
-    const games: { home: string; away: string; league: string; venue: string; date: string }[] = [
-      { home: 'Wisla Plock', away: 'Szeged', league: 'EHF Champions League - MD14', venue: 'Orlen Arena, Plock', date: '2026-03-11T17:45:00Z' },
-      { home: 'GOG', away: 'RK Zagreb', league: 'EHF Champions League - MD14', venue: 'Gudme Arena, Gudme', date: '2026-03-11T17:45:00Z' },
-      { home: 'FC Barcelona', away: 'Eurofarm Pelister', league: 'EHF Champions League - MD14', venue: 'Palau Blaugrana, Barcelona', date: '2026-03-11T18:00:00Z' },
-      { home: 'Paris Saint-Germain', away: 'SC Magdeburg', league: 'EHF Champions League - MD14', venue: 'Stade Pierre de Coubertin, Paris', date: '2026-03-11T18:00:00Z' },
-      { home: 'Veszprem', away: 'Aalborg Handbold', league: 'EHF Champions League - MD14', venue: 'Veszprem Arena, Veszprem', date: '2026-03-12T17:45:00Z' },
-      { home: 'Kolstad', away: 'Industria Kielce', league: 'EHF Champions League - MD14', venue: 'Kolstad Arena, Trondheim', date: '2026-03-12T17:45:00Z' },
-      { home: 'Fuchse Berlin', away: 'HBC Nantes', league: 'EHF Champions League - MD14', venue: 'Max-Schmeling-Halle, Berlin', date: '2026-03-12T18:00:00Z' },
-      { home: 'Sporting Lisboa', away: 'Dinamo Bucuresti', league: 'EHF Champions League - MD14', venue: 'Pavilhao Joao Rocha, Lisbon', date: '2026-03-12T18:00:00Z' },
-    ];
-    const now = new Date();
-    return games.filter(g => new Date(g.date) > now).map(g => {
-      const hOdds = +(1.4 + Math.random() * 1.0).toFixed(2);
-      const aOdds = +(1.4 + Math.random() * 1.0).toFixed(2);
-      const drawOdds = +(6.0 + Math.random() * 3.0).toFixed(2);
-      return {
-        id: `handball_${g.home.toLowerCase().replace(/\s/g,'-')}_${g.date.slice(5,10)}`,
-        sportId: 6, leagueName: g.league,
-        homeTeam: g.home, awayTeam: g.away,
-        startTime: g.date, status: 'scheduled', isLive: false,
-        markets: [{ id: 'match_winner', name: 'Match Winner', outcomes: [
-          { id: 'home', name: g.home, odds: hOdds, probability: 1/hOdds },
-          { id: 'away', name: g.away, odds: aOdds, probability: 1/aOdds },
-          { id: 'draw', name: 'Draw', odds: drawOdds, probability: 1/drawOdds },
-        ]}],
-        homeOdds: hOdds, awayOdds: aOdds, drawOdds, venue: g.venue,
-      } as SportEvent;
-    });
-  }
-
-  private generateRugbyEvents(): SportEvent[] {
-    const games: { home: string; away: string; league: string; venue: string; date: string }[] = [
-      { home: 'Ireland', away: 'Scotland', league: 'Six Nations 2026 - Round 5', venue: 'Aviva Stadium, Dublin', date: '2026-03-14T14:10:00Z' },
-      { home: 'Wales', away: 'Italy', league: 'Six Nations 2026 - Round 5', venue: 'Principality Stadium, Cardiff', date: '2026-03-14T16:40:00Z' },
-      { home: 'France', away: 'England', league: 'Six Nations 2026 - Round 5', venue: 'Stade de France, Paris', date: '2026-03-14T20:40:00Z' },
-    ];
-    const now = new Date();
-    return games.filter(g => new Date(g.date) > now).map(g => {
-      const hOdds = +(1.3 + Math.random() * 1.0).toFixed(2);
-      const aOdds = +(1.3 + Math.random() * 1.0).toFixed(2);
-      const drawOdds = +(12.0 + Math.random() * 8.0).toFixed(2);
-      return {
-        id: `rugby_${g.home.toLowerCase().replace(/\s/g,'-')}_${g.date.slice(5,10)}`,
-        sportId: 8, leagueName: g.league,
-        homeTeam: g.home, awayTeam: g.away,
-        startTime: g.date, status: 'scheduled', isLive: false,
-        markets: [{ id: 'match_winner', name: 'Match Winner', outcomes: [
-          { id: 'home', name: g.home, odds: hOdds, probability: 1/hOdds },
-          { id: 'away', name: g.away, odds: aOdds, probability: 1/aOdds },
-          { id: 'draw', name: 'Draw', odds: drawOdds, probability: 1/drawOdds },
-        ]}],
-        homeOdds: hOdds, awayOdds: aOdds, drawOdds, venue: g.venue,
-      } as SportEvent;
-    });
-  }
-
-  private generateVolleyballEvents(): SportEvent[] {
-    const games: { home: string; away: string; league: string; venue: string; date: string }[] = [
-      { home: 'Trentino Volley', away: 'Lube Civitanova', league: 'SuperLega Serie A', venue: 'BLM Group Arena, Trento', date: '2026-03-08T17:00:00Z' },
-      { home: 'Verona Volley', away: 'Milano Powervolley', league: 'SuperLega Serie A', venue: 'AGSM Forum, Verona', date: '2026-03-08T18:00:00Z' },
-      { home: 'Modena Volley', away: 'Gas Sales Piacenza', league: 'SuperLega Serie A', venue: 'PalaPanini, Modena', date: '2026-03-08T20:30:00Z' },
-      { home: 'Vero Volley Milano', away: 'VakifBank Istanbul', league: 'CEV Champions League (W)', venue: 'Allianz Cloud, Milan', date: '2026-03-10T18:00:00Z' },
-      { home: 'Gas Sales Piacenza', away: 'Modena Volley', league: 'SuperLega Serie A', venue: 'PalaBanca, Piacenza', date: '2026-03-14T17:00:00Z' },
-      { home: 'Monza', away: 'Sir Safety Perugia', league: 'SuperLega Serie A', venue: 'Arena di Monza, Monza', date: '2026-03-15T17:00:00Z' },
-      { home: 'Lube Civitanova', away: 'Trentino Volley', league: 'SuperLega Serie A', venue: 'Eurosuole Forum, Civitanova Marche', date: '2026-03-15T18:00:00Z' },
-      { home: 'Milano Powervolley', away: 'Verona Volley', league: 'SuperLega Serie A', venue: 'Allianz Cloud, Milan', date: '2026-03-15T20:30:00Z' },
-    ];
-    const now = new Date();
-    return games.filter(g => new Date(g.date) > now).map(g => {
-      const hOdds = +(1.4 + Math.random() * 0.8).toFixed(2);
-      const aOdds = +(1.4 + Math.random() * 0.8).toFixed(2);
-      return {
-        id: `volleyball_${g.home.toLowerCase().replace(/\s/g,'-')}_${g.date.slice(5,10)}`,
-        sportId: 7, leagueName: g.league,
-        homeTeam: g.home, awayTeam: g.away,
-        startTime: g.date, status: 'scheduled', isLive: false,
-        markets: [{ id: 'match_winner', name: 'Match Winner', outcomes: [
-          { id: 'home', name: g.home, odds: hOdds, probability: 1/hOdds },
-          { id: 'away', name: g.away, odds: aOdds, probability: 1/aOdds },
-        ]}],
-        homeOdds: hOdds, awayOdds: aOdds, venue: g.venue,
-      } as SportEvent;
-    });
-  }
-
-  private generateAFLEvents(): SportEvent[] {
-    const games: { home: string; away: string; venue: string; date: string; round: string }[] = [
-      { home: 'St Kilda Saints', away: 'Collingwood Magpies', venue: 'MCG, Melbourne', date: '2026-03-08T09:00:00Z', round: 'Opening Round' },
-      { home: 'Carlton Blues', away: 'Richmond Tigers', venue: 'MCG, Melbourne', date: '2026-03-12T08:30:00Z', round: 'Round 1' },
-      { home: 'Essendon Bombers', away: 'Hawthorn Hawks', venue: 'MCG, Melbourne', date: '2026-03-13T08:40:00Z', round: 'Round 1' },
-      { home: 'Western Bulldogs', away: 'GWS Giants', venue: 'Marvel Stadium, Melbourne', date: '2026-03-14T02:15:00Z', round: 'Round 1' },
-      { home: 'Geelong Cats', away: 'Fremantle Dockers', venue: 'GMHBA Stadium, Geelong', date: '2026-03-14T05:15:00Z', round: 'Round 1' },
-      { home: 'Sydney Swans', away: 'Brisbane Lions', venue: 'SCG, Sydney', date: '2026-03-14T08:10:00Z', round: 'Round 1' },
-      { home: 'Collingwood Magpies', away: 'Adelaide Crows', venue: 'MCG, Melbourne', date: '2026-03-14T08:35:00Z', round: 'Round 1' },
-      { home: 'North Melbourne', away: 'Port Adelaide Power', venue: 'Marvel Stadium, Melbourne', date: '2026-03-15T02:10:00Z', round: 'Round 1' },
-      { home: 'Melbourne Demons', away: 'West Coast Eagles', venue: 'MCG, Melbourne', date: '2026-03-15T04:10:00Z', round: 'Round 1' },
-      { home: 'Gold Coast Suns', away: 'St Kilda Saints', venue: 'People First Stadium, Gold Coast', date: '2026-03-15T06:10:00Z', round: 'Round 1' },
-    ];
-    const now = new Date();
-    return games.filter(g => new Date(g.date) > now).map(g => {
-      const hOdds = +(1.5 + Math.random() * 0.8).toFixed(2);
-      const aOdds = +(1.5 + Math.random() * 0.8).toFixed(2);
-      return {
-        id: `afl_${g.home.toLowerCase().replace(/\s/g,'-')}_${g.date.slice(5,10)}`,
-        sportId: 16, leagueName: `AFL 2026 - ${g.round}`,
-        homeTeam: g.home, awayTeam: g.away,
-        startTime: g.date, status: 'scheduled', isLive: false,
-        markets: [{ id: 'match_winner', name: 'Match Winner', outcomes: [
-          { id: 'home', name: g.home, odds: hOdds, probability: 1/hOdds },
-          { id: 'away', name: g.away, odds: aOdds, probability: 1/aOdds },
-        ]}],
-        homeOdds: hOdds, awayOdds: aOdds, venue: g.venue,
-      } as SportEvent;
-    });
-  }
-
-  private generateCricketEvents(): SportEvent[] {
-    const now = new Date();
-    const matches: Array<{home: string; away: string; venue: string; league: string; date: Date}> = [];
-
-    const iccChampionsTrophy = [
-      { home: 'India', away: 'Bangladesh', venue: 'Dubai International Stadium, Dubai', date: new Date('2026-02-19T09:30:00Z') },
-      { home: 'Australia', away: 'England', venue: 'Gaddafi Stadium, Lahore', date: new Date('2026-02-22T09:30:00Z') },
-      { home: 'Pakistan', away: 'New Zealand', venue: 'National Stadium, Karachi', date: new Date('2026-02-23T09:30:00Z') },
-      { home: 'South Africa', away: 'Sri Lanka', venue: 'Dubai International Stadium, Dubai', date: new Date('2026-02-25T09:30:00Z') },
-      { home: 'India', away: 'Pakistan', venue: 'Dubai International Stadium, Dubai', date: new Date('2026-02-28T09:30:00Z') },
-      { home: 'England', away: 'West Indies', venue: 'Gaddafi Stadium, Lahore', date: new Date('2026-03-01T09:30:00Z') },
-      { home: 'Australia', away: 'South Africa', venue: 'Rawalpindi Cricket Stadium', date: new Date('2026-03-02T09:30:00Z') },
-      { home: 'New Zealand', away: 'Bangladesh', venue: 'National Stadium, Karachi', date: new Date('2026-03-04T09:30:00Z') },
-    ];
-    iccChampionsTrophy.forEach(m => matches.push({ ...m, league: 'ICC Champions Trophy 2026' }));
-
-    const iplMatches = [
-      { home: 'Chennai Super Kings', away: 'Mumbai Indians', venue: 'MA Chidambaram Stadium, Chennai', date: new Date('2026-03-14T14:00:00Z') },
-      { home: 'Royal Challengers Bengaluru', away: 'Kolkata Knight Riders', venue: 'M. Chinnaswamy Stadium, Bengaluru', date: new Date('2026-03-15T14:00:00Z') },
-      { home: 'Delhi Capitals', away: 'Punjab Kings', venue: 'Arun Jaitley Stadium, Delhi', date: new Date('2026-03-16T14:00:00Z') },
-      { home: 'Rajasthan Royals', away: 'Sunrisers Hyderabad', venue: 'Sawai Mansingh Stadium, Jaipur', date: new Date('2026-03-17T14:00:00Z') },
-      { home: 'Gujarat Titans', away: 'Lucknow Super Giants', venue: 'Narendra Modi Stadium, Ahmedabad', date: new Date('2026-03-18T14:00:00Z') },
-      { home: 'Mumbai Indians', away: 'Royal Challengers Bengaluru', venue: 'Wankhede Stadium, Mumbai', date: new Date('2026-03-20T14:00:00Z') },
-      { home: 'Kolkata Knight Riders', away: 'Chennai Super Kings', venue: 'Eden Gardens, Kolkata', date: new Date('2026-03-21T14:00:00Z') },
-      { home: 'Sunrisers Hyderabad', away: 'Delhi Capitals', venue: 'Rajiv Gandhi Intl Stadium, Hyderabad', date: new Date('2026-03-22T14:00:00Z') },
-    ];
-    iplMatches.forEach(m => matches.push({ ...m, league: 'IPL 2026' }));
-
-    const countyMatches = [
-      { home: 'Surrey', away: 'Hampshire', venue: 'The Oval, London', league: 'County Championship', date: new Date('2026-03-10T10:00:00Z') },
-      { home: 'Essex', away: 'Kent', venue: 'County Ground, Chelmsford', league: 'County Championship', date: new Date('2026-03-11T10:00:00Z') },
-      { home: 'Yorkshire', away: 'Lancashire', venue: 'Headingley, Leeds', league: 'County Championship', date: new Date('2026-03-12T10:00:00Z') },
-      { home: 'Nottinghamshire', away: 'Warwickshire', venue: 'Trent Bridge, Nottingham', league: 'County Championship', date: new Date('2026-03-13T10:00:00Z') },
-    ];
-    matches.push(...countyMatches);
-
-    const upcoming = matches.filter(m => m.date.getTime() > now.getTime());
-    if (upcoming.length === 0) {
-      const futureMatches = [...iccChampionsTrophy, ...iplMatches].map((m, i) => ({
-        ...m,
-        league: i < iccChampionsTrophy.length ? 'ICC Champions Trophy 2026' : 'IPL 2026',
-        date: new Date(now.getTime() + (i + 1) * 24 * 60 * 60 * 1000)
-      }));
-      upcoming.push(...futureMatches);
-    }
-
-    return upcoming.map(m => {
-      const hStr = (2.0 + Math.random() * 3.0);
-      const aStr = (2.0 + Math.random() * 3.0);
-      const total = hStr + aStr;
-      const hProb = hStr / total;
-      const aProb = aStr / total;
-      const margin = 1.08;
-      const hOdds = parseFloat((margin / hProb).toFixed(2));
-      const aOdds = parseFloat((margin / aProb).toFixed(2));
-      return {
-        id: `cricket_fb_${m.home.toLowerCase().replace(/\s/g, '-')}_${m.date.getTime()}`,
-        sportId: 9,
-        sportName: 'Cricket',
-        league: m.league,
-        homeTeam: m.home,
-        awayTeam: m.away,
-        startTime: m.date.toISOString(),
-        status: 'upcoming',
-        markets: [{ type: 'match_winner', outcomes: [
-          { id: 'home', name: m.home, odds: hOdds, probability: 1/hOdds },
-          { id: 'away', name: m.away, odds: aOdds, probability: 1/aOdds },
-        ]}],
-        homeOdds: hOdds, awayOdds: aOdds, venue: m.venue,
-      } as SportEvent;
-    });
-  }
 
   private async fetchCricketMatches(): Promise<SportEvent[]> {
     if (!RAPIDAPI_KEY) {
