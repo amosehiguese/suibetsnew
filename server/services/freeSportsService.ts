@@ -94,7 +94,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
   baseball: {
     endpoint: 'https://v1.baseball.api-sports.io/games',
     apiHost: 'v1.baseball.api-sports.io',
-    sportId: 5,
+    sportId: 4,
     name: 'Baseball',
     hasDraws: false,
     daysAhead: 3
@@ -102,7 +102,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
   'ice-hockey': {
     endpoint: 'https://v1.hockey.api-sports.io/games',
     apiHost: 'v1.hockey.api-sports.io',
-    sportId: 6,
+    sportId: 5,
     name: 'Ice Hockey',
     hasDraws: false,
     daysAhead: 3
@@ -110,7 +110,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
   mma: {
     endpoint: 'https://v1.mma.api-sports.io/fights',
     apiHost: 'v1.mma.api-sports.io',
-    sportId: 7,
+    sportId: 12,
     name: 'MMA',
     hasDraws: false,
     daysAhead: 3
@@ -118,7 +118,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
   'american-football': {
     endpoint: 'https://v1.american-football.api-sports.io/games',
     apiHost: 'v1.american-football.api-sports.io',
-    sportId: 4,
+    sportId: 15,
     name: 'American Football',
     hasDraws: false,
     daysAhead: 3
@@ -126,7 +126,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
   afl: {
     endpoint: 'https://v1.afl.api-sports.io/games',
     apiHost: 'v1.afl.api-sports.io',
-    sportId: 10,
+    sportId: 16,
     name: 'AFL',
     hasDraws: true,
     daysAhead: 3
@@ -134,7 +134,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
   'formula-1': {
     endpoint: 'https://v1.formula-1.api-sports.io/races',
     apiHost: 'v1.formula-1.api-sports.io',
-    sportId: 11,
+    sportId: 13,
     name: 'Formula 1',
     hasDraws: false,
     daysAhead: 3
@@ -142,7 +142,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
   handball: {
     endpoint: 'https://v1.handball.api-sports.io/games',
     apiHost: 'v1.handball.api-sports.io',
-    sportId: 12,
+    sportId: 6,
     name: 'Handball',
     hasDraws: true,
     daysAhead: 3
@@ -150,7 +150,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
   rugby: {
     endpoint: 'https://v1.rugby.api-sports.io/games',
     apiHost: 'v1.rugby.api-sports.io',
-    sportId: 15,
+    sportId: 8,
     name: 'Rugby',
     hasDraws: true,
     daysAhead: 3
@@ -158,7 +158,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
   volleyball: {
     endpoint: 'https://v1.volleyball.api-sports.io/games',
     apiHost: 'v1.volleyball.api-sports.io',
-    sportId: 16,
+    sportId: 7,
     name: 'Volleyball',
     hasDraws: false,
     daysAhead: 3
@@ -328,8 +328,8 @@ export class FreeSportsService {
         });
         
         if (sportSlug === 'mma') {
-          const mmaCount = sportEvents.filter(e => e.sportId === 7).length;
-          const boxingCount = sportEvents.filter(e => e.sportId === 17).length;
+          const mmaCount = sportEvents.filter(e => e.sportId === 12).length;
+          const boxingCount = sportEvents.filter(e => e.sportId === 11).length;
           if (boxingCount > 0) {
             console.log(`[FreeSports] MMA: ${mmaCount} fights, Boxing: ${boxingCount} fights (${daysToFetch} days)`);
           } else {
@@ -409,7 +409,7 @@ export class FreeSportsService {
     try {
       const generatedF1 = this.generateF1Schedule();
       if (generatedF1.length > 0) {
-        const existingF1Ids = new Set(allEvents.filter(e => e.sportId === 11).map(e => String(e.id)));
+        const existingF1Ids = new Set(allEvents.filter(e => e.sportId === 13).map(e => String(e.id)));
         const newF1 = generatedF1.filter(e => !existingF1Ids.has(String(e.id)));
         allEvents.push(...newF1);
         console.log(`[FreeSports] 🏎️ F1 Generated: ${newF1.length} upcoming races added (${existingF1Ids.size} from API skipped)`);
@@ -430,12 +430,12 @@ export class FreeSportsService {
 
     const fallbackSports = [
       { sportId: 2, name: 'NBA', fn: () => this.generateNBAEvents() },
-      { sportId: 6, name: 'NHL', fn: () => this.generateNHLEvents() },
-      { sportId: 5, name: 'MLB', fn: () => this.generateMLBEvents() },
-      { sportId: 12, name: 'Handball', fn: () => this.generateHandballEvents() },
-      { sportId: 15, name: 'Rugby', fn: () => this.generateRugbyEvents() },
-      { sportId: 16, name: 'Volleyball', fn: () => this.generateVolleyballEvents() },
-      { sportId: 10, name: 'AFL', fn: () => this.generateAFLEvents() },
+      { sportId: 5, name: 'NHL', fn: () => this.generateNHLEvents() },
+      { sportId: 4, name: 'MLB', fn: () => this.generateMLBEvents() },
+      { sportId: 6, name: 'Handball', fn: () => this.generateHandballEvents() },
+      { sportId: 8, name: 'Rugby', fn: () => this.generateRugbyEvents() },
+      { sportId: 7, name: 'Volleyball', fn: () => this.generateVolleyballEvents() },
+      { sportId: 16, name: 'AFL', fn: () => this.generateAFLEvents() },
       { sportId: 9, name: 'Cricket', fn: () => this.generateCricketEvents() },
       { sportId: 18, name: 'Horse Racing', fn: () => this.generateFallbackHorseRacing() },
     ];
@@ -810,7 +810,7 @@ export class FreeSportsService {
   }
 
   private generateBoxingEvents(): SportEvent[] {
-    const BOXING_SPORT_ID = 17;
+    const BOXING_SPORT_ID = 11;
     const boxingFights: {
       id: string; fighter1: string; fighter2: string; record1: string; record2: string;
       odds1: number; odds2: number; title: string; venue: string; date: string; league: string;
@@ -1450,7 +1450,7 @@ export class FreeSportsService {
   }
 
   private generateF1Schedule(): SportEvent[] {
-    const F1_SPORT_ID = 11;
+    const F1_SPORT_ID = 13;
     const f1Races2026: { id: string; gpName: string; circuit: string; date: string }[] = [
       { id: 'australia-gp', gpName: 'Australian Grand Prix', circuit: 'Albert Park Circuit, Melbourne', date: '2026-03-08T05:00:00Z' },
       { id: 'china-gp', gpName: 'Chinese Grand Prix', circuit: 'Shanghai International Circuit', date: '2026-03-15T07:00:00Z' },
@@ -1488,7 +1488,7 @@ export class FreeSportsService {
   }
 
   private generateUFCEvents(): SportEvent[] {
-    const MMA_SPORT_ID = 7;
+    const MMA_SPORT_ID = 12;
     const ufcFights: {
       id: string; fighter1: string; fighter2: string;
       odds1: number; odds2: number; title: string; venue: string;
@@ -1614,22 +1614,24 @@ export class FreeSportsService {
 
   private generateNBAEvents(): SportEvent[] {
     const games: { away: string; home: string; venue: string; date: string }[] = [
-      { away: 'Boston Celtics', home: 'Cleveland Cavaliers', venue: 'Rocket Mortgage FieldHouse, Cleveland', date: '2026-03-08T18:00:00Z' },
-      { away: 'New York Knicks', home: 'Los Angeles Lakers', venue: 'Crypto.com Arena, Los Angeles', date: '2026-03-08T20:30:00Z' },
-      { away: 'Houston Rockets', home: 'San Antonio Spurs', venue: 'Frost Bank Center, San Antonio', date: '2026-03-09T01:00:00Z' },
-      { away: 'Detroit Pistons', home: 'Miami Heat', venue: 'Kaseya Center, Miami', date: '2026-03-08T23:00:00Z' },
-      { away: 'Dallas Mavericks', home: 'Toronto Raptors', venue: 'Scotiabank Arena, Toronto', date: '2026-03-08T23:00:00Z' },
-      { away: 'Washington Wizards', home: 'New Orleans Pelicans', venue: 'Smoothie King Center, New Orleans', date: '2026-03-09T00:00:00Z' },
-      { away: 'Orlando Magic', home: 'Milwaukee Bucks', venue: 'Fiserv Forum, Milwaukee', date: '2026-03-09T01:00:00Z' },
-      { away: 'Indiana Pacers', home: 'Portland Trail Blazers', venue: 'Moda Center, Portland', date: '2026-03-09T02:00:00Z' },
-      { away: 'Chicago Bulls', home: 'Sacramento Kings', venue: 'Golden 1 Center, Sacramento', date: '2026-03-09T02:00:00Z' },
-      { away: 'New York Knicks', home: 'LA Clippers', venue: 'Intuit Dome, Inglewood', date: '2026-03-10T03:00:00Z' },
-      { away: 'Boston Celtics', home: 'San Antonio Spurs', venue: 'Frost Bank Center, San Antonio', date: '2026-03-11T01:00:00Z' },
-      { away: 'Minnesota Timberwolves', home: 'Los Angeles Lakers', venue: 'Crypto.com Arena, Los Angeles', date: '2026-03-11T03:30:00Z' },
-      { away: 'Brooklyn Nets', home: 'Atlanta Hawks', venue: 'State Farm Arena, Atlanta', date: '2026-03-13T00:30:00Z' },
-      { away: 'Denver Nuggets', home: 'San Antonio Spurs', venue: 'Frost Bank Center, San Antonio', date: '2026-03-13T02:00:00Z' },
-      { away: 'Chicago Bulls', home: 'Los Angeles Lakers', venue: 'Crypto.com Arena, Los Angeles', date: '2026-03-13T03:30:00Z' },
       { away: 'Denver Nuggets', home: 'Los Angeles Lakers', venue: 'Crypto.com Arena, Los Angeles', date: '2026-03-15T01:30:00Z' },
+      { away: 'Boston Celtics', home: 'Miami Heat', venue: 'Kaseya Center, Miami', date: '2026-03-15T19:00:00Z' },
+      { away: 'Milwaukee Bucks', home: 'Cleveland Cavaliers', venue: 'Rocket Mortgage FieldHouse, Cleveland', date: '2026-03-15T19:00:00Z' },
+      { away: 'Indiana Pacers', home: 'New York Knicks', venue: 'Madison Square Garden, New York', date: '2026-03-15T19:30:00Z' },
+      { away: 'Philadelphia 76ers', home: 'Chicago Bulls', venue: 'United Center, Chicago', date: '2026-03-15T20:00:00Z' },
+      { away: 'Houston Rockets', home: 'Dallas Mavericks', venue: 'American Airlines Center, Dallas', date: '2026-03-15T20:30:00Z' },
+      { away: 'Sacramento Kings', home: 'Golden State Warriors', venue: 'Chase Center, San Francisco', date: '2026-03-15T22:30:00Z' },
+      { away: 'Memphis Grizzlies', home: 'Phoenix Suns', venue: 'Footprint Center, Phoenix', date: '2026-03-16T01:00:00Z' },
+      { away: 'Toronto Raptors', home: 'Orlando Magic', venue: 'Amway Center, Orlando', date: '2026-03-17T00:00:00Z' },
+      { away: 'Oklahoma City Thunder', home: 'Minnesota Timberwolves', venue: 'Target Center, Minneapolis', date: '2026-03-17T01:00:00Z' },
+      { away: 'LA Clippers', home: 'San Antonio Spurs', venue: 'Frost Bank Center, San Antonio', date: '2026-03-17T01:30:00Z' },
+      { away: 'Boston Celtics', home: 'Atlanta Hawks', venue: 'State Farm Arena, Atlanta', date: '2026-03-18T00:00:00Z' },
+      { away: 'Denver Nuggets', home: 'New York Knicks', venue: 'Madison Square Garden, New York', date: '2026-03-18T00:30:00Z' },
+      { away: 'Milwaukee Bucks', home: 'Miami Heat', venue: 'Kaseya Center, Miami', date: '2026-03-18T00:30:00Z' },
+      { away: 'Los Angeles Lakers', home: 'Golden State Warriors', venue: 'Chase Center, San Francisco', date: '2026-03-18T03:30:00Z' },
+      { away: 'Chicago Bulls', home: 'Houston Rockets', venue: 'Toyota Center, Houston', date: '2026-03-19T01:00:00Z' },
+      { away: 'Philadelphia 76ers', home: 'Boston Celtics', venue: 'TD Garden, Boston', date: '2026-03-19T23:30:00Z' },
+      { away: 'Oklahoma City Thunder', home: 'Cleveland Cavaliers', venue: 'Rocket Mortgage FieldHouse, Cleveland', date: '2026-03-20T00:00:00Z' },
     ];
     const now = new Date();
     return games.filter(g => new Date(g.date) > now).map(g => {
@@ -1687,7 +1689,7 @@ export class FreeSportsService {
       const aOdds = +(1.6 + Math.random() * 0.7).toFixed(2);
       return {
         id: `nhl_${g.home.toLowerCase().replace(/\s/g,'-')}_${g.date.slice(5,10)}`,
-        sportId: 6, leagueName: 'NHL Regular Season',
+        sportId: 5, leagueName: 'NHL Regular Season',
         homeTeam: g.home, awayTeam: g.away,
         startTime: g.date, status: 'scheduled', isLive: false,
         markets: [{ id: 'match_winner', name: 'Match Winner', outcomes: [
@@ -1725,7 +1727,7 @@ export class FreeSportsService {
       const aOdds = +(1.5 + Math.random() * 0.9).toFixed(2);
       return {
         id: `mlb_${g.home.toLowerCase().replace(/\s/g,'-')}_${g.date.slice(5,10)}`,
-        sportId: 5, leagueName: `MLB Spring Training - ${g.league}`,
+        sportId: 4, leagueName: `MLB Spring Training - ${g.league}`,
         homeTeam: g.home, awayTeam: g.away,
         startTime: g.date, status: 'scheduled', isLive: false,
         markets: [{ id: 'match_winner', name: 'Match Winner', outcomes: [
@@ -1755,7 +1757,7 @@ export class FreeSportsService {
       const drawOdds = +(6.0 + Math.random() * 3.0).toFixed(2);
       return {
         id: `handball_${g.home.toLowerCase().replace(/\s/g,'-')}_${g.date.slice(5,10)}`,
-        sportId: 12, leagueName: g.league,
+        sportId: 6, leagueName: g.league,
         homeTeam: g.home, awayTeam: g.away,
         startTime: g.date, status: 'scheduled', isLive: false,
         markets: [{ id: 'match_winner', name: 'Match Winner', outcomes: [
@@ -1781,7 +1783,7 @@ export class FreeSportsService {
       const drawOdds = +(12.0 + Math.random() * 8.0).toFixed(2);
       return {
         id: `rugby_${g.home.toLowerCase().replace(/\s/g,'-')}_${g.date.slice(5,10)}`,
-        sportId: 15, leagueName: g.league,
+        sportId: 8, leagueName: g.league,
         homeTeam: g.home, awayTeam: g.away,
         startTime: g.date, status: 'scheduled', isLive: false,
         markets: [{ id: 'match_winner', name: 'Match Winner', outcomes: [
@@ -1811,7 +1813,7 @@ export class FreeSportsService {
       const aOdds = +(1.4 + Math.random() * 0.8).toFixed(2);
       return {
         id: `volleyball_${g.home.toLowerCase().replace(/\s/g,'-')}_${g.date.slice(5,10)}`,
-        sportId: 16, leagueName: g.league,
+        sportId: 7, leagueName: g.league,
         homeTeam: g.home, awayTeam: g.away,
         startTime: g.date, status: 'scheduled', isLive: false,
         markets: [{ id: 'match_winner', name: 'Match Winner', outcomes: [
@@ -1842,7 +1844,7 @@ export class FreeSportsService {
       const aOdds = +(1.5 + Math.random() * 0.8).toFixed(2);
       return {
         id: `afl_${g.home.toLowerCase().replace(/\s/g,'-')}_${g.date.slice(5,10)}`,
-        sportId: 10, leagueName: `AFL 2026 - ${g.round}`,
+        sportId: 16, leagueName: `AFL 2026 - ${g.round}`,
         homeTeam: g.home, awayTeam: g.away,
         startTime: g.date, status: 'scheduled', isLive: false,
         markets: [{ id: 'match_winner', name: 'Match Winner', outcomes: [

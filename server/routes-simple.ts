@@ -2196,8 +2196,6 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       let reqSportId = req.query.sportId ? Number(req.query.sportId) : undefined;
       const isLive = req.query.isLive ? req.query.isLive === 'true' : undefined;
       
-      if (reqSportId === 8) reqSportId = 7;
-      
       console.log(`Fetching events for sportId: ${reqSportId}, isLive: ${isLive}`);
       
       // FAST PATH: Esports events (sportId=24) - return directly from cache, no football enrichment needed
@@ -2213,7 +2211,9 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       }
       
       // FAST PATH: Free sports (non-football, non-esports) - return from daily cache
-      const FREE_SPORT_IDS = [2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 17, 18, 19, 20];
+      // IDs match DB sport table: 2=Basketball,3=Tennis,4=Baseball,5=Hockey,6=Handball,7=Volleyball,
+      // 8=Rugby,9=Cricket,11=Boxing,12=MMA,13=F1,15=AmericanFootball,16=AFL,17=Snooker,18=Darts,20=Badminton
+      const FREE_SPORT_IDS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
       if (reqSportId && FREE_SPORT_IDS.includes(reqSportId)) {
         const freeSportsEvents = freeSportsService.getUpcomingEvents();
         const now = Date.now();
