@@ -234,6 +234,8 @@ export const BettingProvider: React.FC<{children: ReactNode}> = ({ children }) =
                   txHash: betData.txHash || null,
                   status: 'confirmed',
                   placedAt: new Date().toISOString(),
+                  walrusBlobId: betData.walrusBlobId || null,
+                  walrusUrl: betData.walrusUrl || null,
                 }
               });
               window.dispatchEvent(betConfirmedEvent);
@@ -438,6 +440,8 @@ export const BettingProvider: React.FC<{children: ReactNode}> = ({ children }) =
                   txHash: onChainResult.txDigest,
                   status: 'confirmed',
                   placedAt: new Date().toISOString(),
+                  walrusBlobId: betData.walrusBlobId || null,
+                  walrusUrl: betData.walrusUrl || null,
                 }
               });
               window.dispatchEvent(betConfirmedEvent);

@@ -1,13 +1,10 @@
 import { createHash } from 'crypto';
 
 const WALRUS_PUBLISHERS = [
-  'https://publisher.walrus-mainnet.walrus.space/v1/blobs',
-  'https://walrus-publisher.nodes.guru/v1/blobs',
-  'https://publisher.walrus.space/v1/blobs',
+  'https://walrus-mainnet-publisher-1.staketab.org/v1/blobs',
 ];
 const WALRUS_AGGREGATORS = [
   'https://aggregator.walrus-mainnet.walrus.space/v1/blobs',
-  'https://aggregator.walrus.space/v1/blobs',
 ];
 const STORE_EPOCHS = 5;
 
@@ -132,7 +129,7 @@ function extractBlobId(result: any): string | null {
 
 async function tryPublisher(publisherUrl: string, receiptJson: string): Promise<{ blobId: string; publisher: string } | null> {
   try {
-    const url = `${publisherUrl}?epochs=${STORE_EPOCHS}&send=true`;
+    const url = `${publisherUrl}?epochs=${STORE_EPOCHS}`;
     const response = await fetch(url, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/octet-stream' },

@@ -461,19 +461,23 @@ export function BetHistory() {
                       )}
                       {bet.walrusBlobId && (
                         <>
-                          <div className="text-gray-400">Receipt:</div>
+                          <div className="text-gray-400">🐋 Walrus:</div>
                           <div className="text-right">
-                            <a
-                              href={bet.walrusBlobId.startsWith('local_')
-                                ? `/api/walrus/receipt/${bet.walrusBlobId}`
-                                : `https://aggregator.walrus-mainnet.walrus.space/v1/blobs/${bet.walrusBlobId}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-purple-400 hover:underline inline-flex items-center gap-1"
-                              data-testid={`link-walrus-${bet.id}`}
-                            >
-                              Verify on Walrus <ExternalLink className="w-3 h-3" />
-                            </a>
+                            {bet.walrusBlobId.startsWith('local_') ? (
+                              <span className="text-gray-500 text-xs inline-flex items-center gap-1">
+                                Receipt saved
+                              </span>
+                            ) : (
+                              <a
+                                href={`https://aggregator.walrus-mainnet.walrus.space/v1/blobs/${bet.walrusBlobId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-purple-400 hover:underline inline-flex items-center gap-1"
+                                data-testid={`link-walrus-${bet.id}`}
+                              >
+                                {bet.walrusBlobId.slice(0, 10)}... <ExternalLink className="w-3 h-3" />
+                              </a>
+                            )}
                           </div>
                         </>
                       )}

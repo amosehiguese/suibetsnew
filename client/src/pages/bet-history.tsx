@@ -411,18 +411,22 @@ export default function BetHistoryPage() {
                       </a>
                     )}
                     {bet.walrusBlobId && (
-                      <a
-                        href={bet.walrusBlobId.startsWith('local_')
-                          ? `/api/walrus/receipt/${bet.walrusBlobId}`
-                          : `https://aggregator.walrus-mainnet.walrus.space/v1/blobs/${bet.walrusBlobId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-purple-400 hover:text-purple-300 text-xs flex items-center gap-1 justify-end mt-1"
-                        data-testid={`walrus-link-${bet.id}`}
-                      >
-                        Verify on Walrus
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
+                      bet.walrusBlobId.startsWith('local_') ? (
+                        <span className="text-gray-500 text-xs flex items-center gap-1 justify-end mt-1">
+                          🐋 Walrus receipt saved
+                        </span>
+                      ) : (
+                        <a
+                          href={`https://aggregator.walrus-mainnet.walrus.space/v1/blobs/${bet.walrusBlobId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-purple-400 hover:text-purple-300 text-xs flex items-center gap-1 justify-end mt-1"
+                          data-testid={`walrus-link-${bet.id}`}
+                        >
+                          🐋 {bet.walrusBlobId.slice(0, 10)}... Verify on Walrus
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )
                     )}
                     <button
                       onClick={() => setShareBet(bet)}
