@@ -170,12 +170,11 @@ app.use((req, res, next) => {
     log('Continuing with blockchain-based authentication and storage');
   }
 
-  // WALRUS BACKFILL: Patch any bets that are missing a walrus_blob_id (self-healing on restart)
+  // WALRUS BACKFILL: Patch any bets missing a walrus_blob_id (self-healing on restart)
   try {
     const { db: backfillDb } = await import('./db');
     const { bets: backfillBets } = await import('@shared/schema');
-    const { isNull: backfillIsNull } = await import('drizzle-orm');
-    const { eq: backfillEq } = await import('drizzle-orm');
+    const { isNull: backfillIsNull, eq: backfillEq } = await import('drizzle-orm');
     const { createHash } = await import('crypto');
     const missing = await backfillDb.select().from(backfillBets).where(backfillIsNull(backfillBets.walrusBlobId));
     if (missing.length > 0) {
@@ -184,10 +183,17 @@ app.use((req, res, next) => {
         const betId = row.wurlusBetId || String(row.id);
         const blobId = `local_${createHash('sha256').update(betId + (row.createdAt?.getTime() || Date.now())).digest('hex').slice(0, 16)}`;
         const receiptData = JSON.stringify({
-          version: '1.0', betId, wallet: row.walletAddress,
-          eventName: row.eventName, prediction: row.prediction,
-          odds: row.odds, stake: row.betAmount, placedAt: row.createdAt,
-          storage: { local: true, backfilled: true },
+          platform: 'SuiBets', version: '2.0', type: 'bet_receipt',
+          bet: {
+            id: betId, walletAddress: row.walletAddress,
+            eventName: row.eventName, homeTeam: row.homeTeam, awayTeam: row.awayTeam,
+            prediction: row.prediction, odds: row.odds, stake: row.betAmount,
+            currency: row.currency || 'SBETS', potentialPayout: row.potentialPayout,
+            status: row.status || 'pending',
+          },
+          blockchain: { chain: 'sui:mainnet', network: 'mainnet', txHash: row.txHash || null, betObjectId: row.betObjectId || null },
+          storage: { protocol: 'walrus', network: 'mainnet', local: true, backfilled: true, placedAt: row.createdAt?.getTime() || null, storedAt: Date.now() },
+          verification: { receiptHash: createHash('sha256').update(betId).digest('hex'), algorithm: 'sha256' },
         }, null, 2);
         await backfillDb.update(backfillBets)
           .set({ walrusBlobId: blobId, walrusReceiptData: receiptData })

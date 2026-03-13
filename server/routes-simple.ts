@@ -7968,6 +7968,45 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
         return res.type('html').send(html);
       }
 
+      // Normalize any legacy flat-format receipts to the standard nested structure
+      const normalizeReceiptFormat = (r: any): any => {
+        if (r && typeof r.bet === 'object' && r.bet !== null) return r; // already correct
+        // Old/backfilled flat format → convert to nested
+        return {
+          platform: r.platform || 'SuiBets',
+          version: '2.0',
+          type: r.type || 'bet_receipt',
+          bet: {
+            id: r.betId || r.id || null,
+            walletAddress: r.wallet || r.walletAddress || null,
+            eventName: r.eventName || null,
+            homeTeam: r.homeTeam || null,
+            awayTeam: r.awayTeam || null,
+            prediction: r.prediction || null,
+            odds: r.odds ?? null,
+            stake: r.stake ?? r.betAmount ?? null,
+            currency: r.currency || 'SBETS',
+            potentialPayout: r.potentialPayout ?? null,
+            sportName: r.sportName || null,
+            marketType: r.marketType || null,
+            status: r.status || 'pending',
+          },
+          blockchain: r.blockchain || {
+            chain: 'sui:mainnet',
+            network: 'mainnet',
+            txHash: r.txHash || null,
+            betObjectId: r.betObjectId || null,
+          },
+          storage: {
+            ...(r.storage || {}),
+            placedAt: r.placedAt || r.storage?.placedAt || null,
+            storedAt: r.storedAt || r.storage?.storedAt || null,
+          },
+          verification: r.verification || {},
+        };
+      };
+      receipt = normalizeReceiptFormat(receipt);
+
       const { getWalrusAggregatorUrl } = await import('./services/walrusStorageService');
       res.json({ 
         receipt, 
