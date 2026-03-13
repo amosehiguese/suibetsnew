@@ -179,22 +179,90 @@ app.use((req, res, next) => {
     const missing = await backfillDb.select().from(backfillBets).where(backfillIsNull(backfillBets.walrusBlobId));
     if (missing.length > 0) {
       log(`🐋 Backfilling ${missing.length} bet(s) missing Walrus blob IDs...`);
+      const storedAt = Date.now();
       for (const row of missing) {
         const betId = row.wurlusBetId || String(row.id);
-        const blobId = `local_${createHash('sha256').update(betId + (row.createdAt?.getTime() || Date.now())).digest('hex').slice(0, 16)}`;
+        const currency = (row as any).currency || row.feeCurrency || 'SUI';
+        const placedAt = row.createdAt?.getTime() || storedAt;
+        const blobId = `local_${createHash('sha256').update(betId + placedAt).digest('hex').slice(0, 16)}`;
+
+        const verificationPayload = JSON.stringify({
+          betId,
+          walletAddress: row.walletAddress,
+          eventId: String(row.eventId || ''),
+          prediction: row.prediction,
+          odds: row.odds,
+          stake: row.betAmount,
+          currency,
+          placedAt,
+        });
+
         const receiptData = JSON.stringify({
-          platform: 'SuiBets', version: '2.0', type: 'bet_receipt',
-          bet: {
-            id: betId, walletAddress: row.walletAddress,
-            eventName: row.eventName, homeTeam: row.homeTeam, awayTeam: row.awayTeam,
-            prediction: row.prediction, odds: row.odds, stake: row.betAmount,
-            currency: row.currency || 'SBETS', potentialPayout: row.potentialPayout,
-            status: row.status || 'pending',
+          platform: 'SuiBets',
+          version: '2.0',
+          type: 'bet_receipt',
+          branding: {
+            name: 'SuiBets',
+            tagline: 'Decentralized Sports Betting on Sui',
+            website: 'https://www.suibets.com',
+            walrusSite: 'https://suibets.wal.app',
+            colors: {
+              primary: '#06b6d4',
+              secondary: '#8b5cf6',
+              accent: '#f59e0b',
+              background: '#0a0e1a',
+              surface: '#111827',
+              success: '#10b981',
+              error: '#ef4444',
+            },
+            logo: 'https://www.suibets.com/suibets-logo.png',
           },
-          blockchain: { chain: 'sui:mainnet', network: 'mainnet', txHash: row.txHash || null, betObjectId: row.betObjectId || null },
-          storage: { protocol: 'walrus', network: 'mainnet', local: true, backfilled: true, placedAt: row.createdAt?.getTime() || null, storedAt: Date.now() },
-          verification: { receiptHash: createHash('sha256').update(betId).digest('hex'), algorithm: 'sha256' },
+          bet: {
+            id: betId,
+            walletAddress: row.walletAddress || null,
+            eventId: String(row.eventId || ''),
+            eventName: row.eventName || 'Unknown Event',
+            homeTeam: row.homeTeam || null,
+            awayTeam: row.awayTeam || null,
+            prediction: row.prediction,
+            odds: row.odds,
+            stake: row.betAmount,
+            currency,
+            potentialPayout: row.potentialPayout,
+            sportName: null,
+            marketType: row.marketType || 'match_winner',
+          },
+          blockchain: {
+            chain: 'sui:mainnet',
+            network: 'mainnet',
+            txHash: row.txHash || null,
+            betObjectId: row.betObjectId || null,
+            token: currency === 'SBETS'
+              ? '0x6a4d9c0eab7ac40371a7453d1aa6c89b130950e8af6868ba975fdd81371a7285::sbets::SBETS'
+              : '0x2::sui::SUI',
+            contract: '0x737324ddac9fb96e3d7ffab524f5489c1a0b3e5b4bffa2f244303005001b4ada',
+            platform: '0x5fc1073c9533c6737fa3a0882055d1778602681df70bdabde96b0127b588f082',
+          },
+          storage: {
+            protocol: 'walrus',
+            network: 'mainnet',
+            blobId,
+            local: true,
+            backfilled: true,
+            storedVia: 'local-backfill',
+            storedAt,
+            placedAt,
+            storageEpoch: null,
+            endEpoch: null,
+            walCost: null,
+          },
+          verification: {
+            receiptHash: createHash('sha256').update(verificationPayload).digest('hex'),
+            algorithm: 'sha256',
+            fields: ['betId', 'walletAddress', 'eventId', 'prediction', 'odds', 'stake', 'currency', 'placedAt'],
+          },
         }, null, 2);
+
         await backfillDb.update(backfillBets)
           .set({ walrusBlobId: blobId, walrusReceiptData: receiptData })
           .where(backfillEq(backfillBets.id, row.id));

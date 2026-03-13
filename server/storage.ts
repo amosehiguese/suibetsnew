@@ -496,29 +496,55 @@ export class DatabaseStorage implements IStorage {
       
       // Transform to match frontend's expected format for bet-history page
       // Include both old and new field names for compatibility with all pages
-      return allMatchedBets.map((bet: any) => ({
-        id: bet.wurlusBetId || String(bet.id),
-        numericId: bet.id,
-        eventName: bet.eventName || 'Unknown Event',
-        selection: bet.prediction,
-        prediction: bet.prediction,
-        odds: bet.odds,
-        stake: bet.betAmount,
-        betAmount: bet.betAmount,
-        potentialWin: bet.potentialPayout,
-        potentialPayout: bet.potentialPayout,
-        status: bet.status,
-        placedAt: bet.createdAt?.toISOString() || new Date().toISOString(),
-        createdAt: bet.createdAt?.toISOString() || new Date().toISOString(),
-        settledAt: bet.settledAt?.toISOString(),
-        txHash: bet.txHash,
-        currency: bet.feeCurrency || 'SUI',
-        betType: bet.betType,
-        result: bet.result,
-        walrusBlobId: bet.walrusBlobId,
-        giftedTo: bet.giftedTo || null,
-        giftedFrom: bet.giftedFrom || null
-      }));
+      return allMatchedBets.map((bet: any) => {
+        const blobId = bet.walrusBlobId || null;
+        const walrusUrl = blobId && !blobId.startsWith('local_')
+          ? `https://aggregator.walrus-mainnet.walrus.space/v1/blobs/${blobId}`
+          : null;
+
+        let walrusReceipt: any = null;
+        if (bet.walrusReceiptData) {
+          try { walrusReceipt = JSON.parse(bet.walrusReceiptData); } catch {}
+        }
+
+        return {
+          id: bet.wurlusBetId || String(bet.id),
+          numericId: bet.id,
+          walletAddress: bet.walletAddress || null,
+          eventId: bet.eventId || null,
+          externalEventId: bet.externalEventId || null,
+          eventName: bet.eventName || 'Unknown Event',
+          homeTeam: bet.homeTeam || null,
+          awayTeam: bet.awayTeam || null,
+          selection: bet.prediction,
+          prediction: bet.prediction,
+          marketType: bet.marketType || 'match_winner',
+          odds: bet.odds,
+          stake: bet.betAmount,
+          betAmount: bet.betAmount,
+          potentialWin: bet.potentialPayout,
+          potentialPayout: bet.potentialPayout,
+          payout: bet.payout || null,
+          status: bet.status,
+          result: bet.result || null,
+          placedAt: bet.createdAt?.toISOString() || new Date().toISOString(),
+          createdAt: bet.createdAt?.toISOString() || new Date().toISOString(),
+          settledAt: bet.settledAt?.toISOString() || null,
+          txHash: bet.txHash || null,
+          betObjectId: bet.betObjectId || null,
+          settlementTxHash: bet.settlementTxHash || null,
+          currency: bet.currency || bet.feeCurrency || 'SUI',
+          feeCurrency: bet.feeCurrency || 'SUI',
+          platformFee: bet.platformFee || null,
+          networkFee: bet.networkFee || null,
+          betType: bet.betType || 'single',
+          walrusBlobId: blobId,
+          walrusUrl,
+          walrusReceipt,
+          giftedTo: bet.giftedTo || null,
+          giftedFrom: bet.giftedFrom || null,
+        };
+      });
     } catch (error) {
       console.error('Error getting user bets:', error);
       return [];
