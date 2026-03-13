@@ -2201,18 +2201,18 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       // FAST PATH: Esports events (sportId=9) - return directly from cache, no football enrichment needed
       if (reqSportId === 9) {
         const esportsEvents = esportsService.getUpcomingEvents();
-        const now = Date.now();
+        const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
         const filtered = esportsEvents.filter(e => {
           if (!e.startTime) return true;
-          return new Date(e.startTime).getTime() > now;
+          return new Date(e.startTime).getTime() > sevenDaysAgo;
         });
         console.log(`⚡ FAST PATH: Returning ${filtered.length} esports events directly from cache`);
         return res.json(filtered);
       }
       
       // FAST PATH: Free sports (non-football, non-esports) - return from daily cache
-      // IDs match DB sport table: 2=Basketball,3=Tennis,4=Baseball,5=Hockey,6=Handball,7=Volleyball,
-      // 8=Rugby,9=Cricket,11=Boxing,12=MMA,13=F1,15=AmericanFootball,16=AFL,17=Snooker,18=Darts,20=Badminton
+      // IDs match DB sport table: 2=Basketball,3=Tennis,4=Baseball,5=Baseball,6=Ice Hockey,
+      // 7=MMA,8=Boxing,9=Esports,10=AFL,11=Formula 1,12=Handball,13=NBA,14=NFL,15=Rugby,16=Volleyball,17=Horse Racing
       const FREE_SPORT_IDS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
       if (reqSportId && FREE_SPORT_IDS.includes(reqSportId)) {
         const freeSportsEvents = freeSportsService.getUpcomingEvents();
