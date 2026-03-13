@@ -7819,5 +7819,67 @@ ${receipt.verification ? `<div class="verified"><svg viewBox="0 0 20 20" fill="c
     }
   });
 
+  // Publisher health check — tests all configured publishers live
+  app.get("/api/admin/walrus-publisher-health", async (req: Request, res: Response) => {
+    try {
+      const { checkPublisherHealth } = await import('./services/walrusStorageService');
+      console.log('[Walrus] Running publisher health check...');
+      const results = await checkPublisherHealth();
+      const working = Object.entries(results).filter(([, v]) => v.status.startsWith('✅')).length;
+      res.json({
+        summary: `${working}/${Object.keys(results).length} publishers working`,
+        publishers: results,
+        checkedAt: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Health check failed" });
+    }
+  });
+
+  // Test Walrus storage with a real receipt — verifies the full store + retrieve cycle
+  app.post("/api/admin/walrus-test-store", async (req: Request, res: Response) => {
+    try {
+      const { storeBetReceipt, getBetReceipt } = await import('./services/walrusStorageService');
+      const testData = {
+        betId: `test_${Date.now()}`,
+        walletAddress: '0xtest',
+        eventId: 'test_event',
+        eventName: 'SuiBets Publisher Test',
+        homeTeam: 'Team A',
+        awayTeam: 'Team B',
+        prediction: 'home',
+        odds: 1.95,
+        stake: 1,
+        currency: 'SUI',
+        potentialPayout: 1.95,
+        placedAt: Date.now(),
+      };
+      const stored = await storeBetReceipt(testData);
+      if (!stored.blobId || stored.blobId.startsWith('local_')) {
+        return res.status(503).json({
+          success: false,
+          message: 'All publishers unreachable — receipt fell back to local storage',
+          error: stored.error,
+        });
+      }
+      // Attempt to verify retrieval
+      let retrieved = false;
+      try {
+        await new Promise(r => setTimeout(r, 3000)); // brief wait for certification
+        const receipt = await getBetReceipt(stored.blobId);
+        retrieved = !!receipt;
+      } catch {}
+      res.json({
+        success: true,
+        blobId: stored.blobId,
+        publisherUsed: stored.publisherUsed,
+        retrieved,
+        aggregatorUrl: `https://aggregator.walrus-mainnet.walrus.space/v1/blobs/${stored.blobId}`,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
   return httpServer;
 }

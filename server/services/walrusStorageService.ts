@@ -1,16 +1,54 @@
 import { createHash } from 'crypto';
 
-const WALRUS_PUBLISHERS = [
-  'https://publisher.walrus-mainnet.walrus.space/v1/blobs',      // Mysten Labs official (most reliable)
-  'https://walrus-mainnet-publisher-1.staketab.org/v1/blobs',   // StakeTab
-  'https://walrus.badkids.xyz/v1/blobs',                        // BadKids
-  'https://walrus-publisher.nodes.guru/v1/blobs',               // Nodes.guru
-  'https://walrus-mainnet.nodeinfra.com/v1/blobs',              // NodeInfra
+// =============================================================================
+// Publisher list — ordered by reliability.
+// Only walrus-mainnet-publisher-1.staketab.org is confirmed working on mainnet
+// as of March 2026 (per live testing). Others are kept as fallbacks in case
+// they come back online, but tried with shorter timeouts.
+// Official list: https://github.com/MystenLabs/awesome-walrus
+// =============================================================================
+const WALRUS_PUBLISHERS: Array<{ url: string; timeout: number; priority: 'primary' | 'secondary' }> = [
+  // PRIMARY — confirmed working March 2026
+  { url: 'https://walrus-mainnet-publisher-1.staketab.org/v1/blobs', timeout: 30000, priority: 'primary' },
+  // SECONDARY — Mysten Labs official (was working earlier, may come back)
+  { url: 'https://publisher.walrus-mainnet.walrus.space/v1/blobs', timeout: 12000, priority: 'secondary' },
+  // SECONDARY — community nodes (kept as fallback, short timeout to avoid blocking)
+  { url: 'https://walrus-mainnet.nodeinfra.com/v1/blobs', timeout: 10000, priority: 'secondary' },
+  { url: 'https://walrus.badkids.xyz/v1/blobs', timeout: 10000, priority: 'secondary' },
+  { url: 'https://walrus-publisher.nodes.guru/v1/blobs', timeout: 10000, priority: 'secondary' },
 ];
+
 const WALRUS_AGGREGATORS = [
   'https://aggregator.walrus-mainnet.walrus.space/v1/blobs',
+  'https://wal-aggregator-mainnet.staketab.org/v1/blobs',
 ];
+
 const STORE_EPOCHS = 10;
+
+// Track publisher health so we skip recently-dead ones
+const publisherHealth: Map<string, { failedAt: number; failures: number }> = new Map();
+const HEALTH_RESET_MS = 5 * 60 * 1000; // reset after 5 minutes
+
+function isPublisherHealthy(url: string): boolean {
+  const h = publisherHealth.get(url);
+  if (!h) return true;
+  if (Date.now() - h.failedAt > HEALTH_RESET_MS) {
+    publisherHealth.delete(url);
+    return true;
+  }
+  // Skip secondary publishers after 2 failures; skip primary after 5
+  const isPrimary = WALRUS_PUBLISHERS.find(p => p.url === url)?.priority === 'primary';
+  return h.failures < (isPrimary ? 5 : 2);
+}
+
+function markPublisherFailed(url: string) {
+  const h = publisherHealth.get(url) || { failedAt: 0, failures: 0 };
+  publisherHealth.set(url, { failedAt: Date.now(), failures: h.failures + 1 });
+}
+
+function markPublisherSuccess(url: string) {
+  publisherHealth.delete(url);
+}
 
 interface BetReceiptData {
   betId: string;
@@ -131,19 +169,24 @@ function extractBlobId(result: any): string | null {
   return null;
 }
 
-async function tryPublisher(publisherUrl: string, receiptJson: string): Promise<{ blobId: string; publisher: string } | null> {
+async function tryPublisher(
+  publisherUrl: string,
+  receiptJson: string,
+  timeoutMs: number,
+): Promise<{ blobId: string; publisher: string } | null> {
   try {
     const url = `${publisherUrl}?epochs=${STORE_EPOCHS}`;
     const response = await fetch(url, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/octet-stream' },
       body: receiptJson,
-      signal: AbortSignal.timeout(25000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     if (!response.ok) {
       const text = await response.text().catch(() => '');
       console.warn(`[Walrus] Publisher ${publisherUrl} returned ${response.status}: ${text.slice(0, 200)}`);
+      markPublisherFailed(publisherUrl);
       return null;
     }
 
@@ -151,28 +194,80 @@ async function tryPublisher(publisherUrl: string, receiptJson: string): Promise<
     const blobId = extractBlobId(result);
 
     if (blobId) {
+      markPublisherSuccess(publisherUrl);
       return { blobId, publisher: publisherUrl };
     }
 
     console.warn(`[Walrus] No blobId from ${publisherUrl}:`, JSON.stringify(result).slice(0, 300));
+    markPublisherFailed(publisherUrl);
     return null;
   } catch (err: any) {
-    console.warn(`[Walrus] Publisher ${publisherUrl} failed: ${err.message}`);
+    const isTimeout = err.name === 'TimeoutError' || err.name === 'AbortError';
+    console.warn(`[Walrus] Publisher ${publisherUrl} ${isTimeout ? 'timed out' : `failed: ${err.message}`}`);
+    markPublisherFailed(publisherUrl);
     return null;
   }
 }
 
+// Race all healthy publishers simultaneously — first success wins.
+// Primary publisher always participates; secondaries only if healthy.
 async function storeViaHttp(receiptJson: string): Promise<{ blobId: string; publisher: string } | null> {
-  console.log(`[Walrus] Trying ${WALRUS_PUBLISHERS.length} publishers in sequence...`);
-  for (const publisherUrl of WALRUS_PUBLISHERS) {
-    const result = await tryPublisher(publisherUrl, receiptJson);
-    if (result) {
-      console.log(`[Walrus] ✅ Success with publisher: ${publisherUrl}`);
-      return result;
+  const candidates = WALRUS_PUBLISHERS.filter(p => {
+    if (p.priority === 'primary') return true; // always try primary
+    return isPublisherHealthy(p.url);
+  });
+
+  console.log(`[Walrus] Racing ${candidates.length} publisher(s)...`);
+
+  // Use Promise.any so the first successful publisher wins
+  const promises = candidates.map(async (p) => {
+    const result = await tryPublisher(p.url, receiptJson, p.timeout);
+    if (!result) throw new Error(`${p.url} failed`);
+    return result;
+  });
+
+  try {
+    const winner = await Promise.any(promises);
+    console.log(`[Walrus] ✅ Success with publisher: ${winner.publisher}`);
+    return winner;
+  } catch {
+    console.error(`[Walrus] ❌ ALL ${candidates.length} publishers failed — receipt will be stored locally`);
+    return null;
+  }
+}
+
+// Verify a stored blob is retrievable from aggregators
+async function verifyBlobStored(blobId: string): Promise<boolean> {
+  for (const aggregatorBase of WALRUS_AGGREGATORS) {
+    try {
+      const response = await fetch(`${aggregatorBase}/${blobId}`, {
+        method: 'HEAD',
+        signal: AbortSignal.timeout(15000),
+      });
+      if (response.ok || response.status === 200) {
+        console.log(`[Walrus] ✅ Blob ${blobId} verified on aggregator: ${aggregatorBase}`);
+        return true;
+      }
+    } catch {
+      // try next aggregator
     }
   }
-  console.error(`[Walrus] ❌ ALL ${WALRUS_PUBLISHERS.length} publishers failed — receipt will be stored locally`);
-  return null;
+  // Try GET if HEAD fails (some aggregators don't support HEAD)
+  for (const aggregatorBase of WALRUS_AGGREGATORS) {
+    try {
+      const response = await fetch(`${aggregatorBase}/${blobId}`, {
+        signal: AbortSignal.timeout(15000),
+      });
+      if (response.ok) {
+        console.log(`[Walrus] ✅ Blob ${blobId} verified via GET on: ${aggregatorBase}`);
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  console.warn(`[Walrus] ⚠️ Blob ${blobId} could not be verified on any aggregator (may still be certifying)`);
+  return false;
 }
 
 export async function storeBetReceipt(data: BetReceiptData): Promise<WalrusStoreResponse> {
@@ -183,6 +278,8 @@ export async function storeBetReceipt(data: BetReceiptData): Promise<WalrusStore
 
   if (result) {
     console.log(`🐋 Walrus MAINNET receipt stored: ${result.blobId} (via ${result.publisher})`);
+    // Verify in background — don't block bet response
+    verifyBlobStored(result.blobId).catch(() => {});
     return { blobId: result.blobId, receiptJson, receiptHash, publisherUsed: result.publisher };
   }
 
@@ -215,4 +312,43 @@ export async function getBetReceipt(blobId: string): Promise<any | null> {
 
 export function getWalrusAggregatorUrl(blobId: string): string {
   return `${WALRUS_AGGREGATORS[0]}/${blobId}`;
+}
+
+// Health-check all publishers — useful for admin endpoints
+export async function checkPublisherHealth(): Promise<Record<string, { status: string; latencyMs?: number }>> {
+  const testPayload = JSON.stringify({ suibets_health_check: true, ts: Date.now() });
+  const results: Record<string, { status: string; latencyMs?: number }> = {};
+
+  await Promise.allSettled(
+    WALRUS_PUBLISHERS.map(async (p) => {
+      const start = Date.now();
+      try {
+        const response = await fetch(`${p.url}?epochs=1`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: testPayload,
+          signal: AbortSignal.timeout(15000),
+        });
+        const latencyMs = Date.now() - start;
+        if (response.ok) {
+          const json = await response.json().catch(() => null);
+          const blobId = json ? extractBlobId(json) : null;
+          results[p.url] = {
+            status: blobId ? `✅ working (blobId: ${blobId.slice(0, 12)}...)` : '⚠️ responded but no blobId',
+            latencyMs,
+          };
+        } else {
+          results[p.url] = { status: `❌ HTTP ${response.status}`, latencyMs };
+        }
+      } catch (err: any) {
+        const reason = err.name === 'TimeoutError' ? 'timeout'
+          : err.cause?.code === 'ECONNREFUSED' ? 'connection refused'
+          : err.cause?.code === 'ENOTFOUND' ? 'DNS not found'
+          : err.message;
+        results[p.url] = { status: `❌ ${reason}`, latencyMs: Date.now() - start };
+      }
+    })
+  );
+
+  return results;
 }
