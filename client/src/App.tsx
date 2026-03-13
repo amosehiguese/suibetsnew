@@ -59,6 +59,7 @@ import SharedBetPage from "@/pages/shared-bet";
 import WalrusReceiptPage from "@/pages/walrus-receipt";
 import StreamingPage from "@/pages/streaming";
 import AuthCallback from "@/pages/auth-callback";
+import TradePage from "@/pages/trade";
 
 // Informational Pages
 import PrivacyPolicy from "@/pages/privacy";
@@ -234,6 +235,9 @@ function App() {
                           
                           {/* Streaming */}
                           <Route path="/streaming" component={StreamingPage} />
+                          
+                          {/* Bluefin Trade Integration */}
+                          <Route path="/trade" component={TradePage} />
                           
                           {/* zkLogin OAuth Callback */}
                           <Route path="/auth/callback" component={AuthCallback} />

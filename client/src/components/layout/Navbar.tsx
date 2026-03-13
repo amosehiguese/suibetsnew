@@ -45,13 +45,14 @@ export default function Navbar() {
           </a>
           
           <a 
-            href="https://app.turbos.finance/#/trade?input=0x2::sui::SUI&output=0x6a4d9c0eab7ac40371a7453d1aa6c89b130950e8af6868ba975fdd81371a7285::sbets::SBETS" 
+            href="https://swap.bluefin.io/?input=0x2::sui::SUI&output=0x6a4d9c0eab7ac40371a7453d1aa6c89b130950e8af6868ba975fdd81371a7285::sbets::SBETS" 
             target="_blank"
             rel="noopener noreferrer"
-            className="text-black bg-gradient-to-r from-green-400 to-emerald-500 px-3 py-1.5 rounded-lg cursor-pointer font-bold text-sm hover:shadow-lg hover:shadow-green-500/50 transition-all duration-300 whitespace-nowrap"
+            className="text-white bg-gradient-to-r from-blue-600 to-blue-400 px-3 py-1.5 rounded-lg cursor-pointer font-bold text-sm hover:shadow-lg hover:shadow-blue-500/50 transition-all duration-300 whitespace-nowrap flex items-center gap-1"
             data-testid="link-buy-sbets"
           >
             Buy SBETS
+            <span className="text-[9px] font-bold bg-white/20 rounded px-1 ml-0.5">BLN</span>
           </a>
           
           <a 

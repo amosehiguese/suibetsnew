@@ -94,6 +94,7 @@ const Layout: React.FC<LayoutProps> = ({
     { label: 'Promotions', href: '/promotions' },
     { label: 'Revenue', href: '/revenue' },
     { label: 'Staking', href: '/staking' },
+    { label: 'Trade', href: '/trade', bluefin: true },
   ];
 
   const moreMenuItems = [
@@ -192,7 +193,9 @@ const Layout: React.FC<LayoutProps> = ({
                   ? 'text-cyan-400' 
                   : (item as any).highlight
                     ? 'text-yellow-400 hover:text-yellow-300'
-                    : 'text-gray-300 hover:text-white'
+                    : (item as any).bluefin
+                      ? 'text-blue-400 hover:text-blue-300'
+                      : 'text-gray-300 hover:text-white'
               }`}
               onClick={() => setLocation(item.href)}
               data-testid={`nav-${item.label.toLowerCase()}`}
@@ -200,6 +203,9 @@ const Layout: React.FC<LayoutProps> = ({
               {item.label}
               {(item as any).highlight && location !== item.href && (
                 <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
+              )}
+              {(item as any).bluefin && (
+                <span className="ml-1 text-[10px] font-bold text-blue-400 bg-blue-400/10 border border-blue-400/30 rounded px-1">BLN</span>
               )}
             </button>
           ))}
