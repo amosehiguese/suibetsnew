@@ -3,6 +3,7 @@ import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import { generateNonce, generateRandomness, jwtToAddress, getExtendedEphemeralPublicKey, genAddressSeed, getZkLoginSignature } from '@mysten/sui/zklogin';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
 import { Transaction } from '@mysten/sui/transactions';
+import { getMainDomainOrigin } from '@/lib/queryClient';
 
 let GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 const SUI_NETWORK = (import.meta.env.VITE_SUI_NETWORK as string) || 'mainnet';
@@ -157,19 +158,26 @@ export function ZkLoginProvider({ children }: { children: ReactNode }) {
 
       const exportedKey = ephemeralKeyPair.getSecretKey();
 
-      savePendingState({
+      const pendingState = {
         ephemeralKeyPairExport: exportedKey,
         randomness,
         maxEpoch,
-      });
+      };
 
-      const redirectUri = `${window.location.origin}/auth/callback`;
+      savePendingState(pendingState);
+
+      // Encode pending state in OAuth `state` param so cross-domain redirects work
+      // (sessionStorage is domain-specific; when redirected from wal.app → suibets.com it would be lost)
+      const encodedState = btoa(JSON.stringify(pendingState));
+
+      const redirectUri = `${getMainDomainOrigin()}/auth/callback`;
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
         `client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}` +
         `&redirect_uri=${encodeURIComponent(redirectUri)}` +
         `&response_type=id_token` +
         `&scope=openid` +
-        `&nonce=${nonce}`;
+        `&nonce=${nonce}` +
+        `&state=${encodeURIComponent(encodedState)}`;
 
       console.log('[zkLogin] Redirecting to Google OAuth...');
       window.location.href = authUrl;
@@ -192,7 +200,20 @@ export function ZkLoginProvider({ children }: { children: ReactNode }) {
         throw new Error('No token received from Google');
       }
 
-      const pendingState = loadPendingState();
+      // Try sessionStorage first, then fall back to the OAuth state parameter
+      // (state param is used when redirected cross-domain, e.g. from suibets.wal.app to suibets.com)
+      let pendingState = loadPendingState();
+      if (!pendingState) {
+        const stateParam = params.get('state');
+        if (stateParam) {
+          try {
+            pendingState = JSON.parse(atob(stateParam));
+            console.log('[zkLogin] Restored pending state from OAuth state parameter (cross-domain flow)');
+          } catch {
+            // ignore decode errors
+          }
+        }
+      }
       if (!pendingState) {
         throw new Error('Login session expired. Please try again.');
       }

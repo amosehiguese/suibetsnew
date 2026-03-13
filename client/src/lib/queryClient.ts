@@ -1,6 +1,17 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+const MAIN_DOMAIN = 'https://www.suibets.com';
+
+function isWalrusDomain(): boolean {
+  const hostname = window.location.hostname;
+  return hostname.endsWith('.wal.app') || hostname.endsWith('.walrus.site');
+}
+
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || (isWalrusDomain() ? MAIN_DOMAIN : '');
+
+export function getMainDomainOrigin(): string {
+  return isWalrusDomain() ? MAIN_DOMAIN : window.location.origin;
+}
 
 if (API_BASE) {
   const originalFetch = window.fetch.bind(window);
