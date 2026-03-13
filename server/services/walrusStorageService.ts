@@ -2,15 +2,17 @@ import { createHash } from 'crypto';
 
 // =============================================================================
 // Publisher list — ordered by reliability.
-// Confirmed working March 2026:
-//   - StakeTab-1: https://walrus-mainnet-publisher-1.staketab.org
+// PRIMARY publishers (race in parallel for fastest response):
+//   - StakeTab-1: https://walrus-mainnet-publisher-1.staketab.org (confirmed March 2026)
+//   - StakeTab-2: https://walrus-mainnet-publisher-2.staketab.org (confirmed March 2026)
 //   - Nami Cloud: https://walrus-mainnet-publisher.nami.cloud/{key}/v1/blobs (requires NAMI_CLOUD_ENDPOINT_KEY)
 // Official list: https://github.com/MystenLabs/awesome-walrus
 // =============================================================================
 function buildPublisherList(): Array<{ url: string; timeout: number; priority: 'primary' | 'secondary' }> {
   const list: Array<{ url: string; timeout: number; priority: 'primary' | 'secondary' }> = [
-    // PRIMARY — confirmed working March 2026
+    // PRIMARY — StakeTab confirmed working March 2026 (both nodes race in parallel)
     { url: 'https://walrus-mainnet-publisher-1.staketab.org/v1/blobs', timeout: 30000, priority: 'primary' },
+    { url: 'https://walrus-mainnet-publisher-2.staketab.org/v1/blobs', timeout: 30000, priority: 'primary' },
   ];
 
   // Nami Cloud — add if endpoint key is configured
@@ -26,10 +28,10 @@ function buildPublisherList(): Array<{ url: string; timeout: number; priority: '
 
   // SECONDARY — kept as fallbacks with short timeouts
   list.push(
-    { url: 'https://publisher.walrus-mainnet.walrus.space/v1/blobs', timeout: 12000, priority: 'secondary' },
-    { url: 'https://walrus-mainnet.nodeinfra.com/v1/blobs', timeout: 10000, priority: 'secondary' },
-    { url: 'https://walrus.badkids.xyz/v1/blobs', timeout: 10000, priority: 'secondary' },
-    { url: 'https://walrus-publisher.nodes.guru/v1/blobs', timeout: 10000, priority: 'secondary' },
+    { url: 'https://publisher.walrus-mainnet.walrus.space/v1/blobs', timeout: 15000, priority: 'secondary' },
+    { url: 'https://walrus-mainnet.nodeinfra.com/v1/blobs', timeout: 12000, priority: 'secondary' },
+    { url: 'https://walrus.badkids.xyz/v1/blobs', timeout: 12000, priority: 'secondary' },
+    { url: 'https://walrus-publisher.nodes.guru/v1/blobs', timeout: 12000, priority: 'secondary' },
   );
 
   return list;

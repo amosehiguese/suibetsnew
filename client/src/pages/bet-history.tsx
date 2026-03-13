@@ -416,16 +416,14 @@ export default function BetHistoryPage() {
                           🐋 Walrus receipt saved
                         </span>
                       ) : (
-                        <a
-                          href={`https://aggregator.walrus-mainnet.walrus.space/v1/blobs/${bet.walrusBlobId}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <Link
+                          href={`/walrus-receipt/${bet.walrusBlobId}`}
                           className="text-purple-400 hover:text-purple-300 text-xs flex items-center gap-1 justify-end mt-1"
                           data-testid={`walrus-link-${bet.id}`}
                         >
-                          🐋 {bet.walrusBlobId.slice(0, 10)}... Verify on Walrus
+                          🐋 {bet.walrusBlobId.slice(0, 10)}... View Receipt
                           <ExternalLink className="h-3 w-3" />
-                        </a>
+                        </Link>
                       )
                     )}
                     <button

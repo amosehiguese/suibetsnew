@@ -466,9 +466,7 @@ export function BetSlip() {
                     {confirmedBet.walrusUrl && (
                       <div className="flex justify-between items-center pt-1 border-t border-cyan-900/30 mt-1">
                         <a
-                          href={`/api/walrus/receipt/${confirmedBet.walrusBlobId}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          href={`/walrus-receipt/${confirmedBet.walrusBlobId}`}
                           className="flex items-center gap-1 text-cyan-400 hover:text-cyan-300 text-xs font-medium"
                           data-testid="link-walrus-receipt"
                         >

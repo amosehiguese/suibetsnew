@@ -56,6 +56,7 @@ import StakingPage from "@/pages/staking";
 import NetworkPage from "@/pages/network";
 import AdminPanel from "@/pages/admin-panel";
 import SharedBetPage from "@/pages/shared-bet";
+import WalrusReceiptPage from "@/pages/walrus-receipt";
 import StreamingPage from "@/pages/streaming";
 import AuthCallback from "@/pages/auth-callback";
 
@@ -227,6 +228,9 @@ function App() {
                           
                           {/* Shared Bet Page */}
                           <Route path="/bet/:id" component={SharedBetPage} />
+                          
+                          {/* Walrus Receipt Page */}
+                          <Route path="/walrus-receipt/:blobId" component={WalrusReceiptPage} />
                           
                           {/* Streaming */}
                           <Route path="/streaming" component={StreamingPage} />
