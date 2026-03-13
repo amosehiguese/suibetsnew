@@ -3444,36 +3444,9 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       const betId = onChainBetId || `bet-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const potentialPayout = Math.round(betAmount * odds * 100) / 100;
 
-      const bet = {
-        id: betId,
-        userId,
-        eventId,
-        eventName: eventName || 'Sports Event',
-        homeTeam: resolvedHomeTeam || '', // Store for settlement matching
-        awayTeam: resolvedAwayTeam || '', // Store for settlement matching
-        marketId,
-        outcomeId,
-        odds,
-        betAmount,
-        currency: betCurrency, // Use computed betCurrency (from feeCurrency || currency || 'SUI')
-        status: (paymentMethod === 'wallet' ? 'confirmed' : 'pending') as 'pending' | 'confirmed',
-        prediction,
-        placedAt: Date.now(),
-        potentialPayout,
-        platformFee: paymentMethod === 'wallet' ? 0 : platformFee, // No platform fee for on-chain bets (paid in gas)
-        totalDebit: paymentMethod === 'wallet' ? betAmount : totalDebit,
-        txHash: txHash || undefined,
-        onChainBetId: onChainBetId || undefined,
-        paymentMethod,
-        giftedTo: giftRecipientWallet || undefined,
-        giftedFrom: giftRecipientWallet ? (walletAddress || userId) : undefined
-      };
-
-      // Store bet in storage
-      const storedBet = await storage.createBet(bet);
-
-      // WALRUS: Store bet receipt on decentralized storage (blocking - returns blobId in response)
+      // WALRUS: Store bet receipt BEFORE inserting the bet so blob ID is always guaranteed in the DB row
       let walrusBlobId: string | null = null;
+      let walrusReceiptJson: string | null = null;
       let walrusStorageEpoch: number | null = null;
       let walrusEndEpoch: number | null = null;
       let walrusCost: number | null = null;
@@ -3497,10 +3470,7 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
           sportName: sportName || undefined,
           marketType: marketTypeName || marketId || undefined,
         });
-        const { bets: betsTable } = await import('@shared/schema');
-        const { db: walrusDb } = await import('./db');
-        const { eq: walrusEq } = await import('drizzle-orm');
-        // Enrich receipt JSON with post-storage metadata (epoch, cost, publisher)
+        // Enrich receipt JSON with post-storage metadata
         let enrichedReceiptJson = walrusResult.receiptJson;
         try {
           const receiptObj = JSON.parse(walrusResult.receiptJson);
@@ -3514,25 +3484,47 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
           };
           enrichedReceiptJson = JSON.stringify(receiptObj, null, 2);
         } catch {}
-        // Capture epoch/cost metadata for response
+        walrusReceiptJson = enrichedReceiptJson;
         walrusStorageEpoch = walrusResult.storageEpoch ?? null;
         walrusEndEpoch = walrusResult.endEpoch ?? null;
         walrusCost = walrusResult.walCost ?? null;
-        const updateFields: any = { walrusReceiptData: enrichedReceiptJson };
-        if (walrusResult.blobId) {
-          updateFields.walrusBlobId = walrusResult.blobId;
-          walrusBlobId = walrusResult.blobId;
-        } else {
-          updateFields.walrusBlobId = `local_${walrusResult.receiptHash}`;
-          walrusBlobId = updateFields.walrusBlobId;
-        }
-        await walrusDb.update(betsTable)
-          .set(updateFields)
-          .where(walrusEq(betsTable.wurlusBetId, betId));
-        console.log(`🐋 Receipt saved for bet ${betId}: ${updateFields.walrusBlobId} (publisher: ${walrusResult.publisherUsed || 'local'}) epoch: ${walrusResult.storageEpoch}→${walrusResult.endEpoch} cost: ${walrusResult.walCost}`);
+        walrusBlobId = walrusResult.blobId || `local_${walrusResult.receiptHash}`;
+        console.log(`🐋 Walrus receipt ready for bet ${betId}: ${walrusBlobId} (publisher: ${walrusResult.publisherUsed || 'local'}) epoch: ${walrusResult.storageEpoch}→${walrusResult.endEpoch}`);
       } catch (walrusErr: any) {
-        console.warn(`[Walrus] Store failed: ${walrusErr.message}`);
+        console.warn(`[Walrus] Pre-bet store error: ${walrusErr.message} — using local fallback`);
+        const { createHash } = await import('crypto');
+        walrusBlobId = `local_${createHash('sha256').update(betId + Date.now()).digest('hex').slice(0, 16)}`;
       }
+
+      const bet = {
+        id: betId,
+        userId,
+        eventId,
+        eventName: eventName || 'Sports Event',
+        homeTeam: resolvedHomeTeam || '', // Store for settlement matching
+        awayTeam: resolvedAwayTeam || '', // Store for settlement matching
+        marketId,
+        outcomeId,
+        odds,
+        betAmount,
+        currency: betCurrency, // Use computed betCurrency (from feeCurrency || currency || 'SUI')
+        status: (paymentMethod === 'wallet' ? 'confirmed' : 'pending') as 'pending' | 'confirmed',
+        prediction,
+        placedAt: Date.now(),
+        potentialPayout,
+        platformFee: paymentMethod === 'wallet' ? 0 : platformFee, // No platform fee for on-chain bets (paid in gas)
+        totalDebit: paymentMethod === 'wallet' ? betAmount : totalDebit,
+        txHash: txHash || undefined,
+        onChainBetId: onChainBetId || undefined,
+        paymentMethod,
+        giftedTo: giftRecipientWallet || undefined,
+        giftedFrom: giftRecipientWallet ? (walletAddress || userId) : undefined,
+        walrusBlobId,
+        walrusReceiptData: walrusReceiptJson,
+      };
+
+      // Store bet in storage (walrusBlobId already included — guaranteed to be non-null)
+      const storedBet = await storage.createBet(bet);
       
       // UPDATE LIMITS AFTER SUCCESSFUL BET PLACEMENT
       if (limitsCheckPassed && userWalletForLimits) {

@@ -169,6 +169,35 @@ app.use((req, res, next) => {
     console.error('Error initializing database:', error);
     log('Continuing with blockchain-based authentication and storage');
   }
+
+  // WALRUS BACKFILL: Patch any bets that are missing a walrus_blob_id (self-healing on restart)
+  try {
+    const { db: backfillDb } = await import('./db');
+    const { bets: backfillBets } = await import('@shared/schema');
+    const { isNull: backfillIsNull } = await import('drizzle-orm');
+    const { eq: backfillEq } = await import('drizzle-orm');
+    const { createHash } = await import('crypto');
+    const missing = await backfillDb.select().from(backfillBets).where(backfillIsNull(backfillBets.walrusBlobId));
+    if (missing.length > 0) {
+      log(`🐋 Backfilling ${missing.length} bet(s) missing Walrus blob IDs...`);
+      for (const row of missing) {
+        const betId = row.wurlusBetId || String(row.id);
+        const blobId = `local_${createHash('sha256').update(betId + (row.createdAt?.getTime() || Date.now())).digest('hex').slice(0, 16)}`;
+        const receiptData = JSON.stringify({
+          version: '1.0', betId, wallet: row.walletAddress,
+          eventName: row.eventName, prediction: row.prediction,
+          odds: row.odds, stake: row.betAmount, placedAt: row.createdAt,
+          storage: { local: true, backfilled: true },
+        }, null, 2);
+        await backfillDb.update(backfillBets)
+          .set({ walrusBlobId: blobId, walrusReceiptData: receiptData })
+          .where(backfillEq(backfillBets.id, row.id));
+      }
+      log(`🐋 Walrus backfill complete: ${missing.length} bet(s) patched`);
+    }
+  } catch (backfillErr: any) {
+    console.warn('[Walrus backfill] Failed:', backfillErr.message);
+  }
   
   // Setup blockchain-based authentication
   const { requireWalletAuth } = setupBlockchainAuth(app);

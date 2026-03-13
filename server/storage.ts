@@ -316,7 +316,14 @@ export class DatabaseStorage implements IStorage {
         const existing = await db.select().from(bets).where(eq(bets.wurlusBetId, bet.id));
         if (existing.length > 0) {
           console.log(`⚠️ DUPLICATE BET PREVENTION: Bet ${bet.id} already exists`);
-          return { ...existing[0], id: bet.id, duplicate: true };
+          // If this existing bet is missing a walrusBlobId, patch it now
+          if (!existing[0].walrusBlobId && bet.walrusBlobId) {
+            await db.update(bets)
+              .set({ walrusBlobId: bet.walrusBlobId, walrusReceiptData: bet.walrusReceiptData || null })
+              .where(eq(bets.id, existing[0].id));
+            console.log(`🐋 Patched missing walrusBlobId on duplicate bet ${bet.id}: ${bet.walrusBlobId}`);
+          }
+          return { ...existing[0], walrusBlobId: bet.walrusBlobId || existing[0].walrusBlobId, id: bet.id, duplicate: true };
         }
       }
       
@@ -349,7 +356,9 @@ export class DatabaseStorage implements IStorage {
         awayTeam: bet.awayTeam || '', // Store away team for settlement matching
         betObjectId: bet.onChainBetId || null, // Store on-chain bet object ID for settlement
         giftedTo: bet.giftedTo || null,
-        giftedFrom: bet.giftedFrom || null
+        giftedFrom: bet.giftedFrom || null,
+        walrusBlobId: bet.walrusBlobId || null,
+        walrusReceiptData: bet.walrusReceiptData || null,
       }).returning();
       
       console.log(`✅ BET STORED IN DB: ${bet.id} (db id: ${inserted.id}) tx: ${inserted.txHash}`);

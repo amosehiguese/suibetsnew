@@ -411,20 +411,14 @@ export default function BetHistoryPage() {
                       </a>
                     )}
                     {bet.walrusBlobId && (
-                      bet.walrusBlobId.startsWith('local_') ? (
-                        <span className="text-gray-500 text-xs flex items-center gap-1 justify-end mt-1">
-                          🐋 Walrus receipt saved
-                        </span>
-                      ) : (
-                        <Link
-                          href={`/walrus-receipt/${bet.walrusBlobId}`}
-                          className="text-purple-400 hover:text-purple-300 text-xs flex items-center gap-1 justify-end mt-1"
-                          data-testid={`walrus-link-${bet.id}`}
-                        >
-                          🐋 {bet.walrusBlobId.slice(0, 10)}... View Receipt
-                          <ExternalLink className="h-3 w-3" />
-                        </Link>
-                      )
+                      <Link
+                        href={`/walrus-receipt/${bet.walrusBlobId}`}
+                        className="text-purple-400 hover:text-purple-300 text-xs flex items-center gap-1 justify-end mt-1"
+                        data-testid={`walrus-link-${bet.id}`}
+                      >
+                        🐋 {bet.walrusBlobId.startsWith('local_') ? 'Receipt on file' : `${bet.walrusBlobId.slice(0, 10)}...`} View Receipt
+                        <ExternalLink className="h-3 w-3" />
+                      </Link>
                     )}
                     <button
                       onClick={() => setShareBet(bet)}
