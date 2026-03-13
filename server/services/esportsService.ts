@@ -11,7 +11,7 @@ const LOL_API_KEY = '0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z';
 const LOL_SCHEDULE_URL = 'https://esports-api.lolesports.com/persisted/gw/getSchedule?hl=en-US';
 const DOTA_PRO_MATCHES_URL = 'https://api.opendota.com/api/proMatches';
 
-const ESPORTS_SPORT_ID = 24;
+const ESPORTS_SPORT_ID = 9;
 
 let cachedEsportsEvents: SportEvent[] = [];
 let lastFetchDate = '';

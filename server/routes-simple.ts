@@ -2198,8 +2198,8 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       
       console.log(`Fetching events for sportId: ${reqSportId}, isLive: ${isLive}`);
       
-      // FAST PATH: Esports events (sportId=24) - return directly from cache, no football enrichment needed
-      if (reqSportId === 24) {
+      // FAST PATH: Esports events (sportId=9) - return directly from cache, no football enrichment needed
+      if (reqSportId === 9) {
         const esportsEvents = esportsService.getUpcomingEvents();
         const now = Date.now();
         const filtered = esportsEvents.filter(e => {

@@ -793,35 +793,40 @@ export class ApiSportsService {
       football: 1,
       soccer: 1,
       basketball: 2,
-      nba: 2, // NBA maps to basketball
+      nba: 13,
       tennis: 3,
-      baseball: 4,
-      hockey: 5,
-      handball: 6,
-      volleyball: 7,
-      rugby: 8,
-      cricket: 9, 
-      golf: 10,
-      boxing: 11,
-      mma: 12,
-      'mma-ufc': 12, // Added this entry to support mma-ufc as slug
-      formula_1: 13,
-      'formula-1': 13, // Support either format
-      cycling: 14,
-      american_football: 15,
-      'american-football': 15, // Support hyphenated format
-      nfl: 15, // NFL maps to american_football
-      afl: 16, // Australian Football League
-      'aussie-rules': 16, // Support hyphenated format
-      aussie_rules: 16, // Alternative name for AFL
-      snooker: 17,
-      darts: 18,
-      'table-tennis': 19, // Support hyphenated format
-      table_tennis: 19,
-      badminton: 20,
-      esports: 21,
-      motorsport: 22,
-      netball: 23
+      'american-football': 4,
+      american_football: 4,
+      baseball: 5,
+      hockey: 6,
+      'ice-hockey': 6,
+      mma: 7,
+      'mma-ufc': 7,
+      ufc: 7,
+      boxing: 8,
+      esports: 9,
+      afl: 10,
+      'aussie-rules': 10,
+      aussie_rules: 10,
+      'formula-1': 11,
+      formula_1: 11,
+      handball: 12,
+      nfl: 14,
+      rugby: 15,
+      volleyball: 16,
+      'horse-racing': 17,
+      horse_racing: 17,
+      cricket: 18,
+      // Sports without DB entries keep placeholder IDs
+      golf: 30,
+      cycling: 31,
+      snooker: 32,
+      darts: 33,
+      'table-tennis': 34,
+      table_tennis: 34,
+      badminton: 35,
+      motorsport: 36,
+      netball: 37,
     };
     
     return sportIdMap[sport] || 1; // Default to football if not found
@@ -1400,14 +1405,14 @@ export class ApiSportsService {
         return this.transformTennisEvent(event, isLive, index);
       } else if (sport === 'cricket') {
         // Use cricket-specific transformer to ensure correct sport ID
-        console.log(`[ApiSportsService] Processing cricket with sport ID 9 for event ${index}`);
+        console.log(`[ApiSportsService] Processing cricket with sport ID 18 for event ${index}`);
         
         try {
-          // Guaranteed to use Sport ID 9 for cricket
+          // Guaranteed to use Sport ID 18 for cricket
           const cricketEvent = this.transformGenericEvent(event, sport, isLive, index);
           return {
             ...cricketEvent,
-            sportId: 9, // ENSURE cricket always has sportId 9
+            sportId: 18, // ENSURE cricket always has sportId 18
             score: event.score ? `${event.score.home || 0} - ${event.score.away || 0}` : undefined
           };
         } catch (e) {
@@ -1494,7 +1499,7 @@ export class ApiSportsService {
         // Return a complete, well-formed event with proper sportId
         return {
           id: eventId,
-          sportId: 13, // IMPORTANT: Always use Formula 1 sportId (13)
+          sportId: 11, // IMPORTANT: Always use Formula 1 sportId (11)
           leagueName: competition,
           homeTeam,
           awayTeam,
@@ -1740,7 +1745,7 @@ export class ApiSportsService {
       // Create the cricket event with proper venue and format fields
       const sportEvent: SportEvent = {
         id: id.toString(),
-        sportId: 9,  // CRITICAL: Always use Cricket sportId (9)
+        sportId: 18,  // CRITICAL: Always use Cricket sportId (18)
         leagueName: tournament,
         leagueSlug: tournament.toLowerCase().replace(/\s+/g, '-'),
         homeTeam,
@@ -2050,7 +2055,8 @@ export class ApiSportsService {
     } else {
       // Create real markets with accurate structure for events
       // Check if we need 1X2 markets or just 12 markets (no draw)
-      const isIndividualSport = [3, 10, 11, 12, 13, 14, 17, 19, 23, 24].includes(sportId);
+      // Individual sports (no draws): tennis=3, mma=7, boxing=8, afl=10, formula-1=11, horse-racing=17, cricket=18
+      const isIndividualSport = [3, 7, 8, 10, 11, 17, 18].includes(sportId);
       
       if (isIndividualSport) {
         // For individual sports like tennis, no "draw" outcome
@@ -2517,7 +2523,7 @@ export class ApiSportsService {
 
     return {
       id: eventId,
-      sportId: 13, // Formula 1 sportId
+      sportId: 11, // Formula 1 sportId
       leagueName,
       homeTeam: eventTitle, // Use the event title as the home team for display
       awayTeam: circuit,    // Use circuit as away team for display
@@ -2538,40 +2544,44 @@ export class ApiSportsService {
       football: 1,
       soccer: 1,
       basketball: 2,
+      nba: 13,
       tennis: 3,
-      baseball: 4,
-      hockey: 5,
-      handball: 6,
-      volleyball: 7,
-      rugby: 8,
-      cricket: 9,
-      golf: 10,
-      boxing: 11,
-      mma: 12,
-      'mma-ufc': 12,
-      'formula-1': 13,
-      formula_1: 13,
-      motorsport: 13,
-      cycling: 14,
-      american_football: 15,
-      'american-football': 15,
-      nfl: 15,
-      afl: 16,
-      'aussie-rules': 16,
-      aussie_rules: 16,
-      snooker: 17,
-      darts: 18,
-      table_tennis: 19,
-      'table-tennis': 19,
-      badminton: 20,
-      esports: 21,
-      motorsport_other: 22,
-      netball: 23,
-      surfing: 24,
-      horse_racing: 25,
-      swimming: 26,
-      skiing: 27,
-      water_polo: 28,
+      'american-football': 4,
+      american_football: 4,
+      baseball: 5,
+      hockey: 6,
+      'ice-hockey': 6,
+      mma: 7,
+      'mma-ufc': 7,
+      ufc: 7,
+      boxing: 8,
+      esports: 9,
+      afl: 10,
+      'aussie-rules': 10,
+      aussie_rules: 10,
+      'formula-1': 11,
+      formula_1: 11,
+      handball: 12,
+      nfl: 14,
+      rugby: 15,
+      volleyball: 16,
+      'horse-racing': 17,
+      horse_racing: 17,
+      cricket: 18,
+      // Sports without DB entries keep placeholder IDs
+      golf: 30,
+      cycling: 31,
+      motorsport: 36,
+      snooker: 32,
+      darts: 33,
+      table_tennis: 34,
+      'table-tennis': 34,
+      badminton: 35,
+      netball: 37,
+      surfing: 38,
+      swimming: 39,
+      skiing: 40,
+      water_polo: 41,
     };
     
     // Get the sportId from the mapping or use the numeric value if sport is a number

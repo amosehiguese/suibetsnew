@@ -94,7 +94,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
   baseball: {
     endpoint: 'https://v1.baseball.api-sports.io/games',
     apiHost: 'v1.baseball.api-sports.io',
-    sportId: 4,
+    sportId: 5,
     name: 'Baseball',
     hasDraws: false,
     daysAhead: 3
@@ -102,7 +102,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
   'ice-hockey': {
     endpoint: 'https://v1.hockey.api-sports.io/games',
     apiHost: 'v1.hockey.api-sports.io',
-    sportId: 5,
+    sportId: 6,
     name: 'Ice Hockey',
     hasDraws: false,
     daysAhead: 3
@@ -110,7 +110,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
   mma: {
     endpoint: 'https://v1.mma.api-sports.io/fights',
     apiHost: 'v1.mma.api-sports.io',
-    sportId: 12,
+    sportId: 7,
     name: 'MMA',
     hasDraws: false,
     daysAhead: 3
@@ -118,7 +118,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
   'american-football': {
     endpoint: 'https://v1.american-football.api-sports.io/games',
     apiHost: 'v1.american-football.api-sports.io',
-    sportId: 15,
+    sportId: 4,
     name: 'American Football',
     hasDraws: false,
     daysAhead: 3
@@ -126,7 +126,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
   afl: {
     endpoint: 'https://v1.afl.api-sports.io/games',
     apiHost: 'v1.afl.api-sports.io',
-    sportId: 16,
+    sportId: 10,
     name: 'AFL',
     hasDraws: true,
     daysAhead: 3
@@ -134,7 +134,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
   'formula-1': {
     endpoint: 'https://v1.formula-1.api-sports.io/races',
     apiHost: 'v1.formula-1.api-sports.io',
-    sportId: 13,
+    sportId: 11,
     name: 'Formula 1',
     hasDraws: false,
     daysAhead: 3
@@ -142,7 +142,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
   handball: {
     endpoint: 'https://v1.handball.api-sports.io/games',
     apiHost: 'v1.handball.api-sports.io',
-    sportId: 6,
+    sportId: 12,
     name: 'Handball',
     hasDraws: true,
     daysAhead: 3
@@ -150,7 +150,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
   rugby: {
     endpoint: 'https://v1.rugby.api-sports.io/games',
     apiHost: 'v1.rugby.api-sports.io',
-    sportId: 8,
+    sportId: 15,
     name: 'Rugby',
     hasDraws: true,
     daysAhead: 3
@@ -158,7 +158,7 @@ const FREE_SPORTS_CONFIG: Record<string, {
   volleyball: {
     endpoint: 'https://v1.volleyball.api-sports.io/games',
     apiHost: 'v1.volleyball.api-sports.io',
-    sportId: 7,
+    sportId: 16,
     name: 'Volleyball',
     hasDraws: false,
     daysAhead: 3
@@ -167,8 +167,8 @@ const FREE_SPORTS_CONFIG: Record<string, {
 
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || '';
 const CRICBUZZ_BASE_URL = 'https://free-cricbuzz-cricket-api.p.rapidapi.com';
-const CRICKET_SPORT_ID = 9;
-const HORSE_RACING_SPORT_ID = 18;
+const CRICKET_SPORT_ID = 18;
+const HORSE_RACING_SPORT_ID = 17;
 const RACING_API_BASE = 'https://the-racing-api1.p.rapidapi.com';
 const RACING_API_HOST = 'the-racing-api1.p.rapidapi.com';
 
@@ -328,8 +328,8 @@ export class FreeSportsService {
         });
         
         if (sportSlug === 'mma') {
-          const mmaCount = sportEvents.filter(e => e.sportId === 12).length;
-          const boxingCount = sportEvents.filter(e => e.sportId === 11).length;
+          const mmaCount = sportEvents.filter(e => e.sportId === 7).length;
+          const boxingCount = sportEvents.filter(e => e.sportId === 8).length;
           if (boxingCount > 0) {
             console.log(`[FreeSports] MMA: ${mmaCount} fights, Boxing: ${boxingCount} fights (${daysToFetch} days)`);
           } else {
@@ -409,7 +409,7 @@ export class FreeSportsService {
     try {
       const generatedF1 = this.generateF1Schedule();
       if (generatedF1.length > 0) {
-        const existingF1Ids = new Set(allEvents.filter(e => e.sportId === 13).map(e => String(e.id)));
+        const existingF1Ids = new Set(allEvents.filter(e => e.sportId === 11).map(e => String(e.id)));
         const newF1 = generatedF1.filter(e => !existingF1Ids.has(String(e.id)));
         allEvents.push(...newF1);
         console.log(`[FreeSports] 🏎️ F1 Generated: ${newF1.length} upcoming races added (${existingF1Ids.size} from API skipped)`);
@@ -597,7 +597,7 @@ export class FreeSportsService {
           leagueName = 'Formula 1';
         } else if (sportSlug === 'mma') {
           if (isBoxingFight(game)) {
-            sportId = 11;
+            sportId = 8;
           }
           homeTeam = game.fighters?.home?.name ||
             game.fighters?.first?.name ||
@@ -900,7 +900,7 @@ export class FreeSportsService {
   }
 
   private generateBoxingEvents(): SportEvent[] {
-    const BOXING_SPORT_ID = 11;
+    const BOXING_SPORT_ID = 8;
     const boxingFights: {
       id: string; fighter1: string; fighter2: string; record1: string; record2: string;
       odds1: number; odds2: number; title: string; venue: string; date: string; league: string;
@@ -1540,7 +1540,7 @@ export class FreeSportsService {
   }
 
   private generateF1Schedule(): SportEvent[] {
-    const F1_SPORT_ID = 13;
+    const F1_SPORT_ID = 11;
     const f1Races2026: { id: string; gpName: string; circuit: string; date: string }[] = [
       { id: 'australia-gp', gpName: 'Australian Grand Prix', circuit: 'Albert Park Circuit, Melbourne', date: '2026-03-08T05:00:00Z' },
       { id: 'china-gp', gpName: 'Chinese Grand Prix', circuit: 'Shanghai International Circuit', date: '2026-03-15T07:00:00Z' },
@@ -1578,7 +1578,7 @@ export class FreeSportsService {
   }
 
   private generateUFCEvents(): SportEvent[] {
-    const MMA_SPORT_ID = 12;
+    const MMA_SPORT_ID = 7;
     const ufcFights: {
       id: string; fighter1: string; fighter2: string;
       odds1: number; odds2: number; title: string; venue: string;
@@ -2272,31 +2272,37 @@ export class FreeSportsService {
   getUpcomingEvents(sportSlug?: string): SportEvent[] {
     if (sportSlug) {
       // Canonical slug-to-sportId map covering all sidebar slugs and aliases
+      // IDs match the database sports table exactly
       const SLUG_TO_SPORT_ID: Record<string, number> = {
-        // FREE_SPORTS_CONFIG sports
+        // Core sports (DB IDs)
+        'soccer': 1,
+        'football': 1,
         'basketball': 2,
-        'baseball': 4,
-        'ice-hockey': 5,
-        'hockey': 5,
-        'mma': 12,
-        'mma-ufc': 12,
-        'ufc': 12,
-        'american-football': 15,
-        'nfl': 15,
-        'afl': 16,
-        'formula-1': 13,
-        'f1': 13,
-        'handball': 6,
-        'rugby': 8,
-        'volleyball': 7,
-        // Standalone generators
         'tennis': 3,
-        'boxing': 11,
+        'american-football': 4,
+        'nfl': 14,
+        'baseball': 5,
+        'ice-hockey': 6,
+        'hockey': 6,
+        'mma': 7,
+        'mma-ufc': 7,
+        'ufc': 7,
+        'boxing': 8,
+        'esports': 9,
+        'afl': 10,
+        'aussie-rules': 10,
+        'formula-1': 11,
+        'f1': 11,
+        'handball': 12,
+        'nba': 13,
+        'rugby': 15,
+        'volleyball': 16,
+        'horse-racing': 17,
+        'horseracing': 17,
+        'cricket': 18,
+        // Standalone generators (no DB entry, use placeholder IDs)
         'motogp': 19,
         'moto-gp': 19,
-        'cricket': 9,
-        'horse-racing': 18,
-        'horseracing': 18,
         'wwe': 20,
         'entertainment': 20,
         'wwe-entertainment': 20,

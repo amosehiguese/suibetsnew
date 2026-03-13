@@ -76,19 +76,26 @@ export default function SportsSidebarFixed() {
       } catch (error) {
         console.error("Error fetching sports:", error);
         // Return hardcoded default sports as fallback
+        // Fallback list matching DB sports table IDs exactly
         return [
-          { id: 26, name: 'Soccer', slug: 'soccer', icon: '⚽', isActive: true },
-          { id: 1, name: 'Football', slug: 'football', icon: '⚽', isActive: true }, 
-          { id: 2, name: 'Basketball', slug: 'basketball', icon: '🏀', isActive: true },
-          { id: 3, name: 'Tennis', slug: 'tennis', icon: '🎾', isActive: true },
-          { id: 4, name: 'Baseball', slug: 'baseball', icon: '⚾', isActive: true },
-          { id: 5, name: 'Ice Hockey', slug: 'ice-hockey', icon: '🏒', isActive: true },
-          { id: 6, name: 'Handball', slug: 'handball', icon: '🤾', isActive: true },
-          { id: 7, name: 'Volleyball', slug: 'volleyball', icon: '🏐', isActive: true },
-          { id: 8, name: 'Rugby', slug: 'rugby', icon: '🏉', isActive: true },
-          { id: 9, name: 'Cricket', slug: 'cricket', icon: '🏏', isActive: true },
-          { id: 10, name: 'Golf', slug: 'golf', icon: '⛳', isActive: true },
-          { id: 11, name: 'MMA / Boxing', slug: 'mma-ufc', icon: '🥊', isActive: true },
+          { id: 1,  name: 'Soccer',            slug: 'soccer',            icon: '⚽', isActive: true },
+          { id: 2,  name: 'Basketball',         slug: 'basketball',        icon: '🏀', isActive: true },
+          { id: 3,  name: 'Tennis',             slug: 'tennis',            icon: '🎾', isActive: true },
+          { id: 4,  name: 'American Football',  slug: 'american-football', icon: '🏈', isActive: true },
+          { id: 5,  name: 'Baseball',           slug: 'baseball',          icon: '⚾', isActive: true },
+          { id: 6,  name: 'Ice Hockey',         slug: 'ice-hockey',        icon: '🏒', isActive: true },
+          { id: 7,  name: 'MMA',                slug: 'mma',               icon: '🥊', isActive: true },
+          { id: 8,  name: 'Boxing',             slug: 'boxing',            icon: '🥊', isActive: true },
+          { id: 9,  name: 'Esports',            slug: 'esports',           icon: '🎮', isActive: true },
+          { id: 10, name: 'AFL',                slug: 'afl',               icon: '🏉', isActive: true },
+          { id: 11, name: 'Formula 1',          slug: 'formula-1',         icon: '🏎️', isActive: true },
+          { id: 12, name: 'Handball',           slug: 'handball',          icon: '🤾', isActive: true },
+          { id: 13, name: 'NBA',                slug: 'nba',               icon: '🏀', isActive: true },
+          { id: 14, name: 'NFL',                slug: 'nfl',               icon: '🏈', isActive: true },
+          { id: 15, name: 'Rugby',              slug: 'rugby',             icon: '🏉', isActive: true },
+          { id: 16, name: 'Volleyball',         slug: 'volleyball',        icon: '🏐', isActive: true },
+          { id: 17, name: 'Horse Racing',       slug: 'horse-racing',      icon: '🏇', isActive: true },
+          { id: 18, name: 'Cricket',            slug: 'cricket',           icon: '🏏', isActive: true },
         ];
       }
     },

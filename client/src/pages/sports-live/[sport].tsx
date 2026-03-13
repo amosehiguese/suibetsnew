@@ -28,32 +28,36 @@ const SPORTS_MAPPING: Record<string, number> = {
   'mma-ufc': 7,
   'ufc': 7,
   'afl': 10,
+  'aussie-rules': 10,
   'formula-1': 11,
   'formula1': 11,
   'f1': 11,
   'handball': 12,
+  'nba': 13,
   'nfl': 14,
   'rugby': 15,
   'volleyball': 16,
-  'boxing': 17,
-  'esports': 24,
-  'cricket': 9,
-  'golf': 10,
-  'cycling': 23,
-  'motorsport': 23,
-  'racing': 23,
-  'motogp': 23,
-  'horse-racing': 18,
-  'netball': 25,
-  'snooker': 26,
-  'darts': 27,
-  'table-tennis': 28,
-  'badminton': 29,
-  'beach-volleyball': 30,
-  'winter-sports': 31,
-  'wwe': 20,
-  'wwe-entertainment': 20,
-  'entertainment': 20,
+  'horse-racing': 17,
+  'horseracing': 17,
+  'cricket': 18,
+  // Sports without DB entries use placeholder IDs
+  'boxing': 8,
+  'esports': 9,
+  'golf': 30,
+  'cycling': 31,
+  'motorsport': 31,
+  'racing': 31,
+  'motogp': 32,
+  'netball': 33,
+  'snooker': 34,
+  'darts': 35,
+  'table-tennis': 36,
+  'badminton': 37,
+  'beach-volleyball': 38,
+  'winter-sports': 39,
+  'wwe': 40,
+  'wwe-entertainment': 40,
+  'entertainment': 40,
 };
 
 export default function SportPage() {
@@ -123,7 +127,7 @@ export default function SportPage() {
             console.warn(`API request returned status ${response.status}, trying fallback`);
             
             // For certain sports that have fallback hard-coded events
-            if ([9, 14].includes(sportId)) { // Cricket, Cycling - special handling
+            if ([18].includes(sportId)) { // Cricket - special handling
               console.warn(`Using fallback strategy for sport ID ${sportId} (${sportName})`);
               try {
                 // Use the /api/events/tracked endpoint as fallback for these sports
@@ -160,8 +164,8 @@ export default function SportPage() {
           }
         } catch (fetchError) {
           console.error(`Network error during fetch: ${fetchError}`);
-          // For cricket and cycling, attempt to use the tracking service via the tracked endpoint
-          if ([9, 14].includes(sportId)) {
+          // For cricket, attempt to use the tracking service via the tracked endpoint
+          if ([18].includes(sportId)) {
             console.warn(`Attempting tracked events fallback for sport ID ${sportId}`);
             try {
               const fallbackResponse = await fetch('/api/events/tracked');
@@ -220,8 +224,8 @@ export default function SportPage() {
         if (sportId === 26) targetSportIds.push(1); // Soccer → Football
         
         // Special handling for sports with possible data integrity issues
-        if ([9, 14].includes(sportId)) { // Cricket, Cycling
-          const sportLabel = sportId === 9 ? '🏏 CRICKET' : '🚲 CYCLING';
+        if ([18].includes(sportId)) { // Cricket
+          const sportLabel = '🏏 CRICKET';
           console.log(`${sportLabel} PAGE - Validating event data integrity`);
           
           // Log original data for debugging
@@ -245,12 +249,12 @@ export default function SportPage() {
           // For each valid event, ensure it has the essential fields
           const normalizedData = validatedData.map(event => {
             // Different sports have different properties
-            if (sportId === 9) { // Cricket
+            if (sportId === 18) { // Cricket
               // Cricket events have teams
               return {
                 ...event,
                 id: event.id,
-                sportId: 9, // Ensure correct cricket ID
+                sportId: 18, // Ensure correct cricket ID
                 homeTeam: event.homeTeam || event.home || event.team1 || "Team 1",
                 awayTeam: event.awayTeam || event.away || event.team2 || "Team 2",
                 leagueName: event.leagueName || event.league || event.competition || "Cricket",
@@ -321,7 +325,7 @@ export default function SportPage() {
               : -1; // Use invalid sport ID if none exists
             
             // Logging for specific sports (for debugging)
-            if (sportId === 9) {
+            if (sportId === 18) {
               try {
                 console.log(`Filtering cricket event: sportId=${eventSportId}, teams=${event.homeTeam || 'Unknown'} vs ${event.awayTeam || 'Unknown'}`);
               } catch (logError) {
@@ -346,14 +350,16 @@ export default function SportPage() {
           console.log('Sample event sportId from API:', data[0]?.sportId);
           
           // For certain sports that might have special handling or different IDs
-          if ([9, 10, 14, 17, 18].includes(sportId)) { // Cricket, Golf, Cycling, Snooker, Darts
+          if ([17, 18, 30, 31, 32, 33, 34].includes(sportId)) { // Horse Racing, Cricket, Golf, Cycling, MotoGP, Netball, Snooker
             // Use sport name in the title as a fallback filter method
-            const sportNames = {
-              9: 'cricket',
-              10: 'golf',
-              14: 'cycling',
-              17: 'snooker',
-              18: 'darts'
+            const sportNames: Record<number, string> = {
+              17: 'horse-racing',
+              18: 'cricket',
+              30: 'golf',
+              31: 'cycling',
+              32: 'motogp',
+              33: 'netball',
+              34: 'snooker',
             };
             
             // Create a safer filtering function with null checks
@@ -754,12 +760,12 @@ export default function SportPage() {
               </Button>
               <h1 className="text-3xl font-bold text-cyan-400">
                 {sportName}
-                {sportId === 9 && <span className="ml-2">🏏</span>}
+                {sportId === 18 && <span className="ml-2">🏏</span>}
               </h1>
             </div>
             <p className="text-muted-foreground mt-1 ml-1">
               {selectedTab === 'live' ? 'Live matches happening now' : 'Upcoming scheduled matches'}
-              {sportId === 9 && ' - Cricket Matches'}
+              {sportId === 18 && ' - Cricket Matches'}
             </p>
             <div className="h-1 w-24 bg-cyan-400 mt-2 rounded-full"></div>
           </div>

@@ -401,7 +401,7 @@ export class RugbyService {
       // Create the standard sport event
       return {
         id,
-        sportId: rugbyType === 'league' ? 12 : 13, // Use different IDs for league vs union
+        sportId: 15, // Rugby DB ID is 15 for both league and union
         leagueName,
         homeTeam,
         awayTeam,
@@ -423,8 +423,7 @@ export class RugbyService {
    */
   private isGenuineRugbyGame(event: SportEvent, rugbyType: 'league' | 'union'): boolean {
     // If we have explicit sport ID matching, trust that
-    if (rugbyType === 'league' && event.sportId === 12) return true;
-    if (rugbyType === 'union' && event.sportId === 13) return true;
+    if (event.sportId === 15) return true;
     
     // Check for league name containing rugby keywords
     const leagueName = event.leagueName?.toLowerCase() || '';

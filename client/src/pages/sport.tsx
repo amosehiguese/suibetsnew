@@ -16,25 +16,35 @@ import { SportPageOverlays } from '@/components/betting/SportPageOverlays';
 import SportsSidebar from '@/components/layout/SportsSidebar';
 const suiBetsHero = "/images/sui-hero2.png";
 
-// Map sport slug to sportId for the API
+// Map sport slug to sportId for the API — IDs match database sports table exactly
 const sportIdMap: Record<string, number> = {
   'football': 1,
   'soccer': 1,
   'basketball': 2,
   'tennis': 3,
-  'baseball': 4,
-  'boxing': 5,
+  'american-football': 4,
+  'american_football': 4,
+  'baseball': 5,
   'hockey': 6,
-  'esports': 7,
-  'mma-ufc': 8,
-  'volleyball': 9,
-  'table-tennis': 10,
-  'rugby-league': 11,
-  'rugby-union': 12,
-  'cricket': 13,
-  'horse-racing': 14,
-  'greyhounds': 15,
-  'afl': 16
+  'ice-hockey': 6,
+  'mma': 7,
+  'mma-ufc': 7,
+  'ufc': 7,
+  'boxing': 8,
+  'esports': 9,
+  'afl': 10,
+  'aussie-rules': 10,
+  'formula-1': 11,
+  'f1': 11,
+  'handball': 12,
+  'nba': 13,
+  'nfl': 14,
+  'rugby': 15,
+  'rugby-league': 15,
+  'rugby-union': 15,
+  'volleyball': 16,
+  'horse-racing': 17,
+  'cricket': 18,
 };
 
 /**
