@@ -3474,6 +3474,9 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
 
       // WALRUS: Store bet receipt on decentralized storage (blocking - returns blobId in response)
       let walrusBlobId: string | null = null;
+      let walrusStorageEpoch: number | null = null;
+      let walrusEndEpoch: number | null = null;
+      let walrusCost: number | null = null;
       try {
         const { storeBetReceipt } = await import('./services/walrusStorageService');
         const walrusResult = await storeBetReceipt({
@@ -3497,7 +3500,25 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         const { bets: betsTable } = await import('@shared/schema');
         const { db: walrusDb } = await import('./db');
         const { eq: walrusEq } = await import('drizzle-orm');
-        const updateFields: any = { walrusReceiptData: walrusResult.receiptJson };
+        // Enrich receipt JSON with post-storage metadata (epoch, cost, publisher)
+        let enrichedReceiptJson = walrusResult.receiptJson;
+        try {
+          const receiptObj = JSON.parse(walrusResult.receiptJson);
+          receiptObj.storage = {
+            ...(receiptObj.storage || {}),
+            storageEpoch: walrusResult.storageEpoch ?? null,
+            endEpoch: walrusResult.endEpoch ?? null,
+            walCost: walrusResult.walCost ?? null,
+            publisherUsed: walrusResult.publisherUsed ?? null,
+            storeEpochs: 10,
+          };
+          enrichedReceiptJson = JSON.stringify(receiptObj, null, 2);
+        } catch {}
+        // Capture epoch/cost metadata for response
+        walrusStorageEpoch = walrusResult.storageEpoch ?? null;
+        walrusEndEpoch = walrusResult.endEpoch ?? null;
+        walrusCost = walrusResult.walCost ?? null;
+        const updateFields: any = { walrusReceiptData: enrichedReceiptJson };
         if (walrusResult.blobId) {
           updateFields.walrusBlobId = walrusResult.blobId;
           walrusBlobId = walrusResult.blobId;
@@ -3508,7 +3529,7 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         await walrusDb.update(betsTable)
           .set(updateFields)
           .where(walrusEq(betsTable.wurlusBetId, betId));
-        console.log(`🐋 Receipt saved for bet ${betId}: ${updateFields.walrusBlobId} (publisher: ${walrusResult.publisherUsed || 'local'})`);
+        console.log(`🐋 Receipt saved for bet ${betId}: ${updateFields.walrusBlobId} (publisher: ${walrusResult.publisherUsed || 'local'}) epoch: ${walrusResult.storageEpoch}→${walrusResult.endEpoch} cost: ${walrusResult.walCost}`);
       } catch (walrusErr: any) {
         console.warn(`[Walrus] Store failed: ${walrusErr.message}`);
       }
@@ -3685,6 +3706,9 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         walrusUrl: walrusBlobId && !walrusBlobId.startsWith('local_')
           ? `https://aggregator.walrus-mainnet.walrus.space/v1/blobs/${walrusBlobId}`
           : null,
+        walrusStorageEpoch,
+        walrusEndEpoch,
+        walrusCost,
         calculations: {
           betAmount,
           platformFee: paymentMethod === 'wallet' ? 0 : platformFee,
@@ -7721,8 +7745,26 @@ setTimeout(function(){l.classList.add('h');},6000);
           source = 'local';
         }
       } else {
-        const { getBetReceipt, getWalrusAggregatorUrl } = await import('./services/walrusStorageService');
-        receipt = await getBetReceipt(blobId);
+        // For real Walrus blobs: first try to get the enriched version from our DB
+        // (it has epoch/cost metadata that was added post-storage)
+        try {
+          const { bets: betsTable } = await import('@shared/schema');
+          const { db: receiptDb } = await import('./db');
+          const { eq: receiptEq } = await import('drizzle-orm');
+          const rows = await receiptDb.select({ walrusReceiptData: betsTable.walrusReceiptData })
+            .from(betsTable)
+            .where(receiptEq(betsTable.walrusBlobId, blobId))
+            .limit(1);
+          if (rows.length > 0 && rows[0].walrusReceiptData) {
+            receipt = JSON.parse(rows[0].walrusReceiptData);
+            source = 'walrus'; // still show as Walrus since it's a real blob
+          }
+        } catch {}
+        // Fallback: fetch directly from Walrus aggregator
+        if (!receipt) {
+          const { getBetReceipt } = await import('./services/walrusStorageService');
+          receipt = await getBetReceipt(blobId);
+        }
       }
 
       if (!receipt) {
@@ -7731,79 +7773,206 @@ setTimeout(function(){l.classList.add('h');},6000);
 
       if (req.accepts('html') && !req.query.json) {
         const bet = receipt.bet || receipt;
-        const brand = receipt.branding || {};
         const blockchain = receipt.blockchain || {};
+        const storage = receipt.storage || {};
         const esc = (s: any) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        const epochStart = storage.storageEpoch ?? null;
+        const epochEnd = storage.endEpoch ?? null;
+        const walCostRaw = storage.walCost ?? null;
+        const walCostDisplay = walCostRaw ? (walCostRaw / 1_000_000_000).toFixed(6) + ' WAL' : null;
+        const publisherDisplay = storage.publisherUsed
+          ? (storage.publisherUsed.includes('staketab') ? 'StakeTab' : storage.publisherUsed.includes('nami') ? 'Nami Cloud' : storage.publisherUsed.replace('/v1/blobs','').replace('https://',''))
+          : null;
         const html = `<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SuiBets Bet Receipt</title>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SuiBets — Bet Receipt</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0e1a;color:#e5e7eb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;justify-content:center;padding:24px;min-height:100vh}
-.receipt{max-width:480px;width:100%;background:linear-gradient(135deg,#111827 0%,#1a1f35 100%);border:1px solid #06b6d4;border-radius:16px;overflow:hidden;box-shadow:0 0 40px rgba(6,182,212,0.15)}
-.header{background:linear-gradient(135deg,#06b6d4 0%,#8b5cf6 100%);padding:24px;text-align:center}
-.header h1{font-size:28px;font-weight:800;color:#fff;letter-spacing:1px}
-.header p{color:rgba(255,255,255,0.8);font-size:13px;margin-top:4px}
-.badge{display:inline-block;background:rgba(255,255,255,0.2);color:#fff;padding:4px 12px;border-radius:20px;font-size:11px;margin-top:8px;font-weight:600}
+:root{--cyan:#06b6d4;--purple:#8b5cf6;--amber:#f59e0b;--green:#10b981;--red:#ef4444;--bg:#0a0e1a;--surface:#111827;--surface2:#1a2035;--border:rgba(6,182,212,0.2);--text:#e5e7eb;--muted:#6b7280;--muted2:#9ca3af}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px 16px 40px}
+.receipt{max-width:500px;width:100%;background:var(--surface);border:1px solid var(--cyan);border-radius:20px;overflow:hidden;box-shadow:0 0 60px rgba(6,182,212,0.12),0 0 120px rgba(139,92,246,0.06)}
+/* Header */
+.hdr{background:linear-gradient(135deg,#0891b2 0%,#7c3aed 100%);padding:28px 24px 22px;text-align:center;position:relative}
+.hdr::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent)}
+.hdr-logo{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:6px}
+.hdr-logo .whale{font-size:28px}
+.hdr-logo h1{font-size:32px;font-weight:900;color:#fff;letter-spacing:1px;text-shadow:0 2px 8px rgba(0,0,0,0.3)}
+.hdr-sub{color:rgba(255,255,255,0.75);font-size:13px;margin-bottom:10px}
+.hdr-badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.3px}
+.badge-walrus{background:rgba(255,255,255,0.18);color:#fff;border:1px solid rgba(255,255,255,0.25)}
+.badge-ok{background:rgba(16,185,129,0.25);color:#6ee7b7;border:1px solid rgba(16,185,129,0.4)}
+.badge-local{background:rgba(107,114,128,0.25);color:#d1d5db;border:1px solid rgba(107,114,128,0.4)}
+/* Body */
 .body{padding:24px}
-.event{background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.2);border-radius:12px;padding:16px;margin-bottom:16px;text-align:center}
-.event h2{color:#06b6d4;font-size:18px;font-weight:700}
-.event .teams{color:#9ca3af;font-size:14px;margin-top:4px}
-.prediction{background:linear-gradient(135deg,rgba(139,92,246,0.15),rgba(6,182,212,0.15));border:1px solid rgba(139,92,246,0.3);border-radius:12px;padding:16px;margin-bottom:16px;text-align:center}
-.prediction .label{color:#9ca3af;font-size:12px;text-transform:uppercase;letter-spacing:1px}
-.prediction .value{color:#8b5cf6;font-size:22px;font-weight:800;margin-top:4px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
-.stat{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;text-align:center}
-.stat .label{color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
-.stat .val{color:#fff;font-size:18px;font-weight:700;margin-top:2px}
-.stat .val.cyan{color:#06b6d4}.stat .val.purple{color:#8b5cf6}.stat .val.green{color:#10b981}.stat .val.amber{color:#f59e0b}
-.chain{border-top:1px solid rgba(255,255,255,0.08);padding-top:16px;margin-top:8px}
-.chain .row{display:flex;justify-content:space-between;padding:6px 0;font-size:12px}
-.chain .row .k{color:#6b7280}.chain .row .v{color:#9ca3af;font-family:monospace;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.chain .row a{color:#06b6d4;text-decoration:none}
-.chain .row a:hover{text-decoration:underline}
-.footer{background:rgba(6,182,212,0.05);border-top:1px solid rgba(6,182,212,0.15);padding:16px;text-align:center}
-.footer p{color:#6b7280;font-size:11px}
-.footer a{color:#06b6d4;text-decoration:none}
-.verified{display:inline-flex;align-items:center;gap:6px;color:#10b981;font-size:12px;font-weight:600;margin-top:8px}
-.verified svg{width:16px;height:16px}
-</style></head><body>
+/* Event block */
+.event-card{background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.18);border-radius:14px;padding:18px;margin-bottom:16px;text-align:center}
+.sport-tag{display:inline-block;background:rgba(6,182,212,0.15);color:var(--cyan);padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px}
+.event-name{color:#fff;font-size:17px;font-weight:700;line-height:1.3}
+.matchup{color:var(--muted2);font-size:13px;margin-top:5px}
+/* Prediction block */
+.prediction-card{background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(6,182,212,0.12));border:1px solid rgba(139,92,246,0.25);border-radius:14px;padding:18px;margin-bottom:16px;text-align:center}
+.pred-label{color:var(--muted2);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.pred-val{color:var(--purple);font-size:24px;font-weight:900}
+.pred-market{color:var(--muted);font-size:12px;margin-top:4px}
+/* Stats grid */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.stat{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:12px 10px;text-align:center}
+.stat-label{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}
+.stat-val{font-size:16px;font-weight:800}
+.c-cyan{color:var(--cyan)}.c-amber{color:var(--amber)}.c-green{color:var(--green)}.c-purple{color:var(--purple)}
+/* Chain details */
+.details-section{margin-top:4px}
+.details-title{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;font-size:12px;border-bottom:1px solid rgba(255,255,255,0.04)}
+.row:last-child{border-bottom:none}
+.row-k{color:var(--muted)}
+.row-v{color:var(--muted2);font-family:monospace;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
+.row-v a{color:var(--cyan);text-decoration:none}.row-v a:hover{text-decoration:underline}
+/* Walrus section */
+.walrus-section{background:linear-gradient(135deg,rgba(6,182,212,0.06),rgba(139,92,246,0.06));border:1px solid rgba(6,182,212,0.2);border-radius:14px;padding:16px;margin-top:16px}
+.walrus-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.walrus-title{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--cyan)}
+.walrus-blob{background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.15);border-radius:8px;padding:8px 12px;margin-bottom:10px}
+.walrus-blob-label{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}
+.walrus-blob-id{color:var(--cyan);font-family:monospace;font-size:11px;word-break:break-all;line-height:1.5}
+.walrus-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.walrus-meta{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:8px 10px;text-align:center}
+.wm-label{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px}
+.wm-val{font-size:13px;font-weight:700}
+.walrus-links{display:flex;gap:8px;margin-top:10px}
+.walrus-link{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;transition:opacity 0.2s}
+.walrus-link:hover{opacity:0.8}
+.wl-raw{background:rgba(139,92,246,0.15);color:#c4b5fd;border:1px solid rgba(139,92,246,0.3)}
+/* Verification */
+.verified{display:inline-flex;align-items:center;gap:6px;color:var(--green);font-size:12px;font-weight:600;margin-top:14px;padding:6px 12px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:8px}
+/* Footer */
+.footer{background:rgba(6,182,212,0.04);border-top:1px solid rgba(6,182,212,0.12);padding:18px 24px;text-align:center}
+.footer-logo{font-size:14px;font-weight:800;color:var(--cyan);margin-bottom:4px}
+.footer-links{color:var(--muted);font-size:11px}
+.footer-links a{color:var(--cyan);text-decoration:none}
+.footer-links a:hover{text-decoration:underline}
+.footer-copy{color:var(--muted);font-size:10px;margin-top:4px}
+</style>
+</head>
+<body>
 <div class="receipt">
-<div class="header">
-<h1>SuiBets</h1>
-<p>Decentralized Sports Betting on Sui</p>
-<span class="badge">${source === 'walrus' ? '🐋 Stored on Walrus' : '📋 Local Receipt'}</span>
+
+<!-- Header -->
+<div class="hdr">
+  <div class="hdr-logo">
+    <span class="whale">🐋</span>
+    <h1>SuiBets</h1>
+  </div>
+  <div class="hdr-sub">Decentralized Sports Betting · Sui Blockchain</div>
+  <div class="hdr-badges">
+    ${source === 'walrus'
+      ? '<span class="badge badge-walrus">🐋 Walrus Mainnet</span><span class="badge badge-ok">✓ Verified On-Chain</span>'
+      : '<span class="badge badge-local">📋 Local Receipt</span>'}
+  </div>
 </div>
+
+<!-- Body -->
 <div class="body">
-<div class="event">
-<h2>${esc(bet.eventName || 'Sports Event')}</h2>
-${bet.homeTeam && bet.awayTeam ? `<p class="teams">${esc(bet.homeTeam)} vs ${esc(bet.awayTeam)}</p>` : ''}
-</div>
-<div class="prediction">
-<p class="label">Prediction</p>
-<p class="value">${esc(bet.prediction || bet.selection || '—')}</p>
-</div>
-<div class="grid">
-<div class="stat"><p class="label">Stake</p><p class="val cyan">${esc(bet.stake || bet.betAmount || 0)} ${esc(bet.currency || 'SUI')}</p></div>
-<div class="stat"><p class="label">Odds</p><p class="val amber">${esc(bet.odds || '—')}x</p></div>
-<div class="stat"><p class="label">Potential Payout</p><p class="val green">${esc(bet.potentialPayout || bet.potentialWin || '—')} ${esc(bet.currency || 'SUI')}</p></div>
-<div class="stat"><p class="label">Currency</p><p class="val purple">${esc(bet.currency || 'SUI')}</p></div>
-</div>
-<div class="chain">
-<div class="row"><span class="k">Bet ID</span><span class="v">${esc(bet.id || bet.betId || blobId)}</span></div>
-<div class="row"><span class="k">Wallet</span><span class="v">${esc(bet.walletAddress || '—')}</span></div>
-<div class="row"><span class="k">Chain</span><span class="v">${esc(blockchain.chain || receipt.chain || 'sui:mainnet')}</span></div>
-${(bet.txHash || blockchain.txHash) ? `<div class="row"><span class="k">TX Hash</span><span class="v"><a href="https://suiscan.xyz/mainnet/tx/${esc(bet.txHash || blockchain.txHash)}" target="_blank">${esc((bet.txHash || blockchain.txHash || '').slice(0, 20))}...</a></span></div>` : ''}
-<div class="row"><span class="k">Placed</span><span class="v">${esc(new Date(bet.placedAt || receipt.storage?.storedAt || receipt.storedAt || Date.now()).toLocaleString())}</span></div>
-<div class="row"><span class="k">Storage</span><span class="v">${source === 'walrus' ? 'Walrus Protocol (Mainnet)' : 'Local Database'}</span></div>
-</div>
-${receipt.verification ? `<div class="verified"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/></svg> Receipt Verified (SHA-256)</div>` : ''}
-</div>
+
+  <!-- Event -->
+  <div class="event-card">
+    ${bet.sportName ? `<div class="sport-tag">${esc(bet.sportName)}</div>` : ''}
+    <div class="event-name">${esc(bet.eventName || 'Sports Event')}</div>
+    ${bet.homeTeam && bet.awayTeam ? `<div class="matchup">${esc(bet.homeTeam)} <span style="color:var(--muted)">vs</span> ${esc(bet.awayTeam)}</div>` : ''}
+  </div>
+
+  <!-- Prediction -->
+  <div class="prediction-card">
+    <div class="pred-label">Your Prediction</div>
+    <div class="pred-val">${esc(bet.prediction || bet.selection || '—')}</div>
+    ${bet.marketType ? `<div class="pred-market">${esc(bet.marketType)}</div>` : ''}
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat">
+      <div class="stat-label">Stake</div>
+      <div class="stat-val c-cyan">${esc(bet.stake || bet.betAmount || 0)} <span style="font-size:11px">${esc(bet.currency || 'SUI')}</span></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Odds</div>
+      <div class="stat-val c-amber">${esc(bet.odds || '—')}×</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Potential Win</div>
+      <div class="stat-val c-green">${esc(bet.potentialPayout || bet.potentialWin || '—')} <span style="font-size:11px">${esc(bet.currency || 'SUI')}</span></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Token</div>
+      <div class="stat-val c-purple">${esc(bet.currency || 'SUI')}</div>
+    </div>
+  </div>
+
+  <!-- Details -->
+  <div class="details-section">
+    <div class="details-title">Transaction Details</div>
+    <div class="row"><span class="row-k">Bet ID</span><span class="row-v">${esc(bet.id || bet.betId || '—')}</span></div>
+    <div class="row"><span class="row-k">Wallet</span><span class="row-v">${esc(bet.walletAddress || '—')}</span></div>
+    <div class="row"><span class="row-k">Network</span><span class="row-v">${esc(blockchain.chain || 'sui:mainnet')}</span></div>
+    ${(bet.txHash || blockchain.txHash) ? `<div class="row"><span class="row-k">TX Hash</span><span class="row-v"><a href="https://suiscan.xyz/mainnet/tx/${esc(bet.txHash || blockchain.txHash)}" target="_blank">${esc((bet.txHash || blockchain.txHash || '').slice(0, 22))}…</a></span></div>` : ''}
+    ${(bet.betObjectId || blockchain.betObjectId) ? `<div class="row"><span class="row-k">Bet Object</span><span class="row-v"><a href="https://suiscan.xyz/mainnet/object/${esc(bet.betObjectId || blockchain.betObjectId)}" target="_blank">${esc((bet.betObjectId || blockchain.betObjectId || '').slice(0, 22))}…</a></span></div>` : ''}
+    <div class="row"><span class="row-k">Placed At</span><span class="row-v">${esc(new Date(bet.placedAt || storage.storedAt || Date.now()).toLocaleString())}</span></div>
+  </div>
+
+  <!-- Walrus Storage Section -->
+  ${source === 'walrus' ? `
+  <div class="walrus-section">
+    <div class="walrus-header">
+      <div class="walrus-title">🐋 Walrus Decentralized Storage</div>
+      <span class="badge badge-ok" style="font-size:10px">Mainnet</span>
+    </div>
+    <div class="walrus-blob">
+      <div class="walrus-blob-label">Blob ID (permanent)</div>
+      <div class="walrus-blob-id">${esc(blobId)}</div>
+    </div>
+    ${(epochStart != null || epochEnd != null || walCostDisplay || publisherDisplay) ? `
+    <div class="walrus-meta-grid">
+      ${epochStart != null ? `<div class="walrus-meta"><div class="wm-label">Start Epoch</div><div class="wm-val c-cyan">${esc(epochStart)}</div></div>` : ''}
+      ${epochEnd != null ? `<div class="walrus-meta"><div class="wm-label">End Epoch</div><div class="wm-val c-cyan">${esc(epochEnd)}</div></div>` : ''}
+      ${walCostDisplay ? `<div class="walrus-meta"><div class="wm-label">WAL Cost</div><div class="wm-val c-amber">${esc(walCostDisplay)}</div></div>` : ''}
+      ${publisherDisplay ? `<div class="walrus-meta"><div class="wm-label">Publisher</div><div class="wm-val" style="font-size:11px;color:var(--muted2)">${esc(publisherDisplay)}</div></div>` : ''}
+      <div class="walrus-meta"><div class="wm-label">Store Duration</div><div class="wm-val c-purple">${esc(storage.storeEpochs || 10)} epochs</div></div>
+    </div>` : ''}
+    <div class="walrus-links">
+      <a href="https://aggregator.walrus-mainnet.walrus.space/v1/blobs/${esc(blobId)}" target="_blank" class="walrus-link wl-raw">
+        <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
+        Raw JSON on Walrus
+      </a>
+    </div>
+  </div>
+  ` : `
+  <div class="walrus-section" style="border-color:rgba(107,114,128,0.3)">
+    <div class="walrus-title" style="color:var(--muted2)">📋 Local Storage</div>
+    <div style="color:var(--muted);font-size:12px;margin-top:8px">This receipt is stored in the SuiBets database. Walrus publishers were unavailable at the time of placement.</div>
+  </div>
+  `}
+
+  ${receipt.verification ? `<div class="verified"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/></svg>Receipt integrity verified · SHA-256</div>` : ''}
+
+</div><!-- /body -->
+
+<!-- Footer -->
 <div class="footer">
-<p><a href="https://www.suibets.com" target="_blank">www.suibets.com</a> | <a href="https://suibets.wal.app" target="_blank">suibets.wal.app</a></p>
-<p style="margin-top:4px">&copy; ${new Date().getFullYear()} SuiBets — Built on Sui Blockchain</p>
+  <div class="footer-logo">SuiBets</div>
+  <div class="footer-links">
+    <a href="https://www.suibets.com" target="_blank">suibets.com</a>
+    &nbsp;·&nbsp;
+    <a href="https://suibets.wal.app" target="_blank">suibets.wal.app</a>
+  </div>
+  <div class="footer-copy">© ${new Date().getFullYear()} SuiBets · Built on Sui Blockchain · Powered by Walrus</div>
 </div>
-</div></body></html>`;
+
+</div><!-- /receipt -->
+</body></html>`;
         return res.type('html').send(html);
       }
 

@@ -236,6 +236,9 @@ export const BettingProvider: React.FC<{children: ReactNode}> = ({ children }) =
                   placedAt: new Date().toISOString(),
                   walrusBlobId: betData.walrusBlobId || null,
                   walrusUrl: betData.walrusUrl || null,
+                  walrusStorageEpoch: betData.walrusStorageEpoch ?? null,
+                  walrusEndEpoch: betData.walrusEndEpoch ?? null,
+                  walrusCost: betData.walrusCost ?? null,
                 }
               });
               window.dispatchEvent(betConfirmedEvent);
@@ -442,6 +445,9 @@ export const BettingProvider: React.FC<{children: ReactNode}> = ({ children }) =
                   placedAt: new Date().toISOString(),
                   walrusBlobId: betData.walrusBlobId || null,
                   walrusUrl: betData.walrusUrl || null,
+                  walrusStorageEpoch: betData.walrusStorageEpoch ?? null,
+                  walrusEndEpoch: betData.walrusEndEpoch ?? null,
+                  walrusCost: betData.walrusCost ?? null,
                 }
               });
               window.dispatchEvent(betConfirmedEvent);

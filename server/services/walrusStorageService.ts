@@ -2,21 +2,40 @@ import { createHash } from 'crypto';
 
 // =============================================================================
 // Publisher list — ordered by reliability.
-// Only walrus-mainnet-publisher-1.staketab.org is confirmed working on mainnet
-// as of March 2026 (per live testing). Others are kept as fallbacks in case
-// they come back online, but tried with shorter timeouts.
+// Confirmed working March 2026:
+//   - StakeTab-1: https://walrus-mainnet-publisher-1.staketab.org
+//   - Nami Cloud: https://walrus-mainnet-publisher.nami.cloud/{key}/v1/blobs (requires NAMI_CLOUD_ENDPOINT_KEY)
 // Official list: https://github.com/MystenLabs/awesome-walrus
 // =============================================================================
-const WALRUS_PUBLISHERS: Array<{ url: string; timeout: number; priority: 'primary' | 'secondary' }> = [
-  // PRIMARY — confirmed working March 2026
-  { url: 'https://walrus-mainnet-publisher-1.staketab.org/v1/blobs', timeout: 30000, priority: 'primary' },
-  // SECONDARY — Mysten Labs official (was working earlier, may come back)
-  { url: 'https://publisher.walrus-mainnet.walrus.space/v1/blobs', timeout: 12000, priority: 'secondary' },
-  // SECONDARY — community nodes (kept as fallback, short timeout to avoid blocking)
-  { url: 'https://walrus-mainnet.nodeinfra.com/v1/blobs', timeout: 10000, priority: 'secondary' },
-  { url: 'https://walrus.badkids.xyz/v1/blobs', timeout: 10000, priority: 'secondary' },
-  { url: 'https://walrus-publisher.nodes.guru/v1/blobs', timeout: 10000, priority: 'secondary' },
-];
+function buildPublisherList(): Array<{ url: string; timeout: number; priority: 'primary' | 'secondary' }> {
+  const list: Array<{ url: string; timeout: number; priority: 'primary' | 'secondary' }> = [
+    // PRIMARY — confirmed working March 2026
+    { url: 'https://walrus-mainnet-publisher-1.staketab.org/v1/blobs', timeout: 30000, priority: 'primary' },
+  ];
+
+  // Nami Cloud — add if endpoint key is configured
+  const namiKey = process.env.NAMI_CLOUD_ENDPOINT_KEY;
+  if (namiKey) {
+    list.push({
+      url: `https://walrus-mainnet-publisher.nami.cloud/${namiKey}/v1/blobs`,
+      timeout: 25000,
+      priority: 'primary',
+    });
+    console.log('[Walrus] Nami Cloud publisher enabled');
+  }
+
+  // SECONDARY — kept as fallbacks with short timeouts
+  list.push(
+    { url: 'https://publisher.walrus-mainnet.walrus.space/v1/blobs', timeout: 12000, priority: 'secondary' },
+    { url: 'https://walrus-mainnet.nodeinfra.com/v1/blobs', timeout: 10000, priority: 'secondary' },
+    { url: 'https://walrus.badkids.xyz/v1/blobs', timeout: 10000, priority: 'secondary' },
+    { url: 'https://walrus-publisher.nodes.guru/v1/blobs', timeout: 10000, priority: 'secondary' },
+  );
+
+  return list;
+}
+
+let WALRUS_PUBLISHERS = buildPublisherList();
 
 const WALRUS_AGGREGATORS = [
   'https://aggregator.walrus-mainnet.walrus.space/v1/blobs',
@@ -36,7 +55,6 @@ function isPublisherHealthy(url: string): boolean {
     publisherHealth.delete(url);
     return true;
   }
-  // Skip secondary publishers after 2 failures; skip primary after 5
   const isPrimary = WALRUS_PUBLISHERS.find(p => p.url === url)?.priority === 'primary';
   return h.failures < (isPrimary ? 5 : 2);
 }
@@ -74,6 +92,9 @@ interface WalrusStoreResponse {
   receiptJson: string;
   receiptHash: string;
   publisherUsed?: string;
+  storageEpoch?: number;
+  endEpoch?: number;
+  walCost?: number;
   error?: string;
 }
 
@@ -152,28 +173,44 @@ function hashReceipt(json: string): string {
   return createHash('sha256').update(json).digest('hex').slice(0, 32);
 }
 
-function extractBlobId(result: any): string | null {
-  if (result?.newlyCreated?.blobObject?.blobId) {
-    return result.newlyCreated.blobObject.blobId;
+interface ExtractedBlobData {
+  blobId: string | null;
+  storageEpoch?: number;
+  endEpoch?: number;
+  walCost?: number;
+}
+
+function extractBlobData(result: any): ExtractedBlobData {
+  if (result?.newlyCreated?.blobObject) {
+    const obj = result.newlyCreated.blobObject;
+    return {
+      blobId: obj.blobId || null,
+      storageEpoch: obj.registeredEpoch ?? obj.storage?.startEpoch,
+      endEpoch: obj.storage?.endEpoch,
+      walCost: result.newlyCreated.cost,
+    };
   }
-  if (result?.alreadyCertified?.blobId) {
-    return result.alreadyCertified.blobId;
+  if (result?.alreadyCertified) {
+    return {
+      blobId: result.alreadyCertified.blobId || null,
+      endEpoch: result.alreadyCertified.endEpoch,
+    };
   }
   if (typeof result?.blobId === 'string') {
-    return result.blobId;
+    return { blobId: result.blobId };
   }
   if (Array.isArray(result) && result[0]?.blobStoreResult) {
     const inner = result[0].blobStoreResult;
-    return inner?.newlyCreated?.blobObject?.blobId || inner?.alreadyCertified?.blobId || null;
+    return extractBlobData(inner);
   }
-  return null;
+  return { blobId: null };
 }
 
 async function tryPublisher(
   publisherUrl: string,
   receiptJson: string,
   timeoutMs: number,
-): Promise<{ blobId: string; publisher: string } | null> {
+): Promise<{ blobId: string; publisher: string; storageEpoch?: number; endEpoch?: number; walCost?: number } | null> {
   try {
     const url = `${publisherUrl}?epochs=${STORE_EPOCHS}`;
     const response = await fetch(url, {
@@ -191,11 +228,11 @@ async function tryPublisher(
     }
 
     const result = await response.json();
-    const blobId = extractBlobId(result);
+    const data = extractBlobData(result);
 
-    if (blobId) {
+    if (data.blobId) {
       markPublisherSuccess(publisherUrl);
-      return { blobId, publisher: publisherUrl };
+      return { blobId: data.blobId, publisher: publisherUrl, storageEpoch: data.storageEpoch, endEpoch: data.endEpoch, walCost: data.walCost };
     }
 
     console.warn(`[Walrus] No blobId from ${publisherUrl}:`, JSON.stringify(result).slice(0, 300));
@@ -209,17 +246,19 @@ async function tryPublisher(
   }
 }
 
-// Race all healthy publishers simultaneously — first success wins.
-// Primary publisher always participates; secondaries only if healthy.
-async function storeViaHttp(receiptJson: string): Promise<{ blobId: string; publisher: string } | null> {
+async function storeViaHttp(receiptJson: string): Promise<{ blobId: string; publisher: string; storageEpoch?: number; endEpoch?: number; walCost?: number } | null> {
+  // Refresh publisher list in case env vars were set after startup
+  if (!WALRUS_PUBLISHERS.some(p => p.url.includes('nami.cloud')) && process.env.NAMI_CLOUD_ENDPOINT_KEY) {
+    WALRUS_PUBLISHERS = buildPublisherList();
+  }
+
   const candidates = WALRUS_PUBLISHERS.filter(p => {
-    if (p.priority === 'primary') return true; // always try primary
+    if (p.priority === 'primary') return true;
     return isPublisherHealthy(p.url);
   });
 
   console.log(`[Walrus] Racing ${candidates.length} publisher(s)...`);
 
-  // Use Promise.any so the first successful publisher wins
   const promises = candidates.map(async (p) => {
     const result = await tryPublisher(p.url, receiptJson, p.timeout);
     if (!result) throw new Error(`${p.url} failed`);
@@ -228,7 +267,7 @@ async function storeViaHttp(receiptJson: string): Promise<{ blobId: string; publ
 
   try {
     const winner = await Promise.any(promises);
-    console.log(`[Walrus] ✅ Success with publisher: ${winner.publisher}`);
+    console.log(`[Walrus] ✅ Success via: ${winner.publisher} | epoch: ${winner.storageEpoch}→${winner.endEpoch} | cost: ${winner.walCost}`);
     return winner;
   } catch {
     console.error(`[Walrus] ❌ ALL ${candidates.length} publishers failed — receipt will be stored locally`);
@@ -236,37 +275,19 @@ async function storeViaHttp(receiptJson: string): Promise<{ blobId: string; publ
   }
 }
 
-// Verify a stored blob is retrievable from aggregators
 async function verifyBlobStored(blobId: string): Promise<boolean> {
-  for (const aggregatorBase of WALRUS_AGGREGATORS) {
-    try {
-      const response = await fetch(`${aggregatorBase}/${blobId}`, {
-        method: 'HEAD',
-        signal: AbortSignal.timeout(15000),
-      });
-      if (response.ok || response.status === 200) {
-        console.log(`[Walrus] ✅ Blob ${blobId} verified on aggregator: ${aggregatorBase}`);
-        return true;
-      }
-    } catch {
-      // try next aggregator
-    }
-  }
-  // Try GET if HEAD fails (some aggregators don't support HEAD)
   for (const aggregatorBase of WALRUS_AGGREGATORS) {
     try {
       const response = await fetch(`${aggregatorBase}/${blobId}`, {
         signal: AbortSignal.timeout(15000),
       });
       if (response.ok) {
-        console.log(`[Walrus] ✅ Blob ${blobId} verified via GET on: ${aggregatorBase}`);
+        console.log(`[Walrus] ✅ Blob ${blobId} verified on: ${aggregatorBase}`);
         return true;
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
-  console.warn(`[Walrus] ⚠️ Blob ${blobId} could not be verified on any aggregator (may still be certifying)`);
+  console.warn(`[Walrus] ⚠️ Blob ${blobId} could not be verified (may still be certifying)`);
   return false;
 }
 
@@ -278,9 +299,16 @@ export async function storeBetReceipt(data: BetReceiptData): Promise<WalrusStore
 
   if (result) {
     console.log(`🐋 Walrus MAINNET receipt stored: ${result.blobId} (via ${result.publisher})`);
-    // Verify in background — don't block bet response
     verifyBlobStored(result.blobId).catch(() => {});
-    return { blobId: result.blobId, receiptJson, receiptHash, publisherUsed: result.publisher };
+    return {
+      blobId: result.blobId,
+      receiptJson,
+      receiptHash,
+      publisherUsed: result.publisher,
+      storageEpoch: result.storageEpoch,
+      endEpoch: result.endEpoch,
+      walCost: result.walCost,
+    };
   }
 
   console.warn(`[Walrus] All publishers failed — receipt stored locally (hash: ${receiptHash})`);
@@ -306,7 +334,6 @@ export async function getBetReceipt(blobId: string): Promise<any | null> {
       console.warn(`[Walrus] Aggregator ${aggregatorBase} failed for ${blobId}: ${err.message}`);
     }
   }
-
   return null;
 }
 
@@ -314,7 +341,6 @@ export function getWalrusAggregatorUrl(blobId: string): string {
   return `${WALRUS_AGGREGATORS[0]}/${blobId}`;
 }
 
-// Health-check all publishers — useful for admin endpoints
 export async function checkPublisherHealth(): Promise<Record<string, { status: string; latencyMs?: number }>> {
   const testPayload = JSON.stringify({ suibets_health_check: true, ts: Date.now() });
   const results: Record<string, { status: string; latencyMs?: number }> = {};
@@ -322,6 +348,7 @@ export async function checkPublisherHealth(): Promise<Record<string, { status: s
   await Promise.allSettled(
     WALRUS_PUBLISHERS.map(async (p) => {
       const start = Date.now();
+      const displayUrl = p.url.includes('nami.cloud') ? 'nami.cloud/[key]/v1/blobs' : p.url;
       try {
         const response = await fetch(`${p.url}?epochs=1`, {
           method: 'PUT',
@@ -332,20 +359,20 @@ export async function checkPublisherHealth(): Promise<Record<string, { status: s
         const latencyMs = Date.now() - start;
         if (response.ok) {
           const json = await response.json().catch(() => null);
-          const blobId = json ? extractBlobId(json) : null;
-          results[p.url] = {
-            status: blobId ? `✅ working (blobId: ${blobId.slice(0, 12)}...)` : '⚠️ responded but no blobId',
+          const data = json ? extractBlobData(json) : { blobId: null };
+          results[displayUrl] = {
+            status: data.blobId ? `✅ working (blobId: ${data.blobId.slice(0, 12)}... epoch: ${data.storageEpoch}→${data.endEpoch})` : '⚠️ responded but no blobId',
             latencyMs,
           };
         } else {
-          results[p.url] = { status: `❌ HTTP ${response.status}`, latencyMs };
+          results[displayUrl] = { status: `❌ HTTP ${response.status}`, latencyMs };
         }
       } catch (err: any) {
         const reason = err.name === 'TimeoutError' ? 'timeout'
           : err.cause?.code === 'ECONNREFUSED' ? 'connection refused'
           : err.cause?.code === 'ENOTFOUND' ? 'DNS not found'
           : err.message;
-        results[p.url] = { status: `❌ ${reason}`, latencyMs: Date.now() - start };
+        results[displayUrl] = { status: `❌ ${reason}`, latencyMs: Date.now() - start };
       }
     })
   );

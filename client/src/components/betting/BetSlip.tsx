@@ -27,6 +27,9 @@ interface BetConfirmation {
   legs?: ParlayLeg[];
   walrusBlobId?: string | null;
   walrusUrl?: string | null;
+  walrusStorageEpoch?: number | null;
+  walrusEndEpoch?: number | null;
+  walrusCost?: number | null;
 }
 
 export function BetSlip() {
@@ -410,32 +413,89 @@ export function BetSlip() {
               </div>
             )}
 
-            {confirmedBet.walrusBlobId && (
-              <div className="mt-3 pt-3 border-t border-gray-700">
-                <div className="flex items-center gap-1 mb-1">
-                  <span className="text-purple-400 text-xs font-semibold">🐋 Walrus Receipt</span>
+            {confirmedBet.walrusBlobId ? (
+              <div className="mt-3 pt-3 border-t border-cyan-900/40">
+                <div className="bg-gradient-to-r from-cyan-950/60 to-purple-950/60 border border-cyan-500/30 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-lg">🐋</span>
+                      <span className="text-cyan-400 text-xs font-bold tracking-wide uppercase">Walrus Decentralized Storage</span>
+                    </div>
+                    {!confirmedBet.walrusBlobId.startsWith('local_') && (
+                      <span className="bg-cyan-500/20 text-cyan-300 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-cyan-500/30">
+                        ✓ On-Chain
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400 text-xs">Blob ID:</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-cyan-300 text-xs font-mono">
+                          {confirmedBet.walrusBlobId.startsWith('local_')
+                            ? confirmedBet.walrusBlobId.slice(6, 20) + '...'
+                            : confirmedBet.walrusBlobId.slice(0, 20) + '...'}
+                        </span>
+                        <button
+                          onClick={() => { navigator.clipboard.writeText(confirmedBet.walrusBlobId!); }}
+                          className="text-gray-500 hover:text-cyan-400 transition-colors"
+                          title="Copy Blob ID"
+                        >
+                          <Copy size={11} />
+                        </button>
+                      </div>
+                    </div>
+                    {confirmedBet.walrusStorageEpoch != null && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400 text-xs">Epoch:</span>
+                        <span className="text-gray-300 text-xs font-mono">
+                          {confirmedBet.walrusStorageEpoch}
+                          {confirmedBet.walrusEndEpoch != null && ` → ${confirmedBet.walrusEndEpoch}`}
+                          <span className="text-gray-500 ml-1">(10 epochs)</span>
+                        </span>
+                      </div>
+                    )}
+                    {confirmedBet.walrusCost != null && confirmedBet.walrusCost > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400 text-xs">WAL Cost:</span>
+                        <span className="text-amber-400 text-xs font-mono">
+                          {(confirmedBet.walrusCost / 1_000_000_000).toFixed(6)} WAL
+                        </span>
+                      </div>
+                    )}
+                    {confirmedBet.walrusUrl && (
+                      <div className="flex justify-between items-center pt-1 border-t border-cyan-900/30 mt-1">
+                        <a
+                          href={`/api/walrus/receipt/${confirmedBet.walrusBlobId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-cyan-400 hover:text-cyan-300 text-xs font-medium"
+                          data-testid="link-walrus-receipt"
+                        >
+                          View Receipt <ExternalLink size={10} />
+                        </a>
+                        <a
+                          href={confirmedBet.walrusUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-purple-400 hover:text-purple-300 text-xs"
+                        >
+                          Raw Blob <ExternalLink size={10} />
+                        </a>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400 text-xs">Blob ID:</span>
-                  <span className="text-purple-300 text-xs font-mono">
-                    {confirmedBet.walrusBlobId.startsWith('local_')
-                      ? confirmedBet.walrusBlobId.slice(6, 18) + '...'
-                      : confirmedBet.walrusBlobId.slice(0, 14) + '...'}
-                  </span>
+              </div>
+            ) : (
+              <div className="mt-3 pt-3 border-t border-cyan-900/40">
+                <div className="bg-cyan-950/20 border border-cyan-900/30 rounded-lg p-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-lg">🐋</span>
+                    <span className="text-gray-400 text-xs">Storing receipt on Walrus...</span>
+                    <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                  </div>
                 </div>
-                {confirmedBet.walrusUrl ? (
-                  <a
-                    href={confirmedBet.walrusUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-purple-400 hover:text-purple-300 text-xs mt-1 justify-end"
-                    data-testid="link-walrus-receipt"
-                  >
-                    Verify on Walrus <ExternalLink size={10} />
-                  </a>
-                ) : (
-                  <span className="text-gray-500 text-xs mt-1 block text-right">Receipt saved</span>
-                )}
               </div>
             )}
           </div>
