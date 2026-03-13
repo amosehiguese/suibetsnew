@@ -298,6 +298,10 @@ export default function CleanHome() {
             <Link href="/promotions" className="text-gray-400 hover:text-cyan-400 transition-colors text-sm font-medium" data-testid="nav-promotions">Promotions</Link>
             <Link href="/revenue" className="text-yellow-400 hover:text-yellow-300 transition-colors text-sm font-bold" data-testid="nav-revenue">Revenue</Link>
             <Link href="/staking" className="text-cyan-400 hover:text-cyan-300 transition-colors text-sm font-medium" data-testid="nav-staking">Staking</Link>
+            <Link href="/trade" className="text-blue-400 hover:text-blue-300 transition-colors text-sm font-bold flex items-center gap-1" data-testid="nav-trade">
+              Trade
+              <span className="text-[9px] font-bold bg-blue-400/15 border border-blue-400/30 rounded px-1 text-blue-300">BLN</span>
+            </Link>
             <DropdownMenu>
               <DropdownMenuTrigger className="text-gray-400 hover:text-cyan-400 transition-colors text-sm font-medium flex items-center gap-1 outline-none" data-testid="nav-more">
                 More
@@ -341,7 +345,17 @@ export default function CleanHome() {
               className="bg-cyan-500 hover:bg-cyan-600 text-black font-bold px-3 md:px-4 py-2 rounded-lg text-sm transition-colors"
               data-testid="btn-buy-now"
             >
-              Buy Now
+              Turbos
+            </a>
+            <a 
+              href="https://swap.bluefin.io/?input=0x2::sui::SUI&output=0x6a4d9c0eab7ac40371a7453d1aa6c89b130950e8af6868ba975fdd81371a7285::sbets::SBETS"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden md:inline-flex items-center gap-1 bg-blue-500 hover:bg-blue-600 text-white font-bold px-3 md:px-4 py-2 rounded-lg text-sm transition-colors"
+              data-testid="btn-buy-bluefin"
+            >
+              Bluefin
+              <span className="text-[9px] font-bold bg-white/20 rounded px-1">BLN</span>
             </a>
             {isConnected && walletAddress ? (
               <>
@@ -394,6 +408,10 @@ export default function CleanHome() {
               <Link href="/promotions" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-cyan-400 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-promotions">Promotions</Link>
               <Link href="/revenue" onClick={() => setIsMobileMenuOpen(false)} className="text-yellow-400 hover:text-yellow-300 transition-colors text-base font-bold py-2 border-b border-cyan-900/20" data-testid="mobile-nav-revenue">Revenue</Link>
               <Link href="/staking" onClick={() => setIsMobileMenuOpen(false)} className="text-cyan-400 hover:text-cyan-300 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-staking">Staking</Link>
+              <Link href="/trade" onClick={() => setIsMobileMenuOpen(false)} className="text-blue-400 hover:text-blue-300 transition-colors text-base font-bold py-2 border-b border-cyan-900/20 flex items-center gap-2" data-testid="mobile-nav-trade">
+                Trade
+                <span className="text-[9px] font-bold bg-blue-400/15 border border-blue-400/30 rounded px-1 text-blue-300">BLN</span>
+              </Link>
               <Link href="/streaming" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-cyan-400 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-streaming">Streaming</Link>
               <Link href="/leaderboard" onClick={() => setIsMobileMenuOpen(false)} className="text-yellow-400 hover:text-yellow-300 transition-colors text-base font-bold py-2 border-b border-cyan-900/20" data-testid="mobile-nav-leaderboard">Leaderboard</Link>
               <Link href="/results" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-cyan-400 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-activity">Activity</Link>
