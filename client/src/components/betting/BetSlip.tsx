@@ -25,6 +25,8 @@ interface BetConfirmation {
   placedAt: string;
   isParlay?: boolean;
   legs?: ParlayLeg[];
+  walrusBlobId?: string | null;
+  walrusUrl?: string | null;
 }
 
 export function BetSlip() {
@@ -405,6 +407,35 @@ export function BetSlip() {
                   {confirmedBet.txHash.slice(0, 12)}...
                   <ExternalLink size={12} />
                 </a>
+              </div>
+            )}
+
+            {confirmedBet.walrusBlobId && (
+              <div className="mt-3 pt-3 border-t border-gray-700">
+                <div className="flex items-center gap-1 mb-1">
+                  <span className="text-purple-400 text-xs font-semibold">🐋 Walrus Receipt</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400 text-xs">Blob ID:</span>
+                  <span className="text-purple-300 text-xs font-mono">
+                    {confirmedBet.walrusBlobId.startsWith('local_')
+                      ? confirmedBet.walrusBlobId.slice(6, 18) + '...'
+                      : confirmedBet.walrusBlobId.slice(0, 14) + '...'}
+                  </span>
+                </div>
+                {confirmedBet.walrusUrl ? (
+                  <a
+                    href={confirmedBet.walrusUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-purple-400 hover:text-purple-300 text-xs mt-1 justify-end"
+                    data-testid="link-walrus-receipt"
+                  >
+                    Verify on Walrus <ExternalLink size={10} />
+                  </a>
+                ) : (
+                  <span className="text-gray-500 text-xs mt-1 block text-right">Receipt saved</span>
+                )}
               </div>
             )}
           </div>
