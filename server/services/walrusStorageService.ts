@@ -1,18 +1,16 @@
 import { createHash } from 'crypto';
 
 // =============================================================================
-// Publisher list — ordered by reliability.
-// PRIMARY publishers (race in parallel for fastest response):
-//   - StakeTab-1: https://walrus-mainnet-publisher-1.staketab.org (confirmed March 2026)
-//   - StakeTab-2: https://walrus-mainnet-publisher-2.staketab.org (confirmed March 2026)
-//   - Nami Cloud: https://walrus-mainnet-publisher.nami.cloud/{key}/v1/blobs (requires NAMI_CLOUD_ENDPOINT_KEY)
-// Official list: https://github.com/MystenLabs/awesome-walrus
+// Publisher list — ONLY verified working Walrus mainnet publishers.
+// StakeTab-1 is the primary reliable publisher.
+// StakeTab-2 races alongside it.
+// Nami Cloud is added when NAMI_CLOUD_ENDPOINT_KEY is configured.
 // =============================================================================
 function buildPublisherList(): Array<{ url: string; timeout: number; priority: 'primary' | 'secondary' }> {
   const list: Array<{ url: string; timeout: number; priority: 'primary' | 'secondary' }> = [
-    // PRIMARY — StakeTab confirmed working March 2026 (both nodes race in parallel)
-    { url: 'https://walrus-mainnet-publisher-1.staketab.org/v1/blobs', timeout: 30000, priority: 'primary' },
-    { url: 'https://walrus-mainnet-publisher-2.staketab.org/v1/blobs', timeout: 30000, priority: 'primary' },
+    // Only verified working publishers — StakeTab nodes confirmed March 2026
+    { url: 'https://walrus-mainnet-publisher-1.staketab.org/v1/blobs', timeout: 60000, priority: 'primary' },
+    { url: 'https://walrus-mainnet-publisher-2.staketab.org/v1/blobs', timeout: 60000, priority: 'primary' },
   ];
 
   // Nami Cloud — add if endpoint key is configured
@@ -20,19 +18,11 @@ function buildPublisherList(): Array<{ url: string; timeout: number; priority: '
   if (namiKey) {
     list.push({
       url: `https://walrus-mainnet-publisher.nami.cloud/${namiKey}/v1/blobs`,
-      timeout: 25000,
+      timeout: 60000,
       priority: 'primary',
     });
     console.log('[Walrus] Nami Cloud publisher enabled');
   }
-
-  // SECONDARY — kept as fallbacks with short timeouts
-  list.push(
-    { url: 'https://publisher.walrus-mainnet.walrus.space/v1/blobs', timeout: 15000, priority: 'secondary' },
-    { url: 'https://walrus-mainnet.nodeinfra.com/v1/blobs', timeout: 12000, priority: 'secondary' },
-    { url: 'https://walrus.badkids.xyz/v1/blobs', timeout: 12000, priority: 'secondary' },
-    { url: 'https://walrus-publisher.nodes.guru/v1/blobs', timeout: 12000, priority: 'secondary' },
-  );
 
   return list;
 }
@@ -254,27 +244,37 @@ async function storeViaHttp(receiptJson: string): Promise<{ blobId: string; publ
     WALRUS_PUBLISHERS = buildPublisherList();
   }
 
-  const candidates = WALRUS_PUBLISHERS.filter(p => {
-    if (p.priority === 'primary') return true;
-    return isPublisherHealthy(p.url);
-  });
+  // ROUND 1: Race all publishers in parallel — take the first real blob ID
+  const allCandidates = WALRUS_PUBLISHERS.filter(p => isPublisherHealthy(p.url));
+  console.log(`[Walrus] Round 1: Racing ${allCandidates.length} publisher(s) in parallel...`);
 
-  console.log(`[Walrus] Racing ${candidates.length} publisher(s)...`);
-
-  const promises = candidates.map(async (p) => {
+  const parallelPromises = allCandidates.map(async (p) => {
     const result = await tryPublisher(p.url, receiptJson, p.timeout);
     if (!result) throw new Error(`${p.url} failed`);
     return result;
   });
 
   try {
-    const winner = await Promise.any(promises);
-    console.log(`[Walrus] ✅ Success via: ${winner.publisher} | epoch: ${winner.storageEpoch}→${winner.endEpoch} | cost: ${winner.walCost}`);
+    const winner = await Promise.any(parallelPromises);
+    console.log(`[Walrus] ✅ Round 1 success via: ${winner.publisher} | epoch: ${winner.storageEpoch}→${winner.endEpoch} | cost: ${winner.walCost}`);
     return winner;
   } catch {
-    console.error(`[Walrus] ❌ ALL ${candidates.length} publishers failed — receipt will be stored locally`);
-    return null;
+    console.warn(`[Walrus] Round 1 failed — trying sequential fallback with extended timeouts...`);
   }
+
+  // ROUND 2: Sequential retry — each publisher gets a longer window
+  const EXTENDED_TIMEOUT = 60000;
+  for (const p of WALRUS_PUBLISHERS) {
+    console.log(`[Walrus] Round 2: Trying ${p.url} (${EXTENDED_TIMEOUT / 1000}s)...`);
+    const result = await tryPublisher(p.url, receiptJson, EXTENDED_TIMEOUT);
+    if (result) {
+      console.log(`[Walrus] ✅ Round 2 success via: ${result.publisher}`);
+      return result;
+    }
+  }
+
+  console.error(`[Walrus] ❌ ALL publishers failed in both rounds — will store locally and retry in background`);
+  return null;
 }
 
 async function verifyBlobStored(blobId: string): Promise<boolean> {
@@ -341,6 +341,16 @@ export async function getBetReceipt(blobId: string): Promise<any | null> {
 
 export function getWalrusAggregatorUrl(blobId: string): string {
   return `${WALRUS_AGGREGATORS[0]}/${blobId}`;
+}
+
+/**
+ * Re-upload an existing receipt JSON string to Walrus to get a real blob ID.
+ * Used by the retry worker to upgrade `local_` blob IDs to real ones.
+ */
+export async function reuploadReceiptJson(receiptJson: string): Promise<{ blobId: string; publisherUsed: string } | null> {
+  const result = await storeViaHttp(receiptJson);
+  if (result) return { blobId: result.blobId, publisherUsed: result.publisher };
+  return null;
 }
 
 export async function checkPublisherHealth(): Promise<Record<string, { status: string; latencyMs?: number }>> {

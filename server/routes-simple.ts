@@ -23,6 +23,9 @@ import { promotionService } from "./services/promotionService";
 import { treasuryAutoWithdrawService } from "./services/treasuryAutoWithdrawService";
 import { freeSportsService } from "./services/freeSportsService";
 import { esportsService } from "./services/esportsService";
+import { reuploadReceiptJson } from "./services/walrusStorageService";
+import { bets as betsGlobal } from "@shared/schema";
+import { like as drizzleLike, eq as drizzleEq, and as drizzleAnd, isNotNull as drizzleIsNotNull } from "drizzle-orm";
 
 // SUI BETTING PAUSE - Set to true to pause SUI betting until treasury is funded
 // Users can still bet with SBETS
@@ -154,6 +157,55 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
 
   esportsService.start();
   console.log('🎮 Esports service started - LoL Esports + Dota 2 pro matches (free APIs)');
+
+  // WALRUS RETRY WORKER: Continuously upgrade local_ blob IDs to real Walrus blobs
+  async function walrusRetryWorker() {
+    try {
+      const localBets = await db.select({
+        id: betsGlobal.id,
+        walrusBlobId: betsGlobal.walrusBlobId,
+        walrusReceiptData: betsGlobal.walrusReceiptData,
+      }).from(betsGlobal)
+        .where(drizzleAnd(
+          drizzleLike(betsGlobal.walrusBlobId, 'local_%'),
+          drizzleIsNotNull(betsGlobal.walrusReceiptData),
+        ))
+        .limit(15);
+
+      if (localBets.length === 0) return;
+
+      console.log(`[Walrus Retry] 🔄 ${localBets.length} bets with local IDs — re-uploading to get real blob IDs...`);
+      let upgraded = 0;
+
+      for (const bet of localBets) {
+        if (!bet.walrusReceiptData) continue;
+        try {
+          const result = await reuploadReceiptJson(bet.walrusReceiptData);
+          if (result?.blobId) {
+            await db.update(betsGlobal)
+              .set({ walrusBlobId: result.blobId })
+              .where(drizzleEq(betsGlobal.id, bet.id));
+            console.log(`[Walrus Retry] ✅ Bet #${bet.id}: ${String(bet.walrusBlobId).slice(0, 14)} → ${result.blobId} (via ${result.publisherUsed.split('/').slice(2, 3).join('')})`);
+            upgraded++;
+          }
+        } catch (err: any) {
+          console.warn(`[Walrus Retry] Bet #${bet.id} failed: ${err.message}`);
+        }
+      }
+
+      if (upgraded > 0) {
+        console.log(`[Walrus Retry] ✅ Upgraded ${upgraded}/${localBets.length} bets to real Walrus blob IDs`);
+      } else {
+        console.log(`[Walrus Retry] No upgrades this cycle — publishers temporarily unavailable`);
+      }
+    } catch (err: any) {
+      console.warn('[Walrus Retry] Worker error:', err.message);
+    }
+  }
+  // Run immediately on startup, then every 3 minutes
+  walrusRetryWorker();
+  setInterval(walrusRetryWorker, 3 * 60 * 1000);
+  console.log('🐋 Walrus retry worker started — upgrades local blob IDs to real Walrus blobs every 3 minutes');
 
   // AUTO-VOID completed: 69 phantom bets voided, 30M+ SBETS liability freed (2026-03-07)
   // Can still be triggered manually via POST /api/admin/void-phantom-sbets if needed
