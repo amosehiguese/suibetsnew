@@ -900,6 +900,11 @@ class SettlementWorkerService {
 
     for (const bet of pendingBets) {
       const extId = bet.externalEventId || '';
+      // Boxing bets use the MMA API endpoint (boxing is reclassified within MMA results)
+      if (extId.startsWith('boxing_')) {
+        sportSlugs.add('mma');
+        continue;
+      }
       for (const prefix of Object.keys(slugsByPrefix)) {
         if (extId.startsWith(`${prefix}_`)) {
           sportSlugs.add(prefix);

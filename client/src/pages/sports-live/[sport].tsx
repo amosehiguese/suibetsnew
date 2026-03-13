@@ -16,7 +16,6 @@ const SPORTS_MAPPING: Record<string, number> = {
   'football': 1,
   'soccer': 1,
   'basketball': 2,
-  'nba': 2,
   'tennis': 3,
   'american-football': 4,
   'baseball': 5,
