@@ -16,19 +16,22 @@ export enum SportIds {
   TENNIS = 3,
   BASEBALL = 4,
   HOCKEY = 5,
-  RUGBY = 6,
-  GOLF = 7,
-  VOLLEYBALL = 8,
+  HANDBALL = 6,
+  VOLLEYBALL = 7,
+  RUGBY = 8,
   CRICKET = 9,
-  MMA_UFC = 10,
+  GOLF = 10,
   BOXING = 11,
-  FORMULA_1 = 12,
-  CYCLING = 13,
-  AMERICAN_FOOTBALL = 14,
-  AFL = 15,
-  SNOOKER = 16,
-  DARTS = 17,
-  WWE_ENTERTAINMENT = 20
+  MMA_UFC = 12,
+  FORMULA_1 = 13,
+  CYCLING = 14,
+  AMERICAN_FOOTBALL = 15,
+  AFL = 16,
+  SNOOKER = 17,
+  HORSE_RACING = 18,
+  MOTOGP = 19,
+  WWE_ENTERTAINMENT = 20,
+  DARTS = 21
 }
 
 // Type definition for outcome (if not already defined elsewhere)

@@ -2271,18 +2271,39 @@ export class FreeSportsService {
    */
   getUpcomingEvents(sportSlug?: string): SportEvent[] {
     if (sportSlug) {
-      if (sportSlug === 'cricket') {
-        return cachedFreeSportsEvents.filter(e => e.sportId === CRICKET_SPORT_ID);
-      }
-      if (sportSlug === 'horse-racing') {
-        return cachedFreeSportsEvents.filter(e => e.sportId === HORSE_RACING_SPORT_ID);
-      }
-      if (sportSlug === 'wwe' || sportSlug === 'entertainment' || sportSlug === 'wwe-entertainment') {
-        return cachedFreeSportsEvents.filter(e => e.sportId === 20);
-      }
-      const config = FREE_SPORTS_CONFIG[sportSlug];
-      if (config) {
-        return cachedFreeSportsEvents.filter(e => e.sportId === config.sportId);
+      // Canonical slug-to-sportId map covering all sidebar slugs and aliases
+      const SLUG_TO_SPORT_ID: Record<string, number> = {
+        // FREE_SPORTS_CONFIG sports
+        'basketball': 2,
+        'baseball': 4,
+        'ice-hockey': 5,
+        'hockey': 5,
+        'mma': 12,
+        'mma-ufc': 12,
+        'ufc': 12,
+        'american-football': 15,
+        'nfl': 15,
+        'afl': 16,
+        'formula-1': 13,
+        'f1': 13,
+        'handball': 6,
+        'rugby': 8,
+        'volleyball': 7,
+        // Standalone generators
+        'tennis': 3,
+        'boxing': 11,
+        'motogp': 19,
+        'moto-gp': 19,
+        'cricket': 9,
+        'horse-racing': 18,
+        'horseracing': 18,
+        'wwe': 20,
+        'entertainment': 20,
+        'wwe-entertainment': 20,
+      };
+      const sportId = SLUG_TO_SPORT_ID[sportSlug];
+      if (sportId !== undefined) {
+        return cachedFreeSportsEvents.filter(e => e.sportId === sportId);
       }
     }
     return cachedFreeSportsEvents;
