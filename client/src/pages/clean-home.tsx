@@ -348,7 +348,7 @@ export default function CleanHome() {
               Turbos
             </a>
             <a 
-              href="https://swap.bluefin.io/?input=0x2::sui::SUI&output=0x6a4d9c0eab7ac40371a7453d1aa6c89b130950e8af6868ba975fdd81371a7285::sbets::SBETS"
+              href="https://trade.bluefin.io"
               target="_blank"
               rel="noopener noreferrer"
               className="hidden md:inline-flex items-center gap-1 bg-blue-500 hover:bg-blue-600 text-white font-bold px-3 md:px-4 py-2 rounded-lg text-sm transition-colors"

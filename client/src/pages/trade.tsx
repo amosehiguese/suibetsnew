@@ -4,7 +4,8 @@ import { ExternalLink, TrendingUp, Zap, Globe, ArrowRightLeft } from "lucide-rea
 
 const SBETS_TOKEN = "0x6a4d9c0eab7ac40371a7453d1aa6c89b130950e8af6868ba975fdd81371a7285::sbets::SBETS";
 const BLUEFIN_TRADE_URL = "https://trade.bluefin.io";
-const BLUEFIN_SWAP_URL = `https://swap.bluefin.io/?input=0x2::sui::SUI&output=${SBETS_TOKEN}`;
+const TURBOS_SWAP_URL = `https://app.turbos.finance/#/trade?input=0x2::sui::SUI&output=${SBETS_TOKEN}`;
+const CETUS_SWAP_URL = `https://app.cetus.zone/swap?from=0x2::sui::SUI&to=${SBETS_TOKEN}`;
 
 export default function TradePage() {
   return (
@@ -41,18 +42,18 @@ export default function TradePage() {
         {/* Action Cards */}
         <div className="grid md:grid-cols-2 gap-4">
           {/* Buy SBETS Card */}
-          <div className="bg-[#0b1618] border border-blue-500/30 rounded-2xl p-6 space-y-4 hover:border-blue-400/60 transition-colors">
+          <div className="bg-[#0b1618] border border-cyan-500/30 rounded-2xl p-6 space-y-4 hover:border-cyan-400/60 transition-colors">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center">
-                <ArrowRightLeft className="h-6 w-6 text-blue-400" />
+              <div className="w-12 h-12 rounded-xl bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center">
+                <ArrowRightLeft className="h-6 w-6 text-cyan-400" />
               </div>
               <div>
                 <h2 className="text-lg font-bold text-white">Buy SBETS</h2>
-                <p className="text-sm text-gray-400">Swap SUI → SBETS via Bluefin</p>
+                <p className="text-sm text-gray-400">Swap SUI → SBETS on Sui mainnet</p>
               </div>
             </div>
             <p className="text-gray-400 text-sm">
-              Acquire SBETS tokens to place bets, earn staking rewards, and collect revenue share from the platform. Powered by Bluefin's on-chain liquidity.
+              Acquire SBETS tokens to place bets, earn staking rewards, and collect platform revenue share. Choose your preferred Sui DEX below.
             </p>
             <div className="bg-[#112225] rounded-xl p-3 space-y-2 text-xs font-mono">
               <div className="flex justify-between text-gray-400">
@@ -64,18 +65,29 @@ export default function TradePage() {
                 <span className="text-cyan-300">Sui Mainnet</span>
               </div>
               <div className="flex justify-between text-gray-400">
-                <span>DEX</span>
-                <span className="text-blue-400">Bluefin BLN</span>
+                <span>Contract</span>
+                <span className="text-gray-500 text-[10px] truncate max-w-[160px]">0x6a4d9c...285</span>
               </div>
             </div>
-            <Button
-              className="w-full bg-blue-500 hover:bg-blue-400 text-white font-semibold shadow-[0_0_15px_rgba(59,130,246,0.3)] hover:shadow-[0_0_25px_rgba(59,130,246,0.5)] transition-all"
-              onClick={() => window.open(BLUEFIN_SWAP_URL, '_blank', 'noopener,noreferrer')}
-            >
-              <ArrowRightLeft className="h-4 w-4 mr-2" />
-              Swap on Bluefin
-              <ExternalLink className="h-3.5 w-3.5 ml-2 opacity-70" />
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                className="flex-1 bg-cyan-500 hover:bg-cyan-400 text-black font-semibold transition-all"
+                onClick={() => window.open(TURBOS_SWAP_URL, '_blank', 'noopener,noreferrer')}
+              >
+                <ArrowRightLeft className="h-4 w-4 mr-1" />
+                Turbos
+                <ExternalLink className="h-3 w-3 ml-1 opacity-70" />
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10 font-semibold transition-all"
+                onClick={() => window.open(CETUS_SWAP_URL, '_blank', 'noopener,noreferrer')}
+              >
+                <ArrowRightLeft className="h-4 w-4 mr-1" />
+                Cetus
+                <ExternalLink className="h-3 w-3 ml-1 opacity-70" />
+              </Button>
+            </div>
           </div>
 
           {/* Trade & Perps Card */}
@@ -130,11 +142,11 @@ export default function TradePage() {
           <div className="flex flex-col sm:flex-row gap-3 shrink-0">
             <Button
               size="lg"
-              className="bg-blue-500 hover:bg-blue-400 text-white font-bold px-8 shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:shadow-[0_0_30px_rgba(59,130,246,0.6)] transition-all"
-              onClick={() => window.open(BLUEFIN_SWAP_URL, '_blank', 'noopener,noreferrer')}
+              className="bg-cyan-500 hover:bg-cyan-400 text-black font-bold px-8 shadow-[0_0_20px_rgba(0,255,255,0.3)] hover:shadow-[0_0_30px_rgba(0,255,255,0.5)] transition-all"
+              onClick={() => window.open(TURBOS_SWAP_URL, '_blank', 'noopener,noreferrer')}
             >
               <ArrowRightLeft className="h-5 w-5 mr-2" />
-              Swap SBETS
+              Buy SBETS (Turbos)
               <ExternalLink className="h-4 w-4 ml-2 opacity-70" />
             </Button>
             <Button
