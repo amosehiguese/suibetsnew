@@ -1,12 +1,16 @@
 import { createHash } from 'crypto';
 
 const WALRUS_PUBLISHERS = [
-  'https://walrus-mainnet-publisher-1.staketab.org/v1/blobs',
+  'https://publisher.walrus-mainnet.walrus.space/v1/blobs',      // Mysten Labs official (most reliable)
+  'https://walrus-mainnet-publisher-1.staketab.org/v1/blobs',   // StakeTab
+  'https://walrus.badkids.xyz/v1/blobs',                        // BadKids
+  'https://walrus-publisher.nodes.guru/v1/blobs',               // Nodes.guru
+  'https://walrus-mainnet.nodeinfra.com/v1/blobs',              // NodeInfra
 ];
 const WALRUS_AGGREGATORS = [
   'https://aggregator.walrus-mainnet.walrus.space/v1/blobs',
 ];
-const STORE_EPOCHS = 5;
+const STORE_EPOCHS = 10;
 
 interface BetReceiptData {
   betId: string;
@@ -159,10 +163,15 @@ async function tryPublisher(publisherUrl: string, receiptJson: string): Promise<
 }
 
 async function storeViaHttp(receiptJson: string): Promise<{ blobId: string; publisher: string } | null> {
+  console.log(`[Walrus] Trying ${WALRUS_PUBLISHERS.length} publishers in sequence...`);
   for (const publisherUrl of WALRUS_PUBLISHERS) {
     const result = await tryPublisher(publisherUrl, receiptJson);
-    if (result) return result;
+    if (result) {
+      console.log(`[Walrus] ✅ Success with publisher: ${publisherUrl}`);
+      return result;
+    }
   }
+  console.error(`[Walrus] ❌ ALL ${WALRUS_PUBLISHERS.length} publishers failed — receipt will be stored locally`);
   return null;
 }
 

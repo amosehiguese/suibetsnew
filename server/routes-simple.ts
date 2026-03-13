@@ -2854,6 +2854,8 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       const userId = String(data.userId);
       const eventId = String(data.eventId);
       const { eventName, homeTeam, awayTeam, marketId, outcomeId, odds, betAmount, currency, prediction, feeCurrency, paymentMethod, txHash, onChainBetId, status, isLive, matchMinute, walletAddress, useBonus, useFreeBet } = data;
+      const sportName = typeof req.body.sportName === 'string' ? req.body.sportName : undefined;
+      const marketTypeName = typeof req.body.marketType === 'string' ? req.body.marketType : undefined;
       
       // Gift bet: optional recipient wallet (extracted separately to avoid touching validation schema)
       const giftRecipientWallet = typeof req.body.giftRecipientWallet === 'string' && req.body.giftRecipientWallet.startsWith('0x') && req.body.giftRecipientWallet.length >= 64
@@ -3489,6 +3491,8 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
           txHash: txHash || undefined,
           betObjectId: onChainBetId || undefined,
           placedAt: Date.now(),
+          sportName: sportName || undefined,
+          marketType: marketTypeName || marketId || undefined,
         });
         const { bets: betsTable } = await import('@shared/schema');
         const { db: walrusDb } = await import('./db');
@@ -3504,7 +3508,7 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         await walrusDb.update(betsTable)
           .set(updateFields)
           .where(walrusEq(betsTable.wurlusBetId, betId));
-        console.log(`🐋 Receipt saved for bet ${betId}: ${updateFields.walrusBlobId}`);
+        console.log(`🐋 Receipt saved for bet ${betId}: ${updateFields.walrusBlobId} (publisher: ${walrusResult.publisherUsed || 'local'})`);
       } catch (walrusErr: any) {
         console.warn(`[Walrus] Store failed: ${walrusErr.message}`);
       }
