@@ -39,9 +39,8 @@ function saveFavorites(favorites: Set<string>) {
 const suibetsLogo = "/images/suibets-logo.png";
 const suibetsHeroBg = "/images/hero-bg.png";
 
-// Sport IDs MUST match database: 1=Soccer, 2=Basketball, 3=Tennis, 4=American Football, 5=Baseball, 6=Ice Hockey, 7=MMA/Boxing, 9=Esports
-// New sports: 10=AFL, 11=Formula 1, 12=Handball, 14=NFL, 15=Rugby, 16=Volleyball
-// Note: NBA games are included in Basketball (sportId 2). Boxing merged into MMA (sportId 7).
+// Sport IDs match DB: 1=Soccer,2=Basketball,3=Tennis,4=AmericanFootball,5=Baseball,6=IceHockey,
+// 7=MMA,8=Boxing,9=Esports,10=AFL,11=Formula1,12=Handball,13=NBA,14=NFL,15=Rugby,16=Volleyball,17=HorseRacing
 const SPORTS_LIST = [
   { id: 1, name: "Football", icon: "⚽" },
   { id: 2, name: "Basketball", icon: "🏀" },
@@ -50,13 +49,13 @@ const SPORTS_LIST = [
   { id: 16, name: "Volleyball", icon: "🏐" },
   { id: 12, name: "Handball", icon: "🤾" },
   { id: 15, name: "Rugby", icon: "🏉" },
-  { id: 24, name: "Esports", icon: "🎮" },
+  { id: 9, name: "Esports", icon: "🎮" },
   { id: 7, name: "MMA", icon: "🥊" },
-  { id: 18, name: "Horse Racing", icon: "🏇" },
-  { id: 17, name: "Boxing", icon: "🥊" },
+  { id: 17, name: "Horse Racing", icon: "🏇" },
+  { id: 8, name: "Boxing", icon: "🥊" },
   { id: 11, name: "Formula 1", icon: "🏎️" },
   { id: 19, name: "MotoGP", icon: "🏍️" },
-  { id: 9, name: "Cricket", icon: "🏏" },
+  { id: 18, name: "Cricket", icon: "🏏" },
   { id: 3, name: "Tennis", icon: "🎾" },
   { id: 20, name: "WWE", icon: "🎭" },
 ];
@@ -546,7 +545,7 @@ export default function CleanHome() {
           </button>
         </div>
 
-        {selectedSport === 18 && events.length > 0 && (
+        {selectedSport === 17 && events.length > 0 && (
           <div className="bg-[#0d1117] rounded-xl border border-cyan-900/20 px-4 py-3 mb-4" data-testid="horse-racing-explainer">
             <div className="flex items-start gap-3">
               <span className="text-lg mt-0.5">🏇</span>
@@ -595,11 +594,11 @@ export default function CleanHome() {
               <p className="text-gray-500 text-sm">
                 {showFavoritesOnly ? "Star some teams to see them here!" : 
                   selectedSport === 11 ? "Formula 1 races update weekly. Check back closer to race weekend!" :
-                  selectedSport === 17 ? "Boxing fights update weekly. Check back closer to fight night!" :
-                  selectedSport === 24 ? "No esports matches scheduled right now. Check back soon!" :
+                  selectedSport === 8 ? "Boxing fights update weekly. Check back closer to fight night!" :
+                  selectedSport === 9 ? "No esports matches scheduled right now. Check back soon!" :
                   selectedSport === 3 ? "Tennis events coming soon!" :
-                  selectedSport === 7 ? "MMA / Boxing fights update weekly. Check back closer to fight night!" :
-                  selectedSport === 18 ? "Horse Racing events appear closer to race times!" :
+                  selectedSport === 7 ? "MMA fights update weekly. Check back closer to fight night!" :
+                  selectedSport === 17 ? "Horse Racing events appear closer to race times!" :
                   "Check back later for more events"}
               </p>
             </div>
@@ -821,7 +820,7 @@ function RaceEventCard({ event }: { event: Event }) {
   const runners = winMarket?.outcomes || [];
   const runnersInfo = (event as any).runnersInfo || [];
   const raceDetails = (event as any).raceDetails;
-  const isHorseRacing = event.sportId === 18;
+  const isHorseRacing = event.sportId === 17;
   const isMotorsport = event.sportId === 11 || event.sportId === 19;
   const hasWPS = (isHorseRacing || isMotorsport) && placeMarket && showMarket;
 
@@ -987,7 +986,7 @@ function LeagueGroup({ leagueName, events, defaultExpanded = false, favorites, t
       {isExpanded && (
         <div className="divide-y divide-cyan-900/20">
           {events.map((event, index) => (
-            (event.sportId === 18 || event.sportId === 11 || event.sportId === 19) ? (
+            (event.sportId === 17 || event.sportId === 11 || event.sportId === 19) ? (
               <RaceEventCard
                 key={`${event.sportId}-${event.id}-${index}`}
                 event={event}
