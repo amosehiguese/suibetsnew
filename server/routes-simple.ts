@@ -8374,5 +8374,69 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
     }
   });
 
+  /**
+   * GET /api/turbos/pool-stats — Sui RPC fetch for Turbos SBETS/SUI CLMM pool
+   * Pool ID: 0x7d8d95ccb870cc2ec63997815726e15722ea128d34a2737750dfb52c3a0afd68
+   */
+  const TURBOS_POOL_ID = '0x7d8d95ccb870cc2ec63997815726e15722ea128d34a2737750dfb52c3a0afd68';
+  let turbosPoolStatsCache: { data: any; ts: number } | null = null;
+  app.get('/api/turbos/pool-stats', async (_req: Request, res: Response) => {
+    try {
+      const now = Date.now();
+      if (turbosPoolStatsCache && now - turbosPoolStatsCache.ts < 30_000) {
+        return res.json(turbosPoolStatsCache.data);
+      }
+      const rpcRes = await fetch('https://fullnode.mainnet.sui.io:443', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0', id: 1, method: 'sui_getObject',
+          params: [TURBOS_POOL_ID, { showContent: true, showType: true }],
+        }),
+      });
+      if (!rpcRes.ok) throw new Error(`Sui RPC ${rpcRes.status}`);
+      const rpc: any = await rpcRes.json();
+      const fields = rpc?.result?.data?.content?.fields ?? {};
+
+      // Turbos stores tick_current_index as I32 (two's complement in bits field)
+      const tickBits: number = fields.tick_current_index?.fields?.bits ?? 0;
+      const tick = tickBits >= 2147483648 ? tickBits - 4294967296 : tickBits;
+      // Price of token0 (SBETS) in terms of token1 (SUI): 1.0001^tick
+      // We want SBETS per SUI = 1 / price_sbets_in_sui = 1.0001^(-tick)
+      const sbetsPerSui = Math.exp(-tick * Math.log(1.0001));
+
+      // Active liquidity
+      const liquidity = fields.liquidity ?? '0';
+
+      // Fee stored as integer bps (e.g. 10000 = 1.00%)
+      const feeRaw = Number(fields.fee ?? 0);
+      const feeRatePct = feeRaw / 10_000;
+
+      // Tick spacing
+      const tickSpacing = fields.tick_spacing ?? null;
+
+      // Coin reserves (raw, 9 decimals each)
+      const coinA = fields.coin_a ?? '0'; // SBETS
+      const coinB = fields.coin_b ?? '0'; // SUI
+
+      const data = {
+        poolId: TURBOS_POOL_ID,
+        price: sbetsPerSui,
+        liquidity,
+        feeRatePct,
+        tickSpacing,
+        currentTick: tick,
+        coinA,
+        coinB,
+        updatedAt: now,
+      };
+      turbosPoolStatsCache = { data, ts: now };
+      res.json(data);
+    } catch (err: any) {
+      if (turbosPoolStatsCache) return res.json(turbosPoolStatsCache.data);
+      res.status(502).json({ error: 'Turbos pool stats unavailable', detail: err.message });
+    }
+  });
+
   return httpServer;
 }
