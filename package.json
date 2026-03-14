@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@7kprotocol/sdk-ts": "^4.0.0",
+    "@bluefin-exchange/bluefin7k-aggregator-sdk": "^5.4.4",
     "@hookform/resolvers": "^3.9.1",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@mysten/bcs": "^1.6.0",
