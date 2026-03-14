@@ -295,7 +295,7 @@ export default function CleanHome() {
             <Link href="/network" className="text-yellow-400 hover:text-yellow-300 transition-colors text-sm font-bold flex items-center gap-1" data-testid="nav-predict">Predict<span className="inline-block w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" /></Link>
             <Link href="/trading" className="flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 transition-colors text-sm font-bold" data-testid="nav-trade">
               Trade
-              <span className="bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-[10px] font-bold px-1.5 py-0.5 rounded">BLN</span>
+              <span className="bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-[10px] font-bold px-1.5 py-0.5 rounded">DEX</span>
             </Link>
             <Link href="/bet-history" className="text-gray-400 hover:text-cyan-400 transition-colors text-sm font-medium" data-testid="nav-my-bets">My Bets</Link>
             <Link href="/revenue" className="text-yellow-400 hover:text-yellow-300 transition-colors text-sm font-bold" data-testid="nav-revenue">Revenue</Link>
@@ -400,7 +400,7 @@ export default function CleanHome() {
               <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="text-cyan-400 hover:text-cyan-300 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-bets">Bets</Link>
               <Link href="/network" onClick={() => setIsMobileMenuOpen(false)} className="text-yellow-400 hover:text-yellow-300 transition-colors text-base font-bold py-2 border-b border-cyan-900/20" data-testid="mobile-nav-predict">Predict</Link>
               <Link href="/trading" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors text-base font-bold py-2 border-b border-cyan-900/20" data-testid="mobile-nav-trade">
-                Trade <span className="bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-[10px] font-bold px-1.5 py-0.5 rounded">BLN</span>
+                Trade <span className="bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-[10px] font-bold px-1.5 py-0.5 rounded">DEX</span>
               </Link>
               <Link href="/bet-history" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-cyan-400 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-my-bets">My Bets</Link>
               <Link href="/revenue" onClick={() => setIsMobileMenuOpen(false)} className="text-yellow-400 hover:text-yellow-300 transition-colors text-base font-bold py-2 border-b border-cyan-900/20" data-testid="mobile-nav-revenue">Revenue</Link>

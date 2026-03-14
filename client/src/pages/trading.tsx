@@ -875,7 +875,7 @@ export default function TradingPage() {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-white leading-tight">Bluefin + Turbos Integration</h1>
-                <p className="text-xs text-gray-400">Liquidity Network (BLN) · Sui Mainnet</p>
+                <p className="text-xs text-gray-400">Powered by Bluefin + Turbos · Sui Mainnet</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -1033,7 +1033,7 @@ export default function TradingPage() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-white mb-1">Dual Pool Depth</p>
-                  <p className="text-xs text-gray-400 leading-relaxed">Bluefin's BLN provides institutional-grade liquidity for SBETS swaps alongside Turbos Finance — tight spreads, zero counterparty risk.</p>
+                  <p className="text-xs text-gray-400 leading-relaxed">Bluefin's institutional-grade liquidity network powers SBETS swaps alongside Turbos Finance — tight spreads, zero counterparty risk.</p>
                 </div>
               </div>
             </div>

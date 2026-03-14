@@ -92,7 +92,7 @@ const Layout: React.FC<LayoutProps> = ({
     { label: 'My Bets', href: '/bet-history' },
     { label: 'Revenue', href: '/revenue' },
     { label: 'Staking', href: '/staking' },
-    { label: 'Trade', href: '/trading', badge: 'BLN' },
+    { label: 'Trade', href: '/trading', badge: 'DEX' },
     { label: 'Dashboard', href: '/wallet-dashboard', icon: <Wallet className="h-4 w-4 mr-2" /> },
     { label: 'Promotions', href: '/promotions', icon: <Target className="h-4 w-4 mr-2" /> },
   ];

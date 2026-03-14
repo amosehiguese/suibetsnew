@@ -38,7 +38,7 @@ export default function TradePage() {
           </p>
           <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-400/30 rounded-full px-4 py-1 text-blue-300 text-sm font-medium">
             <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-            Bluefin Liquidity Network (BLN)
+            Powered by Bluefin + Turbos
           </div>
         </div>
 
@@ -173,7 +173,7 @@ export default function TradePage() {
           </div>
         </div>
 
-        {/* BLN Info */}
+        {/* About Bluefin */}
         <div className="bg-gradient-to-r from-blue-900/20 via-[#0b1618] to-cyan-900/10 border border-blue-500/20 rounded-2xl p-6">
           <h3 className="text-white font-bold text-lg mb-3 flex items-center gap-2">
             <Globe className="h-5 w-5 text-blue-400" />
@@ -182,9 +182,9 @@ export default function TradePage() {
           <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-400">
             <div className="space-y-2">
               <p>
-                <span className="text-blue-300 font-semibold">BLN</span> lets protocols like SuiBets tap into Bluefin's shared liquidity pool and trading rails — meaning SBETS holders always have deep liquidity for swaps.
+                <span className="text-blue-300 font-semibold">Bluefin's network</span> lets protocols like SuiBets tap into shared liquidity pools and trading rails — meaning SBETS holders always have deep liquidity for swaps.
               </p>
-              <p>New markets launched via BLN inherit Bluefin's existing order book depth and trading infrastructure on day one.</p>
+              <p>Markets built on Bluefin's infrastructure inherit its existing order book depth and trading rails on day one.</p>
             </div>
             <div className="space-y-2">
               <p>
