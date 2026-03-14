@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { MetaAg, type MetaQuote } from "@7kprotocol/sdk-ts";
+import { MetaAg, type MetaQuote, EProvider } from "@7kprotocol/sdk-ts";
 import { Transaction } from "@mysten/sui/transactions";
 import { useCurrentAccount, useSignTransaction } from "@mysten/dapp-kit";
 import { Button } from "@/components/ui/button";
@@ -10,14 +10,49 @@ import { useToast } from "@/hooks/use-toast";
 const SBETS_TOKEN_ADDR = "0x6a4d9c0eab7ac40371a7453d1aa6c89b130950e8af6868ba975fdd81371a7285::sbets::SBETS";
 const SUI_TYPE = "0x2::sui::SUI";
 
-const ag = new MetaAg({ slippageBps: 100 });
+const ag = new MetaAg({
+  slippageBps: 100,
+  providers: {
+    [EProvider.BLUEFIN7K]: {},
+    [EProvider.CETUS]: {},
+    [EProvider.OKX]: {},
+  },
+});
+
+function getRawAmountOut(q: any): string | null {
+  if (q == null) return null;
+  const raw =
+    q.amountOut ??
+    q.coinAmountOut ??
+    q.outputAmount ??
+    q.amount_out ??
+    q.returnAmount ??
+    q.outputCoinAmount ??
+    q.estimatedAmountOut ??
+    q.toAmount ??
+    null;
+  if (raw != null) return String(raw);
+  const inner = q.quote ?? q.data ?? q.result ?? null;
+  if (!inner) return null;
+  const innerRaw =
+    inner.amountOut ??
+    inner.coinAmountOut ??
+    inner.outputAmount ??
+    inner.amount_out ??
+    inner.returnAmount ??
+    inner.outputCoinAmount ??
+    inner.estimatedAmountOut ??
+    inner.toAmount ??
+    null;
+  return innerRaw != null ? String(innerRaw) : null;
+}
 
 function getAmountOut(q: MetaQuote): string | null {
-  const inner = (q as any).quote;
-  if (!inner) return null;
-  const raw = inner.amountOut ?? inner.coinAmountOut ?? inner.outputAmount ?? inner.amount_out ?? null;
+  const raw = getRawAmountOut(q as any);
   if (raw == null) return null;
-  return (Number(raw) / 1e9).toFixed(4);
+  const num = Number(raw);
+  if (isNaN(num) || num === 0) return null;
+  return (num / 1e9).toFixed(4);
 }
 
 function getProviderLabel(provider: string): string {
@@ -83,7 +118,15 @@ export function SwapWidget() {
 
       const out = getAmountOut(best);
       if (out) setSbetsOut(out);
-      else setQuoteError("Could not read output amount. Try again.");
+      else {
+        const fallback = results.find(r => getAmountOut(r) !== null);
+        if (fallback) {
+          setQuote(fallback);
+          setSbetsOut(getAmountOut(fallback)!);
+        } else {
+          setQuoteError("Could not read output amount. Try again.");
+        }
+      }
     } catch (err: any) {
       console.error("Quote error:", err);
       setQuoteError("Failed to fetch quote — check your connection.");

@@ -3,6 +3,7 @@ import { useCurrentAccount } from "@mysten/dapp-kit";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { SwapWidget } from "@/components/SwapWidget";
 import {
   ArrowUpDown, TrendingUp, Zap, Globe, ExternalLink,
   Wallet, Clock, ArrowDownLeft, ArrowUpRight, RefreshCw,
@@ -367,54 +368,8 @@ export default function TradingPage() {
           {/* ── Swap cards ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-            {/* Buy SBETS */}
-            <div className="bg-[#0e1e24] border border-white/5 rounded-xl p-6 flex flex-col" data-testid="card-buy-sbets">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 rounded-lg bg-[#00d0ff]/10 flex items-center justify-center">
-                  <ArrowUpDown className="h-4 w-4 text-[#00d0ff]" />
-                </div>
-                <div>
-                  <p className="font-bold text-white">Buy SBETS</p>
-                  <p className="text-xs text-gray-400">Swap SUI → SBETS on Bluefin or Turbos</p>
-                </div>
-              </div>
-              <p className="text-sm text-gray-400 leading-relaxed mb-5 flex-1">
-                Acquire SBETS tokens to place bets, earn staking rewards, and collect
-                revenue share. Two live pools on Sui Mainnet — pick your preferred DEX.
-              </p>
-              <div className="border border-white/5 rounded-lg p-3 mb-5 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Token</span>
-                  <span className="text-[#00d0ff] font-medium">SBETS</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Network</span>
-                  <span className="text-[#00d0ff] font-medium">Sui Mainnet</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Available on</span>
-                  <span className="text-[#00d0ff] font-medium">Bluefin · Turbos</span>
-                </div>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Button
-                  className="w-full bg-[#0066cc] hover:bg-[#0055bb] text-white font-semibold gap-2"
-                  onClick={() => window.open(BLUEFIN_SWAP, "_blank")}
-                  data-testid="button-swap-bluefin">
-                  <ArrowUpDown className="h-4 w-4" />
-                  Swap on Bluefin
-                  <ExternalLink className="h-3 w-3 opacity-70" />
-                </Button>
-                <Button
-                  className="w-full bg-[#00b896] hover:bg-[#00a07f] text-white font-semibold gap-2"
-                  onClick={() => window.open(TURBOS_SWAP_URL, "_blank")}
-                  data-testid="button-swap-turbos">
-                  <ArrowUpDown className="h-4 w-4" />
-                  Swap on Turbos
-                  <ExternalLink className="h-3 w-3 opacity-70" />
-                </Button>
-              </div>
-            </div>
+            {/* In-App Swap Widget */}
+            <SwapWidget />
 
             {/* Trade & Perps */}
             <div className="bg-[#0e1e24] border border-white/5 rounded-xl p-6 flex flex-col" data-testid="card-trade-perps">
