@@ -8288,5 +8288,91 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 
   // ──────────────────────────────────────────────────────────────────────────
 
+  /**
+   * GET /api/prices — CoinGecko proxy for BTC/ETH/SUI with 60s in-memory cache
+   */
+  let pricesCache: { data: any; ts: number } | null = null;
+  app.get('/api/prices', async (_req: Request, res: Response) => {
+    try {
+      const now = Date.now();
+      if (pricesCache && now - pricesCache.ts < 60_000) {
+        return res.json(pricesCache.data);
+      }
+      const cgRes = await fetch(
+        'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,sui&vs_currencies=usd&include_24hr_change=true',
+        { headers: { Accept: 'application/json' } }
+      );
+      if (!cgRes.ok) throw new Error(`CoinGecko ${cgRes.status}`);
+      const raw: any = await cgRes.json();
+      const data = {
+        BTC: { price: raw.bitcoin?.usd ?? 0, change24h: raw.bitcoin?.usd_24h_change ?? 0 },
+        ETH: { price: raw.ethereum?.usd ?? 0, change24h: raw.ethereum?.usd_24h_change ?? 0 },
+        SUI: { price: raw.sui?.usd ?? 0, change24h: raw.sui?.usd_24h_change ?? 0 },
+        updatedAt: now,
+      };
+      pricesCache = { data, ts: now };
+      res.json(data);
+    } catch (err: any) {
+      if (pricesCache) return res.json(pricesCache.data);
+      res.status(502).json({ error: 'Price feed unavailable', detail: err.message });
+    }
+  });
+
+  /**
+   * GET /api/bluefin/pool-stats — Sui RPC fetch for SBETS/SUI CLMM pool object
+   */
+  const SBETS_POOL_ID = '0xbcda57bac902ed2207da46c11f6b8388fd2d36c45ffb9851228d607813b7ab4b';
+  let poolStatsCache: { data: any; ts: number } | null = null;
+  app.get('/api/bluefin/pool-stats', async (_req: Request, res: Response) => {
+    try {
+      const now = Date.now();
+      if (poolStatsCache && now - poolStatsCache.ts < 30_000) {
+        return res.json(poolStatsCache.data);
+      }
+      const rpcRes = await fetch('https://fullnode.mainnet.sui.io:443', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0', id: 1, method: 'sui_getObject',
+          params: [SBETS_POOL_ID, { showContent: true, showType: true }],
+        }),
+      });
+      if (!rpcRes.ok) throw new Error(`Sui RPC ${rpcRes.status}`);
+      const rpc: any = await rpcRes.json();
+      const fields = rpc?.result?.data?.content?.fields ?? {};
+
+      // Parse sqrt_price (Q64.64 fixed-point) → actual price ratio
+      const sqrtPriceRaw = BigInt(fields.current_sqrt_price ?? fields.sqrt_price ?? '0');
+      const sqrtPriceF = Number(sqrtPriceRaw) / Number(BigInt(1) << BigInt(64));
+      const price = sqrtPriceF * sqrtPriceF;
+
+      // Active liquidity
+      const liquidity = fields.liquidity ?? fields.current_liquidity ?? '0';
+
+      // Fee rate (stored as basis points integer, e.g. 500 = 0.05%)
+      const feeRate = fields.fee_rate ?? fields.fee ?? '0';
+      const feeRatePct = Number(feeRate) / 10_000;
+
+      // Tick spacing & current tick
+      const tickSpacing = fields.tick_spacing ?? fields.tickSpacing ?? null;
+      const currentTick = fields.current_tick_index?.fields?.bits ?? fields.current_tick ?? null;
+
+      const data = {
+        poolId: SBETS_POOL_ID,
+        price,          // SBETS per SUI (approximate)
+        liquidity,
+        feeRatePct,
+        tickSpacing,
+        currentTick,
+        updatedAt: now,
+      };
+      poolStatsCache = { data, ts: now };
+      res.json(data);
+    } catch (err: any) {
+      if (poolStatsCache) return res.json(poolStatsCache.data);
+      res.status(502).json({ error: 'Pool stats unavailable', detail: err.message });
+    }
+  });
+
   return httpServer;
 }
