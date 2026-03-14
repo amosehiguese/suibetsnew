@@ -42,8 +42,6 @@ function getRawAmountOut(q: any): string | null {
     q.coinAmountOut ??
     q.outputAmount ??
     q.amount_out ??
-    q.returnAmount ??
-    q.returnAmountWithDecimal ??
     q.outputCoinAmount ??
     q.estimatedAmountOut ??
     q.toAmount ??
@@ -56,8 +54,6 @@ function getRawAmountOut(q: any): string | null {
     inner.coinAmountOut ??
     inner.outputAmount ??
     inner.amount_out ??
-    inner.returnAmount ??
-    inner.returnAmountWithDecimal ??
     inner.outputCoinAmount ??
     inner.estimatedAmountOut ??
     inner.toAmount ??
@@ -68,6 +64,17 @@ function getRawAmountOut(q: any): string | null {
 function getAmountOut(q: any): string | null {
   const raw = getRawAmountOut(q);
   if (raw == null) return null;
+  const num = Number(raw);
+  if (isNaN(num) || num === 0) return null;
+  return (num / 1e9).toFixed(4);
+}
+
+function getBluefinAggQuoteAmountOut(q: any): string | null {
+  const raw =
+    q?.returnAmountAfterCommissionWithDecimal ||
+    q?.returnAmountWithDecimal ||
+    null;
+  if (!raw) return null;
   const num = Number(raw);
   if (isNaN(num) || num === 0) return null;
   return (num / 1e9).toFixed(4);
@@ -167,7 +174,7 @@ export function SwapWidget() {
 
         if (turbosResult.status === "fulfilled" && turbosResult.value) {
           const tq = turbosResult.value as any;
-          const out = getAmountOut(tq);
+          const out = getBluefinAggQuoteAmountOut(tq);
           if (out) {
             setTurbosRoute({ rawQuote: tq, amountOut: out });
           }
