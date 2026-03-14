@@ -1032,7 +1032,7 @@ export default function TradingPage() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-white mb-1">Dual Pool Depth</p>
-                  <p className="text-xs text-gray-400 leading-relaxed">Two live CLMM pools on Bluefin and Turbos provide deep on-chain liquidity — tight spreads, zero counterparty risk.</p>
+                  <p className="text-xs text-gray-400 leading-relaxed">Bluefin's BLN provides institutional-grade liquidity for SBETS swaps alongside Turbos Finance — tight spreads, zero counterparty risk.</p>
                 </div>
               </div>
             </div>
