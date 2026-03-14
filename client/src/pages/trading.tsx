@@ -18,7 +18,9 @@ const BLUEFIN_API      = "https://dapi.api.sui-prod.bluefin.io";
 const BLUEFIN_TERMINAL = "https://trade.bluefin.io/";
 // SUI → SBETS swap URLs — both pools are live on Sui Mainnet
 const SBETS_TOKEN_ADDR = "0x6a4d9c0eab7ac40371a7453d1aa6c89b130950e8af6868ba975fdd81371a7285::sbets::SBETS";
+const BLUEFIN_SPOT_POOL_ID = "0xbcda57bac902ed2207da46c11f6b8388fd2d36c45ffb9851228d607813b7ab4b";
 const BLUEFIN_SWAP     = `https://trade.bluefin.io/swap?fromToken=0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI&toToken=${SBETS_TOKEN_ADDR}`;
+const BLUEFIN_POOL_URL = `https://trade.bluefin.io/liquidity-pools?pool=${BLUEFIN_SPOT_POOL_ID}`;
 const TURBOS_SWAP_URL  = `https://app.turbos.finance/#/trade?input=0x2::sui::SUI&output=${SBETS_TOKEN_ADDR}`;
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -434,6 +436,28 @@ export default function TradingPage() {
                 <TrendingUp className="h-4 w-4" /> Terminal <ExternalLink className="h-3 w-3 opacity-70" />
               </Button>
             </div>
+          </div>
+
+          {/* ── Live Bluefin SBETS/SUI Pool ── */}
+          <div className="bg-[#061218] border border-[#0066cc]/30 rounded-xl px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              <span className="text-green-400 text-xs font-semibold uppercase tracking-wide">Live Pool</span>
+              <Badge className="bg-[#0066cc]/15 text-[#60a5fa] border-[#0066cc]/30 text-[10px] font-medium">Bluefin Spot CLMM</Badge>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-gray-500 text-[10px] uppercase tracking-wide mb-0.5">SUI / SBETS · 0.3% fee · tick spacing 60</p>
+              <p className="text-[#60a5fa] text-xs font-mono truncate">{BLUEFIN_SPOT_POOL_ID}</p>
+            </div>
+            <a
+              href={BLUEFIN_POOL_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#0066cc] hover:text-[#60a5fa] text-xs flex items-center gap-1 shrink-0 transition-colors"
+              data-testid="link-bluefin-pool"
+            >
+              View pool <ExternalLink className="h-3 w-3" />
+            </a>
           </div>
 
           {/* ── How Liquidity Works ── */}

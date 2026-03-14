@@ -24,6 +24,8 @@ const SBETS_TOKEN_ADDR =
 const SUI_TYPE = "0x2::sui::SUI";
 const BLUEFIN_PARTNER =
   "0x17c0b1f7a6ad73f51268f16b8c06c049eecc2f28a270cdd29c06e3d2dea23302";
+const BLUEFIN_SBETS_POOL_ID =
+  "0xbcda57bac902ed2207da46c11f6b8388fd2d36c45ffb9851228d607813b7ab4b";
 const MANUAL_GAS_BUDGET = 500_000_000;
 
 const suiMainnetClient = new SuiClient({ url: getFullnodeUrl("mainnet") });
@@ -374,9 +376,12 @@ export function SwapWidget() {
             <span className="text-white font-medium">
               directly through on-chain liquidity pools on Sui Mainnet
             </span>{" "}
-            — Bluefin holds the deepest SBETS pool, Cetus and Turbos provide
-            additional liquidity. The aggregator checks all routes in real time
+            — Bluefin holds the primary SBETS/SUI CLMM pool, with Cetus and Turbos providing
+            additional routes. The aggregator checks all routes in real time
             and selects the best rate.
+          </p>
+          <p className="font-mono text-[10px] text-gray-500 break-all">
+            Bluefin pool: {BLUEFIN_SBETS_POOL_ID}
           </p>
           <p>
             <span className="text-white font-medium">
@@ -561,8 +566,8 @@ export function SwapWidget() {
       )}
 
       <p className="text-[11px] text-gray-600 text-center mt-3">
-        Powered by Bluefin · Cetus · Turbos · 7k aggregator · 1% slippage · No
-        platform fees
+        Powered by Bluefin Spot CLMM · Cetus · Turbos · 7k aggregator · 1%
+        slippage · No platform fees
       </p>
     </div>
   );

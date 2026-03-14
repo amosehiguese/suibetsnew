@@ -4,6 +4,9 @@ import { ExternalLink, TrendingUp, Zap, Globe, ArrowRightLeft } from "lucide-rea
 
 const SBETS_TOKEN = "0x6a4d9c0eab7ac40371a7453d1aa6c89b130950e8af6868ba975fdd81371a7285::sbets::SBETS";
 const BLUEFIN_TRADE_URL = "https://trade.bluefin.io";
+const BLUEFIN_POOL_ID = "0xbcda57bac902ed2207da46c11f6b8388fd2d36c45ffb9851228d607813b7ab4b";
+const BLUEFIN_SPOT_SWAP_URL = `https://trade.bluefin.io/#/swap?from=0x2::sui::SUI&to=${SBETS_TOKEN}`;
+const BLUEFIN_POOL_URL = `https://trade.bluefin.io/liquidity-pools?pool=${BLUEFIN_POOL_ID}`;
 const TURBOS_SWAP_URL = `https://app.turbos.finance/#/trade?input=0x2::sui::SUI&output=${SBETS_TOKEN}`;
 const CETUS_SWAP_URL = `https://app.cetus.zone/swap?from=0x2::sui::SUI&to=${SBETS_TOKEN}`;
 
@@ -70,6 +73,14 @@ export default function TradePage() {
               </div>
             </div>
             <div className="flex gap-2">
+              <Button
+                className="flex-1 bg-blue-500 hover:bg-blue-400 text-white font-semibold transition-all"
+                onClick={() => window.open(BLUEFIN_SPOT_SWAP_URL, '_blank', 'noopener,noreferrer')}
+              >
+                <ArrowRightLeft className="h-4 w-4 mr-1" />
+                Bluefin
+                <ExternalLink className="h-3 w-3 ml-1 opacity-70" />
+              </Button>
               <Button
                 className="flex-1 bg-cyan-500 hover:bg-cyan-400 text-black font-semibold transition-all"
                 onClick={() => window.open(TURBOS_SWAP_URL, '_blank', 'noopener,noreferrer')}
@@ -142,11 +153,11 @@ export default function TradePage() {
           <div className="flex flex-col sm:flex-row gap-3 shrink-0">
             <Button
               size="lg"
-              className="bg-cyan-500 hover:bg-cyan-400 text-black font-bold px-8 shadow-[0_0_20px_rgba(0,255,255,0.3)] hover:shadow-[0_0_30px_rgba(0,255,255,0.5)] transition-all"
-              onClick={() => window.open(TURBOS_SWAP_URL, '_blank', 'noopener,noreferrer')}
+              className="bg-blue-500 hover:bg-blue-400 text-white font-bold px-8 shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:shadow-[0_0_30px_rgba(59,130,246,0.6)] transition-all"
+              onClick={() => window.open(BLUEFIN_SPOT_SWAP_URL, '_blank', 'noopener,noreferrer')}
             >
               <ArrowRightLeft className="h-5 w-5 mr-2" />
-              Buy SBETS (Turbos)
+              Buy SBETS (Bluefin)
               <ExternalLink className="h-4 w-4 ml-2 opacity-70" />
             </Button>
             <Button
@@ -182,6 +193,43 @@ export default function TradePage() {
               <p>All trades settle on-chain via Sui, with non-custodial guarantees and transparent fee flows back to the SuiBets treasury.</p>
             </div>
           </div>
+          {/* Live Pool Info */}
+          <div className="mt-5 bg-blue-900/20 border border-blue-500/30 rounded-xl p-4 space-y-2">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse shrink-0" />
+              <span className="text-green-400 text-xs font-semibold uppercase tracking-wide">Live Pool — Bluefin Spot CLMM</span>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-2 text-xs font-mono">
+              <div className="flex flex-col gap-1">
+                <span className="text-gray-500">Pool</span>
+                <span className="text-blue-300 break-all">{BLUEFIN_POOL_ID}</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-gray-500">Pair / Fee / Tick spacing</span>
+                <span className="text-cyan-300">SUI / SBETS · 0.3% · 60</span>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-3 pt-1">
+              <a
+                href={BLUEFIN_POOL_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:text-blue-300 text-xs flex items-center gap-1 underline underline-offset-2"
+              >
+                View pool on Bluefin <ExternalLink className="h-3 w-3" />
+              </a>
+              <span className="text-gray-600">·</span>
+              <a
+                href={`https://suiscan.xyz/mainnet/object/${BLUEFIN_POOL_ID}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:text-blue-300 text-xs flex items-center gap-1 underline underline-offset-2"
+              >
+                Suiscan <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+          </div>
+
           <div className="mt-4 flex flex-wrap gap-2">
             <a
               href="https://bluefin.io"
