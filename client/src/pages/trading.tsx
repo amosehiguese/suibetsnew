@@ -397,7 +397,7 @@ export default function TradingPage() {
               </div>
               <Button
                 className="w-full bg-[#0066cc] hover:bg-[#0055bb] text-white font-semibold gap-2"
-                onClick={() => window.open(BLUEFIN_SWAP, "_blank")}
+                onClick={() => window.open(SBETS_SWAP_URL, "_blank")}
                 data-testid="button-swap-sbets">
                 <ArrowUpDown className="h-4 w-4" />
                 Swap on Bluefin
@@ -456,7 +456,7 @@ export default function TradingPage() {
             </div>
             <div className="flex gap-3 shrink-0">
               <Button className="bg-[#0066cc] hover:bg-[#0055bb] text-white font-semibold gap-2"
-                onClick={() => window.open(BLUEFIN_SWAP, "_blank")} data-testid="button-cta-swap">
+                onClick={() => window.open(SBETS_SWAP_URL, "_blank")} data-testid="button-cta-swap">
                 <ArrowUpDown className="h-4 w-4" /> Swap SBETS <ExternalLink className="h-3 w-3 opacity-70" />
               </Button>
               <Button variant="outline" className="border-white/10 bg-transparent hover:bg-white/5 text-white font-semibold gap-2"
@@ -573,7 +573,7 @@ export default function TradingPage() {
               </p>
               <div className="flex gap-2 shrink-0">
                 <Button size="sm" className="bg-[#0066cc] hover:bg-[#0055bb] text-white gap-1.5 text-xs h-8"
-                  onClick={() => window.open(BLUEFIN_SWAP, "_blank")} data-testid="button-liquidity-swap">
+                  onClick={() => window.open(SBETS_SWAP_URL, "_blank")} data-testid="button-liquidity-swap">
                   <ArrowUpDown className="h-3.5 w-3.5" /> Get SBETS
                   <ExternalLink className="h-3 w-3 opacity-70" />
                 </Button>
