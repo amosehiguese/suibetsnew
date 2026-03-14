@@ -1,14 +1,57 @@
 contexts:
   mainnet:
+    # Walrus Sites package ID on Sui mainnet (v2.7.0)
     package: 0x26eb7ee8688da02c5f671679524e379f0b837a12f1d1d799f255b7eea260ad27
     staking_object: 0x10b9d30c28448939ce6c4d6c6e0ffce4a7f8a4ada8248bdad09ef8b70e4a3904
     general:
-       wallet_env: mainnet
-       walrus_context: mainnet
-       walrus_package: 0xfa65cb2d62f4d39e60346fb7d501c12538ca2bbc646eaa37ece2aec5f897814e
-       walrus_binary: /home/runner/.local/bin/walrus
-       walrus_config: /home/runner/.config/walrus/client_config.yaml
-       wallet: /home/runner/.sui/sui_config/client.yaml
-       rpc_url: https://fullnode.mainnet.sui.io:443
-       gas_budget: 500000000
+      wallet_env: mainnet
+      walrus_context: mainnet
+      walrus_package: 0xfa65cb2d62f4d39e60346fb7d501c12538ca2bbc646eaa37ece2aec5f897814e
+      walrus_binary: /home/runner/.local/bin/walrus
+      walrus_config: /home/runner/.config/walrus/client_config.yaml
+      wallet: /home/runner/.sui/sui_config/client.yaml
+      rpc_url: https://fullnode.mainnet.sui.io:443
+      gas_budget: 500000000
 default_context: mainnet
+
+# ─── SuiBets Deployment Info ─────────────────────────────────────────────────
+#
+# Site Object ID : 0x7a538ca8c822a006210105b7a804842ba62a56510f35a2cf1a67a5e04fec5aba
+# SuiNS Name    : suibets.sui
+# SuiNS NFT ID  : 0x37bef7ac855aa1ff3d33cf59bb7dd4ca30d8aad557866d7075ad907fd8ca4f07
+# Portal URL    : https://suibets.wal.app
+# Backend URL   : https://www.suibets.com
+#
+# ─── Prerequisites ───────────────────────────────────────────────────────────
+#
+# 1. Sui wallet must be configured at:
+#      ~/.sui/sui_config/client.yaml
+#    Import your admin wallet key if not already set:
+#      sui keytool import <YOUR_PRIVATE_KEY> ed25519
+#      sui client switch --env mainnet
+#
+# ─── Update Deployed Site ────────────────────────────────────────────────────
+#
+# Run the deploy script (builds frontend then pushes to Walrus):
+#
+#   ./deploy-walrus.sh
+#
+# Or manually:
+#
+#   VITE_API_BASE_URL=https://www.suibets.com npx vite build
+#   /home/runner/.local/bin/site-builder \
+#     --config walrus-sites-config.yaml \
+#     update \
+#     --epochs 5 \
+#     dist/public \
+#     0x7a538ca8c822a006210105b7a804842ba62a56510f35a2cf1a67a5e04fec5aba
+#
+# ─── Re-link SuiNS (run once after any address change) ───────────────────────
+#
+# The site-builder links the SuiNS name automatically via two calls:
+#   1. set_target_address  →  suibets.sui resolves to the site object
+#   2. set_user_data       →  key=walrus_site_id, value=<Site Object ID>
+#      (This is the field wal.app reads via @mysten/suins getNameRecord().walrusSiteId)
+#
+# SuiNS V2 Controller : 0x71af035413ed499710980ed8adb010bbf2cc5cacf4ab37c7710a4bb87eb58ba5
+# SuiNS Registry     : 0x6e0ddefc0ad98889c04bab9639e512c21766c5e6366f89e696956d9be6952871
