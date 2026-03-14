@@ -25,8 +25,9 @@ import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { decodeSuiPrivateKey } from "@mysten/sui/cryptography";
 
 // ── Bluefin Spot CLMM contract ───────────────────────────────────────────────
+// Latest upgraded package (UpgradeCap.package – version 17 as of 2026-03-14)
 const BLUEFIN_SPOT_PKG =
-  "0x3492c874c1e3b3e2984e8c41b589e642d4d0a5d6459e5a9cfc2d52fd7c89c267";
+  "0xd075338d105482f1527cbfd363d6413558f184dec36d9138a70261e87f486e9c";
 const GLOBAL_CONFIG =
   "0x03db251ba509a8d5d8777b6338836082335d93eecbdd09a11e190a1cff51c352";
 const CLOCK = "0x0000000000000000000000000000000000000000000000000000000000000006";
@@ -49,7 +50,7 @@ const TICK_UPPER = 276240; // u32 on-chain (positive i32 → same value)
 
 // ── Seed amounts ──────────────────────────────────────────────────────────────
 const SBETS_AMOUNT_RAW = BigInt("1000000000000000"); // 1,000,000 SBETS (9 dec)
-const SUI_MAX_RAW = BigInt("1000000000"); //         1 SUI max (9 dec)
+const SUI_MAX_RAW = BigInt("2000000000"); //         2 SUI max (9 dec) – ~1.02 SUI needed
 
 async function main() {
   const privateKeyHex = process.env.ADMIN_PRIVATE_KEY;
