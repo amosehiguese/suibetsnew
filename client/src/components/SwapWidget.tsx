@@ -4,11 +4,12 @@ import { Transaction } from "@mysten/sui/transactions";
 import { useCurrentAccount, useSignTransaction } from "@mysten/dapp-kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowDown, RefreshCw, Zap, ExternalLink, CheckCircle2 } from "lucide-react";
+import { ArrowDown, RefreshCw, Zap, ExternalLink, CheckCircle2, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const SBETS_TOKEN_ADDR = "0x6a4d9c0eab7ac40371a7453d1aa6c89b130950e8af6868ba975fdd81371a7285::sbets::SBETS";
 const SUI_TYPE = "0x2::sui::SUI";
+const TURBOS_URL = `https://app.turbos.finance/#/trade?input=0x2::sui::SUI&output=${SBETS_TOKEN_ADDR}`;
 
 const ag = new MetaAg({
   slippageBps: 100,
@@ -57,9 +58,13 @@ function getAmountOut(q: MetaQuote): string | null {
 
 function getProviderLabel(provider: string): string {
   const map: Record<string, string> = {
-    BLUEFIN7K: "Bluefin 7k",
+    bluefin7k: "Bluefin",
+    BLUEFIN7K: "Bluefin",
+    cetus: "Cetus",
     CETUS: "Cetus",
     FLOWX: "FlowX",
+    flowx: "FlowX",
+    okx: "OKX",
     OKX: "OKX",
   };
   return map[provider] ?? provider;
@@ -79,6 +84,7 @@ export function SwapWidget() {
   const [swapping, setSwapping] = useState(false);
   const [quoteError, setQuoteError] = useState("");
   const [txDigest, setTxDigest] = useState("");
+  const [showInfo, setShowInfo] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   const fetchQuote = useCallback(async (amount: string) => {
@@ -150,6 +156,7 @@ export function SwapWidget() {
       const digest = await ag.fastSwap({
         quote,
         signer: walletAddress,
+        useGasCoin: false,
         signTransaction: async (txBytes: string) => {
           const tx = Transaction.from(txBytes);
           const result = await signTx({ transaction: tx });
@@ -160,7 +167,7 @@ export function SwapWidget() {
       setTxDigest(digest);
       toast({
         title: "Swap Successful!",
-        description: `SUI → SBETS confirmed on-chain`,
+        description: `SUI → SBETS confirmed on Bluefin Mainnet`,
       });
       setSuiAmount("1");
       setSbetsOut("");
@@ -179,6 +186,7 @@ export function SwapWidget() {
   };
 
   const canSwap = !!walletAddress && !!quote && !swapping && !loading && !!sbetsOut;
+  const selectedProvider = quote ? getProviderLabel((quote as any).provider) : "";
 
   return (
     <div className="bg-[#0e1e24] border border-white/5 rounded-xl p-6 flex flex-col" data-testid="card-swap-widget">
@@ -193,16 +201,46 @@ export function SwapWidget() {
             IN-APP
           </span>
         </div>
-        <button
-          onClick={() => fetchQuote(suiAmount)}
-          disabled={loading}
-          className="text-gray-500 hover:text-white transition-colors p-1"
-          title="Refresh quote"
-          data-testid="button-refresh-quote"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-[#00d0ff]" : ""}`} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowInfo(v => !v)}
+            className="text-gray-500 hover:text-[#00d0ff] transition-colors p-1"
+            title="How does this work?"
+            data-testid="button-swap-info"
+          >
+            <Info className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => fetchQuote(suiAmount)}
+            disabled={loading}
+            className="text-gray-500 hover:text-white transition-colors p-1"
+            title="Refresh quote"
+            data-testid="button-refresh-quote"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-[#00d0ff]" : ""}`} />
+          </button>
+        </div>
       </div>
+
+      {/* Info Panel */}
+      {showInfo && (
+        <div className="bg-[#060f14] border border-[#00d0ff]/20 rounded-xl p-4 mb-4 text-xs text-gray-400 space-y-2">
+          <p className="text-[#00d0ff] font-semibold text-sm mb-1">How this swap works</p>
+          <p>
+            This widget routes your swap <span className="text-white font-medium">directly through Bluefin's liquidity pool on Sui Mainnet</span> — the deepest SBETS pool available. Bluefin holds the largest share of SBETS liquidity, giving you tighter spreads and less price impact than any other DEX.
+          </p>
+          <p>
+            The 7k aggregator checks all available routes (Bluefin, Cetus) in real time and automatically selects the best rate for your trade. When Bluefin is selected, your transaction goes directly into Bluefin's AMM pool and settles on-chain in under one second.
+          </p>
+          <p>
+            <span className="text-white font-medium">No middleman, no custodian</span> — you sign and the smart contract executes the swap atomically. Your wallet receives SBETS directly.
+          </p>
+          <div className="flex items-center gap-2 pt-1">
+            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse shrink-0" />
+            <span className="text-green-400 font-medium">Live on Sui Mainnet</span>
+          </div>
+        </div>
+      )}
 
       {/* From: SUI */}
       <div className="bg-[#060f14] border border-white/5 rounded-xl p-4 mb-2">
@@ -243,7 +281,7 @@ export function SwapWidget() {
           <span className="text-gray-500">You receive</span>
           {quote && !loading && (
             <span className="text-[#00d0ff] font-medium">
-              via {getProviderLabel((quote as any).provider)}
+              via {selectedProvider} Mainnet
             </span>
           )}
         </div>
@@ -266,30 +304,49 @@ export function SwapWidget() {
         </div>
       </div>
 
-      {/* Multiple routes */}
-      {quotes.length > 1 && !loading && (
-        <div className="flex gap-1 mb-4 flex-wrap">
-          {quotes.map((q, i) => {
-            const out = getAmountOut(q);
-            const label = getProviderLabel((q as any).provider);
-            const isSelected = q === quote;
-            return (
-              <button
-                key={i}
-                onClick={() => {
-                  setQuote(q);
-                  if (out) setSbetsOut(out);
-                }}
-                className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
-                  isSelected
-                    ? "bg-[#00d0ff]/10 border-[#00d0ff]/30 text-[#00d0ff]"
-                    : "bg-white/[0.03] border-white/5 text-gray-400 hover:text-white"
-                }`}
-              >
-                {label} {out ? `→ ${out}` : ""}
-              </button>
-            );
-          })}
+      {/* Routes: in-app + Turbos external */}
+      {!loading && (
+        <div className="mb-4">
+          {quotes.length > 0 && (
+            <p className="text-[10px] text-gray-600 uppercase tracking-wider mb-1.5 font-semibold">In-app routes</p>
+          )}
+          <div className="flex gap-1 flex-wrap">
+            {quotes.map((q, i) => {
+              const out = getAmountOut(q);
+              const label = getProviderLabel((q as any).provider);
+              const isSelected = q === quote;
+              return (
+                <button
+                  key={i}
+                  onClick={() => {
+                    setQuote(q);
+                    if (out) setSbetsOut(out);
+                  }}
+                  className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+                    isSelected
+                      ? "bg-[#00d0ff]/10 border-[#00d0ff]/30 text-[#00d0ff]"
+                      : "bg-white/[0.03] border-white/5 text-gray-400 hover:text-white"
+                  }`}
+                  data-testid={`button-route-${label.toLowerCase()}`}
+                >
+                  {label} {out ? `→ ${out}` : ""}
+                </button>
+              );
+            })}
+
+            {/* Turbos — external link */}
+            <a
+              href={TURBOS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs px-2.5 py-1 rounded-lg border bg-white/[0.03] border-white/5 text-gray-400 hover:text-white transition-colors flex items-center gap-1"
+              data-testid="button-route-turbos"
+              title="Swap on Turbos (opens new tab)"
+            >
+              Turbos
+              <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+            </a>
+          </div>
         </div>
       )}
 
@@ -307,7 +364,7 @@ export function SwapWidget() {
           className="flex items-center gap-2 text-xs text-green-400 mb-3 hover:text-green-300 transition-colors"
         >
           <CheckCircle2 className="h-3.5 w-3.5" />
-          Swap confirmed — View on Suiscan
+          Swap confirmed on Bluefin — View on Suiscan
           <ExternalLink className="h-3 w-3 opacity-70" />
         </a>
       )}
@@ -327,7 +384,7 @@ export function SwapWidget() {
           {swapping ? (
             <>
               <RefreshCw className="h-4 w-4 animate-spin" />
-              Swapping on Sui...
+              Swapping on Bluefin Mainnet...
             </>
           ) : !sbetsOut && !loading ? (
             "Enter amount"
@@ -340,7 +397,7 @@ export function SwapWidget() {
       )}
 
       <p className="text-[11px] text-gray-600 text-center mt-3">
-        Best rate via 7k aggregator · 1% slippage · Sui Mainnet · No fees
+        Powered by Bluefin Mainnet · 7k aggregator · 1% slippage · No platform fees
       </p>
     </div>
   );
