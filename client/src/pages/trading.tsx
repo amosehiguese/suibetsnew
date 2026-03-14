@@ -15,9 +15,9 @@ import {
 // ─── Bluefin MAINNET — confirmed from official Bluefin v2 SDK ─────────────
 const BLUEFIN_API      = "https://dapi.api.sui-prod.bluefin.io";
 const BLUEFIN_TERMINAL = "https://trade.bluefin.io/";
-// Direct SUI → SBETS swap — confirmed working (same as the Buy Now button)
+// SUI → SBETS swap on Bluefin Mainnet (Sui DEX aggregator via Bluefin)
 const SBETS_TOKEN_ADDR = "0x6a4d9c0eab7ac40371a7453d1aa6c89b130950e8af6868ba975fdd81371a7285::sbets::SBETS";
-const SBETS_SWAP_URL   = `https://app.turbos.finance/#/trade?input=0x2::sui::SUI&output=${SBETS_TOKEN_ADDR}`;
+const BLUEFIN_SWAP     = `https://trade.bluefin.io/swap?fromToken=0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI&toToken=${SBETS_TOKEN_ADDR}`;
 // ─────────────────────────────────────────────────────────────────────────
 
 interface BluefinTransaction { id: string; symbol: string; type: string; amount: string; asset: string; status: string; txHash: string; createdAt: number; }
@@ -397,7 +397,7 @@ export default function TradingPage() {
               </div>
               <Button
                 className="w-full bg-[#0066cc] hover:bg-[#0055bb] text-white font-semibold gap-2"
-                onClick={() => window.open(SBETS_SWAP_URL, "_blank")}
+                onClick={() => window.open(BLUEFIN_SWAP, "_blank")}
                 data-testid="button-swap-sbets">
                 <ArrowUpDown className="h-4 w-4" />
                 Swap on Bluefin
@@ -456,7 +456,7 @@ export default function TradingPage() {
             </div>
             <div className="flex gap-3 shrink-0">
               <Button className="bg-[#0066cc] hover:bg-[#0055bb] text-white font-semibold gap-2"
-                onClick={() => window.open(SBETS_SWAP_URL, "_blank")} data-testid="button-cta-swap">
+                onClick={() => window.open(BLUEFIN_SWAP, "_blank")} data-testid="button-cta-swap">
                 <ArrowUpDown className="h-4 w-4" /> Swap SBETS <ExternalLink className="h-3 w-3 opacity-70" />
               </Button>
               <Button variant="outline" className="border-white/10 bg-transparent hover:bg-white/5 text-white font-semibold gap-2"
@@ -573,7 +573,7 @@ export default function TradingPage() {
               </p>
               <div className="flex gap-2 shrink-0">
                 <Button size="sm" className="bg-[#0066cc] hover:bg-[#0055bb] text-white gap-1.5 text-xs h-8"
-                  onClick={() => window.open(SBETS_SWAP_URL, "_blank")} data-testid="button-liquidity-swap">
+                  onClick={() => window.open(BLUEFIN_SWAP, "_blank")} data-testid="button-liquidity-swap">
                   <ArrowUpDown className="h-3.5 w-3.5" /> Get SBETS
                   <ExternalLink className="h-3 w-3 opacity-70" />
                 </Button>
