@@ -152,7 +152,7 @@ function PoolStatsCard() {
           <div className="bg-black/20 rounded-lg px-3 py-2">
             <p className="text-[10px] text-gray-500 mb-1">Fee Rate</p>
             <p className="text-sm font-bold text-green-400 font-mono" data-testid="stat-fee-rate">
-              {data?.feeRatePct != null ? `${(data.feeRatePct * 100).toFixed(2)}%` : "—"}
+              {data?.feeRatePct != null ? `${data.feeRatePct.toFixed(2)}%` : "—"}
             </p>
           </div>
           <div className="bg-black/20 rounded-lg px-3 py-2">
@@ -201,7 +201,7 @@ function LPSection() {
           <div className="bg-[#060f14] border border-white/5 rounded-xl p-4">
             <p className="text-[10px] text-gray-500 mb-1 uppercase tracking-wide">Pool Fee Tier</p>
             <p className="text-xl font-bold text-[#00d0ff]">
-              {feeRatePct > 0 ? `${(feeRatePct * 100).toFixed(2)}%` : "—"}
+              {feeRatePct > 0 ? `${feeRatePct.toFixed(2)}%` : "—"}
             </p>
             <p className="text-[10px] text-gray-500 mt-1">per swap routed through your range</p>
           </div>
@@ -317,7 +317,7 @@ function PerpsMarketsSection() {
                 </td>
                 <td className="px-6 py-4 text-right">
                   <span className="text-green-400 font-mono text-xs font-semibold">
-                    {feeRatePct > 0 ? `${(feeRatePct * 100).toFixed(2)}%` : "—"}
+                    {feeRatePct > 0 ? `${feeRatePct.toFixed(2)}%` : "—"}
                   </span>
                 </td>
                 <td className={`px-6 py-4 text-right font-mono text-xs font-semibold ${suiChange >= 0 ? "text-green-400" : "text-red-400"}`}>
