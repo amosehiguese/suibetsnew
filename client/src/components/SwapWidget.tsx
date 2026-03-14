@@ -4,6 +4,8 @@ import {
   buildTx as bluefinBuildTx,
   getQuote as bluefinGetQuote,
   Config as BluefinConfig,
+  isBluefinXRouting,
+  isSuiTransaction,
 } from "@bluefin-exchange/bluefin7k-aggregator-sdk";
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
@@ -232,12 +234,19 @@ export function SwapWidget() {
       let digest = "";
 
       if (turbosSelected && turbosRoute) {
+        const rawQuote = turbosRoute.rawQuote;
+        if (isBluefinXRouting(rawQuote)) {
+          throw new Error("BluefinX routing is not supported for Turbos. Please refresh and try again.");
+        }
         const { tx } = await bluefinBuildTx({
-          quoteResponse: turbosRoute.rawQuote,
+          quoteResponse: rawQuote,
           accountAddress: walletAddress,
           commission: { commissionBps: 0, partner: BLUEFIN_PARTNER },
           slippage: 0.01,
         });
+        if (!isSuiTransaction(tx)) {
+          throw new Error("Unexpected transaction type from Turbos. Please refresh and try again.");
+        }
         tx.setGasBudget(MANUAL_GAS_BUDGET);
         const result = await signAndExecuteTx({ transaction: tx });
         digest = result.digest;
@@ -246,12 +255,18 @@ export function SwapWidget() {
 
         if (isBluefinProvider(provider)) {
           const rawQuote = (quote as any).quote ?? quote;
+          if (isBluefinXRouting(rawQuote)) {
+            throw new Error("BluefinX routing is not yet supported in-app. Please use the Bluefin terminal instead.");
+          }
           const { tx } = await bluefinBuildTx({
             quoteResponse: rawQuote,
             accountAddress: walletAddress,
             commission: { commissionBps: 0, partner: BLUEFIN_PARTNER },
             slippage: 0.01,
           });
+          if (!isSuiTransaction(tx)) {
+            throw new Error("Unexpected transaction type from Bluefin. Please refresh and try again.");
+          }
           tx.setGasBudget(MANUAL_GAS_BUDGET);
           const result = await signAndExecuteTx({ transaction: tx });
           digest = result.digest;
