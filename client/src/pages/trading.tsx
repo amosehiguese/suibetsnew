@@ -24,7 +24,8 @@ const TURBOS_POOL_ID   = "0x7d8d95ccb870cc2ec63997815726e15722ea128d34a2737750df
 const BLUEFIN_SWAP     = `https://trade.bluefin.io/swap?fromToken=0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI&toToken=${SBETS_TOKEN_ADDR}`;
 const BLUEFIN_POOL_URL = `https://trade.bluefin.io/liquidity-pools?pool=${BLUEFIN_SPOT_POOL_ID}`;
 const TURBOS_SWAP_URL  = `https://app.turbos.finance/#/trade?input=0x2::sui::SUI&output=${SBETS_TOKEN_ADDR}`;
-const TURBOS_POOL_URL  = `https://app.turbos.finance/#/pool/${TURBOS_POOL_ID}`;
+const TURBOS_POOL_URL  = `https://dexscreener.com/sui/${TURBOS_POOL_ID}`;
+const TURBOS_LP_URL    = `https://app.turbos.finance/pools`;
 
 /* ── Data hooks ─────────────────────────────────────────────────────────── */
 
@@ -345,7 +346,7 @@ function LPSection() {
               </div>
             </div>
             <Button size="sm" className="w-full bg-[#00b896] hover:bg-[#00a07f] text-white gap-1.5 text-xs h-8"
-              onClick={() => window.open(TURBOS_POOL_URL, "_blank")} data-testid="button-lp-add-turbos">
+              onClick={() => window.open(TURBOS_LP_URL, "_blank")} data-testid="button-lp-add-turbos">
               <Droplets className="h-3.5 w-3.5" /> Add on Turbos <ExternalLink className="h-3 w-3 opacity-70" />
             </Button>
           </div>
