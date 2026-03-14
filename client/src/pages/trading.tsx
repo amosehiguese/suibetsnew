@@ -451,7 +451,7 @@ export default function TradingPage() {
                   step: "01",
                   icon: <ArrowUpDown className="h-5 w-5 text-[#00d0ff]" />,
                   title: "Swap SUI → SBETS",
-                  desc: "Users acquire SBETS tokens via Bluefin's on-chain BLN liquidity pools. Deep order book ensures minimal slippage.",
+                  desc: "Users swap SUI for SBETS via the in-app DEX aggregator. Trades route through Turbos Finance's on-chain AMM pool for best execution.",
                   color: "text-[#00d0ff]",
                   border: "border-[#00d0ff]/20",
                   bg: "bg-[#00d0ff]/5",
