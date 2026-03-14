@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { SwapWidget } from "@/components/SwapWidget";
 import {
   ArrowUpDown, TrendingUp, Zap, Globe, ExternalLink,
   Wallet, Clock, ArrowDownLeft, ArrowUpRight, RefreshCw,
@@ -26,6 +25,37 @@ const BLUEFIN_POOL_URL = `https://trade.bluefin.io/liquidity-pools?pool=${BLUEFI
 const TURBOS_SWAP_URL  = `https://app.turbos.finance/#/trade?input=0x2::sui::SUI&output=${SBETS_TOKEN_ADDR}`;
 const TURBOS_POOL_URL  = `https://dexscreener.com/sui/${TURBOS_POOL_ID}`;
 const TURBOS_LP_URL    = `https://app.turbos.finance/pools`;
+
+/* ── Swap Widget (lazy-loaded to isolate SDK crashes) ───────────────────── */
+
+function SwapWidgetUnavailable() {
+  return (
+    <div className="bg-[#0e1e24] border border-white/5 rounded-xl p-6 flex flex-col items-center justify-center gap-4 min-h-[260px]" data-testid="card-swap-widget-fallback">
+      <div className="w-10 h-10 rounded-xl bg-[#00d0ff]/10 flex items-center justify-center">
+        <Zap className="h-5 w-5 text-[#00d0ff]" />
+      </div>
+      <div className="text-center space-y-2">
+        <p className="font-bold text-white text-sm">Quick Swap</p>
+        <p className="text-xs text-gray-400">In-app swap is loading or temporarily unavailable.</p>
+        <p className="text-xs text-gray-500">You can still swap SBETS directly on Bluefin or Turbos.</p>
+      </div>
+      <a
+        href={BLUEFIN_SWAP}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-xs text-[#00d0ff] hover:text-[#60e0ff] underline flex items-center gap-1 transition-colors"
+      >
+        Swap on Bluefin <ExternalLink className="h-3 w-3" />
+      </a>
+    </div>
+  );
+}
+
+const SwapWidget = lazy(() =>
+  import("@/components/SwapWidget")
+    .then((m) => ({ default: m.SwapWidget }))
+    .catch(() => ({ default: SwapWidgetUnavailable }))
+);
 
 /* ── Data hooks ─────────────────────────────────────────────────────────── */
 
@@ -889,7 +919,9 @@ export default function TradingPage() {
 
           {/* ── Swap cards ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <SwapWidget />
+            <Suspense fallback={<SwapWidgetUnavailable />}>
+              <SwapWidget />
+            </Suspense>
             <div className="bg-[#0e1e24] border border-white/5 rounded-xl p-6 flex flex-col" data-testid="card-trade-perps">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-9 h-9 rounded-lg bg-[#00d0ff]/10 flex items-center justify-center">
