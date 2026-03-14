@@ -17,7 +17,7 @@
     "@jridgewell/trace-mapping": "^0.3.25",
     "@mysten/bcs": "^1.6.0",
     "@mysten/dapp-kit": "^0.15.2",
-    "@mysten/sui": "^1.26.1",
+    "@mysten/sui": "^1.44.0",
     "@mysten/sui.js": "^0.54.1",
     "@mysten/wallet-kit": "^0.8.6",
     "@mysten/wallet-standard": "^0.14.2",
