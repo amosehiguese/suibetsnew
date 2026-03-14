@@ -975,7 +975,7 @@ export default function TradingPage() {
                 {
                   step: "01", icon: <ArrowUpDown className="h-5 w-5 text-[#00d0ff]" />,
                   title: "Swap SUI → SBETS",
-                  desc: "Users swap SUI for SBETS via the in-app DEX. Trades route through Bluefin or Turbos on-chain CLMM pools for best execution.",
+                  desc: "Users swap SUI for SBETS via the in-app DEX. Trades route through Bluefin's Liquidity Network or Turbos Finance on-chain CLMM pools for best execution.",
                   color: "text-[#00d0ff]", border: "border-[#00d0ff]/20", bg: "bg-[#00d0ff]/5",
                 },
                 {
