@@ -243,89 +243,102 @@ function LPSection() {
   );
 }
 
-/* ── Perps Markets Section ──────────────────────────────────────────────── */
-
-interface PerpsMarket {
-  symbol: string;
-  price: number;
-  change24h: number;
-  source: "coingecko" | "bluefin";
-}
+/* ── SBETS Market Section ───────────────────────────────────────────────── */
 
 function PerpsMarketsSection() {
-  const { data: prices, isLoading } = useLivePrices();
+  const { data: prices, isLoading: pricesLoading, isFetching: pricesFetching, refetch: refetchPrices } = useLivePrices();
+  const { data: pool, isLoading: poolLoading, isFetching: poolFetching, refetch: refetchPool } = usePoolStats();
 
-  const markets: PerpsMarket[] = prices
-    ? [
-        { symbol: "BTC-PERP", price: prices.BTC?.price ?? 0, change24h: prices.BTC?.change24h ?? 0, source: "coingecko" },
-        { symbol: "ETH-PERP", price: prices.ETH?.price ?? 0, change24h: prices.ETH?.change24h ?? 0, source: "coingecko" },
-        { symbol: "SUI-PERP", price: prices.SUI?.price ?? 0, change24h: prices.SUI?.change24h ?? 0, source: "coingecko" },
-      ]
-    : [];
+  const isLoading = pricesLoading || poolLoading;
+  const isFetching = pricesFetching || poolFetching;
+
+  const suiUsd = prices?.SUI?.price ?? 0;
+  const suiChange = prices?.SUI?.change24h ?? 0;
+  const sbetsPerSui = pool?.price ?? 0;
+  const sbetsUsd = sbetsPerSui > 0 && suiUsd > 0 ? suiUsd / sbetsPerSui : 0;
+  const feeRatePct = pool?.feeRatePct ?? 0;
+
+  const handleRefresh = () => { refetchPrices(); refetchPool(); };
 
   return (
-    <div className="bg-[#0e1e24] border border-white/5 rounded-xl overflow-hidden" data-testid="section-perps-markets">
+    <div className="bg-[#0e1e24] border border-white/5 rounded-xl overflow-hidden" data-testid="section-sbets-market">
       <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
         <div className="flex items-center gap-2">
           <BarChart2 className="h-4 w-4 text-[#00d0ff]" />
-          <span className="font-semibold text-white text-sm">Perps Markets</span>
-          <Badge className="bg-[#00d0ff]/10 text-[#00d0ff] border-[#00d0ff]/30 text-[10px]">Live</Badge>
+          <span className="font-semibold text-white text-sm">SBETS Market</span>
+          <Badge className="bg-[#00d0ff]/10 text-[#00d0ff] border-[#00d0ff]/30 text-[10px]">Live · Bluefin</Badge>
         </div>
-        <Button variant="outline" size="sm" className="border-white/10 bg-transparent hover:bg-white/5 text-white gap-1.5 text-xs h-7"
-          onClick={() => window.open(BLUEFIN_TERMINAL, "_blank")} data-testid="button-open-perps-terminal">
-          Trade on Bluefin <ExternalLink className="h-3 w-3 opacity-70" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleRefresh} className="text-gray-500 hover:text-white transition-colors" data-testid="button-refresh-sbets-market">
+            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin text-[#00d0ff]" : ""}`} />
+          </button>
+          <Button variant="outline" size="sm" className="border-white/10 bg-transparent hover:bg-white/5 text-white gap-1.5 text-xs h-7"
+            onClick={() => window.open(BLUEFIN_SWAP, "_blank")} data-testid="button-swap-sbets">
+            Buy SBETS <ExternalLink className="h-3 w-3 opacity-70" />
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
-        <div className="p-6 space-y-3">
-          {[1,2,3].map(i => <div key={i} className="h-10 rounded-lg bg-white/5 animate-pulse" />)}
-        </div>
+        <div className="p-6"><div className="h-20 rounded-lg bg-white/5 animate-pulse" /></div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-white/[0.02]">
               <tr className="text-gray-500 text-xs border-b border-white/5">
-                <th className="text-left px-6 py-3 font-medium">Market</th>
-                <th className="text-right px-6 py-3 font-medium">Mark Price</th>
-                <th className="text-right px-6 py-3 font-medium">24h Change</th>
-                <th className="text-right px-6 py-3 font-medium">Trade</th>
+                <th className="text-left px-6 py-3 font-medium">Token</th>
+                <th className="text-right px-6 py-3 font-medium">Price (USD)</th>
+                <th className="text-right px-6 py-3 font-medium">SBETS per SUI</th>
+                <th className="text-right px-6 py-3 font-medium">Pool Fee</th>
+                <th className="text-right px-6 py-3 font-medium">SUI 24h</th>
+                <th className="text-right px-6 py-3 font-medium">Swap</th>
               </tr>
             </thead>
             <tbody>
-              {markets.map((m, i) => {
-                const pos = m.change24h >= 0;
-                return (
-                  <tr key={m.symbol} className="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors" data-testid={`row-perp-${i}`}>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-[#00d0ff]/10 border border-[#00d0ff]/20 flex items-center justify-center">
-                          <span className="text-[10px] font-black text-[#00d0ff]">{m.symbol.slice(0,1)}</span>
-                        </div>
-                        <span className="text-white font-medium text-xs">{m.symbol}</span>
-                        <Badge className="bg-[#0066cc]/15 text-[#60a5fa] border-[#0066cc]/20 text-[9px]">up to 20×</Badge>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right font-mono text-xs text-white">
-                      ${m.price >= 1000 ? m.price.toLocaleString("en-US", { maximumFractionDigits: 0 }) : m.price.toFixed(4)}
-                    </td>
-                    <td className={`px-6 py-4 text-right font-mono text-xs font-semibold ${pos ? "text-green-400" : "text-red-400"}`}>
-                      <span className="flex items-center justify-end gap-1">
-                        {pos ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                        {pos ? "+" : ""}{m.change24h.toFixed(2)}%
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <Button size="sm" variant="outline"
-                        className="border-white/10 bg-transparent hover:bg-white/5 text-white h-7 px-3 text-xs gap-1"
-                        onClick={() => window.open(`${BLUEFIN_TERMINAL}trade/${m.symbol}`, "_blank")}
-                        data-testid={`button-trade-${m.symbol.toLowerCase()}`}>
-                        Trade <ExternalLink className="h-2.5 w-2.5 opacity-70" />
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
+              <tr className="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors" data-testid="row-sbets-market">
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-[#00d0ff]/20 border border-[#00d0ff]/30 flex items-center justify-center">
+                      <span className="text-[10px] font-black text-[#00d0ff]">S</span>
+                    </div>
+                    <div>
+                      <p className="text-white font-semibold text-xs">SBETS</p>
+                      <p className="text-[10px] text-gray-500">SuiBets Token · Sui Mainnet</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-right">
+                  <span className="font-mono text-sm font-bold text-[#00d0ff]" data-testid="stat-sbets-market-price">
+                    {sbetsUsd > 0 ? `$${sbetsUsd.toFixed(6)}` : "—"}
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-right font-mono text-xs text-white" data-testid="stat-sbets-per-sui">
+                  {sbetsPerSui > 0 ? sbetsPerSui.toFixed(2) : "—"}
+                </td>
+                <td className="px-6 py-4 text-right">
+                  <span className="text-green-400 font-mono text-xs font-semibold">
+                    {feeRatePct > 0 ? `${(feeRatePct * 100).toFixed(2)}%` : "—"}
+                  </span>
+                </td>
+                <td className={`px-6 py-4 text-right font-mono text-xs font-semibold ${suiChange >= 0 ? "text-green-400" : "text-red-400"}`}>
+                  <span className="flex items-center justify-end gap-1">
+                    {suiChange >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                    {suiChange >= 0 ? "+" : ""}{suiChange.toFixed(2)}%
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-right">
+                  <div className="flex items-center justify-end gap-1.5">
+                    <Button size="sm" className="bg-[#0066cc] hover:bg-[#0055bb] text-white h-7 px-3 text-xs gap-1"
+                      onClick={() => window.open(BLUEFIN_SWAP, "_blank")} data-testid="button-buy-sbets-bluefin">
+                      Bluefin <ExternalLink className="h-2.5 w-2.5 opacity-70" />
+                    </Button>
+                    <Button size="sm" className="bg-[#00b896] hover:bg-[#00a07f] text-white h-7 px-3 text-xs gap-1"
+                      onClick={() => window.open(TURBOS_SWAP_URL, "_blank")} data-testid="button-buy-sbets-turbos">
+                      Turbos <ExternalLink className="h-2.5 w-2.5 opacity-70" />
+                    </Button>
+                  </div>
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -333,12 +346,13 @@ function PerpsMarketsSection() {
 
       <div className="px-6 py-3 border-t border-white/5 bg-white/[0.01]">
         <p className="text-[10px] text-gray-500">
-          Mark prices sourced from CoinGecko · Refresh every 60 s · Trade on Bluefin perps with up to 20× leverage · Non-custodial, on-chain settlement
+          Price derived from Bluefin CLMM pool (SBETS/SUI) × CoinGecko SUI price · Refreshes every 30s · Pool ID: {BLUEFIN_SPOT_POOL_ID.slice(0,16)}…
         </p>
       </div>
     </div>
   );
 }
+
 
 // ─── Bluefin MAINNET — confirmed from official Bluefin v2 SDK ─────────────
 const BLUEFIN_API      = "https://dapi.api.sui-prod.bluefin.io";
