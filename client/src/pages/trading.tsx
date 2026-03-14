@@ -818,7 +818,7 @@ export default function TradingPage() {
                   step: "03",
                   icon: <Coins className="h-5 w-5 text-green-400" />,
                   title: "Fees Flow to Revenue Pool",
-                  desc: "Platform fees from betting volume accumulate in the on-chain revenue pool, shared with all SBETS stakers.",
+                  desc: "Platform fees from betting volume accumulate in the on-chain revenue pool, shared with all SuiBets holders.",
                   color: "text-green-400",
                   border: "border-green-400/20",
                   bg: "bg-green-400/5",
@@ -827,7 +827,7 @@ export default function TradingPage() {
                   step: "04",
                   icon: <PieChart className="h-5 w-5 text-purple-400" />,
                   title: "Earn Revenue Share",
-                  desc: "SBETS stakers earn proportional revenue share. More stake = larger share of the platform's betting income.",
+                  desc: "SuiBets holders earn proportional revenue share. More stake = larger share of the platform's betting income.",
                   color: "text-purple-400",
                   border: "border-purple-400/20",
                   bg: "bg-purple-400/5",
@@ -867,7 +867,7 @@ export default function TradingPage() {
                 <div>
                   <p className="text-sm font-semibold text-white mb-1">Community-Owned</p>
                   <p className="text-xs text-gray-400 leading-relaxed">
-                    SBETS holders govern the protocol. Revenue share is distributed proportionally to all stakers on-chain.
+                    SBETS holders govern the protocol. Revenue share is distributed proportionally to all SuiBets holders on-chain.
                   </p>
                 </div>
               </div>
