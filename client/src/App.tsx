@@ -2,7 +2,7 @@ import { Switch, Route } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { ConnectWalletModal } from "@/components/modals/ConnectWalletModal";
 
@@ -59,7 +59,7 @@ import SharedBetPage from "@/pages/shared-bet";
 import WalrusReceiptPage from "@/pages/walrus-receipt";
 import StreamingPage from "@/pages/streaming";
 import AuthCallback from "@/pages/auth-callback";
-import TradingPage from "@/pages/trading";
+const TradingPage = lazy(() => import("@/pages/trading"));
 
 // Informational Pages
 import PrivacyPolicy from "@/pages/privacy";
@@ -237,7 +237,13 @@ function App() {
                           <Route path="/streaming" component={StreamingPage} />
                           
                           {/* Bluefin Trade Integration */}
-                          <Route path="/trading" component={TradingPage} />
+                          <Route path="/trading">
+                            <ErrorBoundary>
+                              <Suspense fallback={<div style={{color:"#fff",textAlign:"center",paddingTop:"4rem"}}>Loading...</div>}>
+                                <TradingPage />
+                              </Suspense>
+                            </ErrorBoundary>
+                          </Route>
                           
                           {/* zkLogin OAuth Callback */}
                           <Route path="/auth/callback" component={AuthCallback} />

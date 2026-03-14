@@ -28,16 +28,28 @@ const BLUEFIN_SBETS_POOL_ID =
   "0xbcda57bac902ed2207da46c11f6b8388fd2d36c45ffb9851228d607813b7ab4b";
 const MANUAL_GAS_BUDGET = 500_000_000;
 
-const suiMainnetClient = new SuiClient({ url: getFullnodeUrl("mainnet") });
-BluefinConfig.setSuiClient(suiMainnetClient);
+function createAggregator() {
+  try {
+    const suiMainnetClient = new SuiClient({ url: getFullnodeUrl("mainnet") });
+    BluefinConfig.setSuiClient(suiMainnetClient);
+    return new MetaAg({
+      slippageBps: 100,
+      providers: {
+        [EProvider.BLUEFIN7K]: {},
+        [EProvider.CETUS]: {},
+      },
+    });
+  } catch (e) {
+    console.warn("[SwapWidget] Failed to initialize aggregator:", e);
+    return null;
+  }
+}
 
-const ag = new MetaAg({
-  slippageBps: 100,
-  providers: {
-    [EProvider.BLUEFIN7K]: {},
-    [EProvider.CETUS]: {},
-  },
-});
+let _ag: MetaAg | null = null;
+function getAg(): MetaAg | null {
+  if (!_ag) _ag = createAggregator();
+  return _ag;
+}
 
 function getRawAmountOut(q: any): string | null {
   if (q == null) return null;
@@ -160,7 +172,7 @@ export function SwapWidget() {
 
       try {
         const [agResults, turbosResult] = await Promise.allSettled([
-          ag.quote({
+          getAg()?.quote({
             coinTypeIn: SUI_TYPE,
             coinTypeOut: SBETS_TOKEN_ADDR,
             amountIn,
@@ -273,7 +285,7 @@ export function SwapWidget() {
           const result = await signAndExecuteTx({ transaction: tx });
           digest = result.digest;
         } else {
-          digest = await ag.fastSwap({
+          digest = await getAg()?.fastSwap({
             quote,
             signer: walletAddress,
             useGasCoin: false,
