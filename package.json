@@ -80,6 +80,7 @@
     "framer-motion": "^11.13.1",
     "html2canvas": "^1.4.1",
     "input-otp": "^1.2.4",
+    "jiti": "^1.21.6",
     "lucide-react": "^0.453.0",
     "memorystore": "^1.6.7",
     "openai": "^6.9.1",
@@ -126,7 +127,7 @@
     "esbuild": "^0.25.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
-    "tsx": "^4.19.1",
+    "tsx": "^4.21.0",
     "typescript": "5.6.3",
     "vite": "^5.4.14"
   },
