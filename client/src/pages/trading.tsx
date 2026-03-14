@@ -15,9 +15,10 @@ import {
 // ─── Bluefin MAINNET — confirmed from official Bluefin v2 SDK ─────────────
 const BLUEFIN_API      = "https://dapi.api.sui-prod.bluefin.io";
 const BLUEFIN_TERMINAL = "https://trade.bluefin.io/";
-// SUI → SBETS swap on Bluefin Mainnet (Sui DEX aggregator via Bluefin)
+// SUI → SBETS swap URLs — both pools are live on Sui Mainnet
 const SBETS_TOKEN_ADDR = "0x6a4d9c0eab7ac40371a7453d1aa6c89b130950e8af6868ba975fdd81371a7285::sbets::SBETS";
 const BLUEFIN_SWAP     = `https://trade.bluefin.io/swap?fromToken=0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI&toToken=${SBETS_TOKEN_ADDR}`;
+const TURBOS_SWAP_URL  = `https://app.turbos.finance/#/trade?input=0x2::sui::SUI&output=${SBETS_TOKEN_ADDR}`;
 // ─────────────────────────────────────────────────────────────────────────
 
 interface BluefinTransaction { id: string; symbol: string; type: string; amount: string; asset: string; status: string; txHash: string; createdAt: number; }
@@ -374,12 +375,12 @@ export default function TradingPage() {
                 </div>
                 <div>
                   <p className="font-bold text-white">Buy SBETS</p>
-                  <p className="text-xs text-gray-400">Swap SUI → SBETS via Bluefin</p>
+                  <p className="text-xs text-gray-400">Swap SUI → SBETS on Bluefin or Turbos</p>
                 </div>
               </div>
               <p className="text-sm text-gray-400 leading-relaxed mb-5 flex-1">
                 Acquire SBETS tokens to place bets, earn staking rewards, and collect
-                revenue share. Powered by Bluefin's on-chain liquidity network.
+                revenue share. Two live pools on Sui Mainnet — pick your preferred DEX.
               </p>
               <div className="border border-white/5 rounded-lg p-3 mb-5 space-y-2">
                 <div className="flex justify-between text-sm">
@@ -391,18 +392,28 @@ export default function TradingPage() {
                   <span className="text-[#00d0ff] font-medium">Sui Mainnet</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Protocol</span>
-                  <span className="text-[#00d0ff] font-medium">Bluefin BLN</span>
+                  <span className="text-gray-500">Available on</span>
+                  <span className="text-[#00d0ff] font-medium">Bluefin · Turbos</span>
                 </div>
               </div>
-              <Button
-                className="w-full bg-[#0066cc] hover:bg-[#0055bb] text-white font-semibold gap-2"
-                onClick={() => window.open(BLUEFIN_SWAP, "_blank")}
-                data-testid="button-swap-sbets">
-                <ArrowUpDown className="h-4 w-4" />
-                Swap on Bluefin
-                <ExternalLink className="h-3 w-3 opacity-70" />
-              </Button>
+              <div className="flex flex-col gap-2">
+                <Button
+                  className="w-full bg-[#0066cc] hover:bg-[#0055bb] text-white font-semibold gap-2"
+                  onClick={() => window.open(BLUEFIN_SWAP, "_blank")}
+                  data-testid="button-swap-bluefin">
+                  <ArrowUpDown className="h-4 w-4" />
+                  Swap on Bluefin
+                  <ExternalLink className="h-3 w-3 opacity-70" />
+                </Button>
+                <Button
+                  className="w-full bg-[#00b896] hover:bg-[#00a07f] text-white font-semibold gap-2"
+                  onClick={() => window.open(TURBOS_SWAP_URL, "_blank")}
+                  data-testid="button-swap-turbos">
+                  <ArrowUpDown className="h-4 w-4" />
+                  Swap on Turbos
+                  <ExternalLink className="h-3 w-3 opacity-70" />
+                </Button>
+              </div>
             </div>
 
             {/* Trade & Perps */}
@@ -449,15 +460,19 @@ export default function TradingPage() {
           {/* ── CTA banner ── */}
           <div className="bg-gradient-to-r from-[#0066cc]/20 to-[#00d0ff]/10 border border-[#00d0ff]/20 rounded-xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <p className="font-bold text-white text-lg">Ready to trade on Bluefin?</p>
+              <p className="font-bold text-white text-lg">Ready to get SBETS?</p>
               <p className="text-sm text-gray-400 mt-1">
-                Connect your Sui wallet on Bluefin mainnet and start swapping SBETS instantly.
+                Swap SUI → SBETS on Bluefin or Turbos — both pools live on Sui Mainnet.
               </p>
             </div>
-            <div className="flex gap-3 shrink-0">
+            <div className="flex flex-wrap gap-2 shrink-0">
               <Button className="bg-[#0066cc] hover:bg-[#0055bb] text-white font-semibold gap-2"
-                onClick={() => window.open(BLUEFIN_SWAP, "_blank")} data-testid="button-cta-swap">
-                <ArrowUpDown className="h-4 w-4" /> Swap SBETS <ExternalLink className="h-3 w-3 opacity-70" />
+                onClick={() => window.open(BLUEFIN_SWAP, "_blank")} data-testid="button-cta-swap-bluefin">
+                <ArrowUpDown className="h-4 w-4" /> Bluefin <ExternalLink className="h-3 w-3 opacity-70" />
+              </Button>
+              <Button className="bg-[#00b896] hover:bg-[#00a07f] text-white font-semibold gap-2"
+                onClick={() => window.open(TURBOS_SWAP_URL, "_blank")} data-testid="button-cta-swap-turbos">
+                <ArrowUpDown className="h-4 w-4" /> Turbos <ExternalLink className="h-3 w-3 opacity-70" />
               </Button>
               <Button variant="outline" className="border-white/10 bg-transparent hover:bg-white/5 text-white font-semibold gap-2"
                 onClick={() => window.open(BLUEFIN_TERMINAL, "_blank")} data-testid="button-cta-terminal">
@@ -568,13 +583,19 @@ export default function TradingPage() {
             {/* Action footer */}
             <div className="border-t border-white/5 px-6 py-4 bg-white/[0.02] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <p className="text-xs text-gray-400">
-                SuiBets liquidity is powered by <span className="text-[#00d0ff] font-medium">Bluefin BLN</span> on{" "}
-                <span className="text-[#00d0ff] font-medium">Sui Mainnet</span>. All swaps settle on-chain in &lt;1 second.
+                SBETS pools live on <span className="text-[#00d0ff] font-medium">Bluefin</span> &amp;{" "}
+                <span className="text-[#00b896] font-medium">Turbos</span> — both on{" "}
+                <span className="text-[#00d0ff] font-medium">Sui Mainnet</span>. Swaps settle on-chain in &lt;1 second.
               </p>
-              <div className="flex gap-2 shrink-0">
+              <div className="flex gap-2 shrink-0 flex-wrap">
                 <Button size="sm" className="bg-[#0066cc] hover:bg-[#0055bb] text-white gap-1.5 text-xs h-8"
-                  onClick={() => window.open(BLUEFIN_SWAP, "_blank")} data-testid="button-liquidity-swap">
-                  <ArrowUpDown className="h-3.5 w-3.5" /> Get SBETS
+                  onClick={() => window.open(BLUEFIN_SWAP, "_blank")} data-testid="button-liquidity-swap-bluefin">
+                  <ArrowUpDown className="h-3.5 w-3.5" /> Bluefin
+                  <ExternalLink className="h-3 w-3 opacity-70" />
+                </Button>
+                <Button size="sm" className="bg-[#00b896] hover:bg-[#00a07f] text-white gap-1.5 text-xs h-8"
+                  onClick={() => window.open(TURBOS_SWAP_URL, "_blank")} data-testid="button-liquidity-swap-turbos">
+                  <ArrowUpDown className="h-3.5 w-3.5" /> Turbos
                   <ExternalLink className="h-3 w-3 opacity-70" />
                 </Button>
                 <Button size="sm" variant="outline" className="border-white/10 bg-transparent hover:bg-white/5 text-white gap-1.5 text-xs h-8"
