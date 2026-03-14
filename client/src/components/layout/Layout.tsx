@@ -89,12 +89,12 @@ const Layout: React.FC<LayoutProps> = ({
   const topNavItems = [
     { label: 'Bets', href: '/' },
     { label: 'Predict', href: '/network', highlight: true },
-    { label: 'Dashboard', href: '/wallet-dashboard' },
     { label: 'My Bets', href: '/bet-history' },
-    { label: 'Promotions', href: '/promotions' },
     { label: 'Revenue', href: '/revenue' },
     { label: 'Staking', href: '/staking' },
-    { label: 'Trade', href: '/trade', bluefin: true },
+    { label: 'Trade', href: '/trading', badge: 'BLN' },
+    { label: 'Dashboard', href: '/wallet-dashboard', icon: <Wallet className="h-4 w-4 mr-2" /> },
+    { label: 'Promotions', href: '/promotions', icon: <Target className="h-4 w-4 mr-2" /> },
   ];
 
   const moreMenuItems = [
@@ -193,20 +193,24 @@ const Layout: React.FC<LayoutProps> = ({
                   ? 'text-cyan-400' 
                   : (item as any).highlight
                     ? 'text-yellow-400 hover:text-yellow-300'
-                    : (item as any).bluefin
-                      ? 'text-blue-400 hover:text-blue-300'
+                    : (item as any).badge
+                      ? 'text-[#00d0ff] hover:text-[#00eeff]'
                       : 'text-gray-300 hover:text-white'
               }`}
               onClick={() => setLocation(item.href)}
               data-testid={`nav-${item.label.toLowerCase()}`}
             >
-              {item.label}
-              {(item as any).highlight && location !== item.href && (
-                <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
-              )}
-              {(item as any).bluefin && (
-                <span className="ml-1 text-[10px] font-bold text-blue-400 bg-blue-400/10 border border-blue-400/30 rounded px-1">BLN</span>
-              )}
+              <span className="flex items-center gap-1.5">
+                {item.label}
+                {(item as any).highlight && location !== item.href && (
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
+                )}
+                {(item as any).badge && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#00d0ff]/20 text-[#00d0ff] border border-[#00d0ff]/30 leading-none">
+                    {(item as any).badge}
+                  </span>
+                )}
+              </span>
             </button>
           ))}
           

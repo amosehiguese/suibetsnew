@@ -293,21 +293,27 @@ export default function CleanHome() {
           <div className="hidden md:flex items-center gap-6">
             <Link href="/" className="text-cyan-400 hover:text-cyan-300 transition-colors text-sm font-medium" data-testid="nav-bets">Bets</Link>
             <Link href="/network" className="text-yellow-400 hover:text-yellow-300 transition-colors text-sm font-bold flex items-center gap-1" data-testid="nav-predict">Predict<span className="inline-block w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" /></Link>
-            <Link href="/dashboard" className="text-gray-400 hover:text-cyan-400 transition-colors text-sm font-medium" data-testid="nav-dashboard">Dashboard</Link>
+            <Link href="/trading" className="flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 transition-colors text-sm font-bold" data-testid="nav-trade">
+              Trade
+              <span className="bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-[10px] font-bold px-1.5 py-0.5 rounded">BLN</span>
+            </Link>
             <Link href="/bet-history" className="text-gray-400 hover:text-cyan-400 transition-colors text-sm font-medium" data-testid="nav-my-bets">My Bets</Link>
-            <Link href="/promotions" className="text-gray-400 hover:text-cyan-400 transition-colors text-sm font-medium" data-testid="nav-promotions">Promotions</Link>
             <Link href="/revenue" className="text-yellow-400 hover:text-yellow-300 transition-colors text-sm font-bold" data-testid="nav-revenue">Revenue</Link>
             <Link href="/staking" className="text-cyan-400 hover:text-cyan-300 transition-colors text-sm font-medium" data-testid="nav-staking">Staking</Link>
-            <Link href="/trade" className="text-blue-400 hover:text-blue-300 transition-colors text-sm font-bold flex items-center gap-1" data-testid="nav-trade">
-              Trade
-              <span className="text-[9px] font-bold bg-blue-400/15 border border-blue-400/30 rounded px-1 text-blue-300">BLN</span>
-            </Link>
             <DropdownMenu>
               <DropdownMenuTrigger className="text-gray-400 hover:text-cyan-400 transition-colors text-sm font-medium flex items-center gap-1 outline-none" data-testid="nav-more">
                 More
                 <MoreHorizontal className="h-4 w-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-[#0b1618] border border-cyan-900/30 min-w-[180px] z-[9999]">
+                <DropdownMenuItem className="cursor-pointer text-gray-200 hover:text-white flex items-center px-4 py-3 text-sm" onClick={() => setLocation('/wallet-dashboard')} data-testid="nav-more-dashboard">
+                  <Wallet className="h-4 w-4 mr-2" />
+                  Dashboard
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer text-gray-200 hover:text-white flex items-center px-4 py-3 text-sm" onClick={() => setLocation('/promotions')} data-testid="nav-more-promotions">
+                  <Target className="h-4 w-4 mr-2" />
+                  Promotions
+                </DropdownMenuItem>
                 <DropdownMenuItem className="cursor-pointer text-gray-200 hover:text-white flex items-center px-4 py-3 text-sm" onClick={() => setLocation('/streaming')} data-testid="nav-more-streaming">
                   <TrendingUp className="h-4 w-4 mr-2" />
                   Streaming
@@ -345,17 +351,7 @@ export default function CleanHome() {
               className="bg-cyan-500 hover:bg-cyan-600 text-black font-bold px-3 md:px-4 py-2 rounded-lg text-sm transition-colors"
               data-testid="btn-buy-now"
             >
-              Turbos
-            </a>
-            <a 
-              href="https://trade.bluefin.io"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden md:inline-flex items-center gap-1 bg-blue-500 hover:bg-blue-600 text-white font-bold px-3 md:px-4 py-2 rounded-lg text-sm transition-colors"
-              data-testid="btn-buy-bluefin"
-            >
-              Bluefin
-              <span className="text-[9px] font-bold bg-white/20 rounded px-1">BLN</span>
+              Buy Now
             </a>
             {isConnected && walletAddress ? (
               <>
@@ -403,15 +399,14 @@ export default function CleanHome() {
             <div className="flex flex-col gap-3">
               <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="text-cyan-400 hover:text-cyan-300 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-bets">Bets</Link>
               <Link href="/network" onClick={() => setIsMobileMenuOpen(false)} className="text-yellow-400 hover:text-yellow-300 transition-colors text-base font-bold py-2 border-b border-cyan-900/20" data-testid="mobile-nav-predict">Predict</Link>
-              <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-cyan-400 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-dashboard">Dashboard</Link>
+              <Link href="/trading" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors text-base font-bold py-2 border-b border-cyan-900/20" data-testid="mobile-nav-trade">
+                Trade <span className="bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-[10px] font-bold px-1.5 py-0.5 rounded">BLN</span>
+              </Link>
               <Link href="/bet-history" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-cyan-400 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-my-bets">My Bets</Link>
-              <Link href="/promotions" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-cyan-400 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-promotions">Promotions</Link>
               <Link href="/revenue" onClick={() => setIsMobileMenuOpen(false)} className="text-yellow-400 hover:text-yellow-300 transition-colors text-base font-bold py-2 border-b border-cyan-900/20" data-testid="mobile-nav-revenue">Revenue</Link>
               <Link href="/staking" onClick={() => setIsMobileMenuOpen(false)} className="text-cyan-400 hover:text-cyan-300 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-staking">Staking</Link>
-              <Link href="/trade" onClick={() => setIsMobileMenuOpen(false)} className="text-blue-400 hover:text-blue-300 transition-colors text-base font-bold py-2 border-b border-cyan-900/20 flex items-center gap-2" data-testid="mobile-nav-trade">
-                Trade
-                <span className="text-[9px] font-bold bg-blue-400/15 border border-blue-400/30 rounded px-1 text-blue-300">BLN</span>
-              </Link>
+              <Link href="/wallet-dashboard" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-cyan-400 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-dashboard">Dashboard</Link>
+              <Link href="/promotions" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-cyan-400 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-promotions">Promotions</Link>
               <Link href="/streaming" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-cyan-400 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-streaming">Streaming</Link>
               <Link href="/leaderboard" onClick={() => setIsMobileMenuOpen(false)} className="text-yellow-400 hover:text-yellow-300 transition-colors text-base font-bold py-2 border-b border-cyan-900/20" data-testid="mobile-nav-leaderboard">Leaderboard</Link>
               <Link href="/results" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-cyan-400 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-activity">Activity</Link>

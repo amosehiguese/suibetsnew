@@ -8133,5 +8133,160 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
     }
   });
 
+  // ─── Bluefin Mainnet Proxy Routes ─────────────────────────────────────────
+  // All endpoints proxy to https://dapi.api.sui-prod.bluefin.io (SUI MAINNET)
+
+  /** GET /api/bluefin/tickers  — public market ticker data */
+  app.get('/api/bluefin/tickers', async (req: Request, res: Response) => {
+    try {
+      const { bluefinService } = await import('./services/bluefinService');
+      const symbol = req.query.symbol as string | undefined;
+      const data = await bluefinService.getTicker(symbol);
+      res.json(data);
+    } catch (err: any) {
+      res.status(502).json({ error: 'Bluefin mainnet unavailable', detail: err.message });
+    }
+  });
+
+  /** GET /api/bluefin/orderbook?symbol=BTC-PERP */
+  app.get('/api/bluefin/orderbook', async (req: Request, res: Response) => {
+    try {
+      const { bluefinService } = await import('./services/bluefinService');
+      const symbol = req.query.symbol as string;
+      if (!symbol) return res.status(400).json({ error: 'symbol required' });
+      const data = await bluefinService.getOrderBook(symbol, Number(req.query.limit) || 20);
+      res.json(data);
+    } catch (err: any) {
+      res.status(502).json({ error: 'Bluefin mainnet unavailable', detail: err.message });
+    }
+  });
+
+  /** GET /api/bluefin/recent-trades?symbol=BTC-PERP */
+  app.get('/api/bluefin/recent-trades', async (req: Request, res: Response) => {
+    try {
+      const { bluefinService } = await import('./services/bluefinService');
+      const symbol = req.query.symbol as string;
+      if (!symbol) return res.status(400).json({ error: 'symbol required' });
+      const data = await bluefinService.getRecentTrades(symbol, Number(req.query.limit) || 30);
+      res.json(data);
+    } catch (err: any) {
+      res.status(502).json({ error: 'Bluefin mainnet unavailable', detail: err.message });
+    }
+  });
+
+  /** GET /api/bluefin/funding-rate?symbol=BTC-PERP */
+  app.get('/api/bluefin/funding-rate', async (req: Request, res: Response) => {
+    try {
+      const { bluefinService } = await import('./services/bluefinService');
+      const symbol = req.query.symbol as string | undefined;
+      const data = await bluefinService.getFundingRate(symbol);
+      res.json(data);
+    } catch (err: any) {
+      res.status(502).json({ error: 'Bluefin mainnet unavailable', detail: err.message });
+    }
+  });
+
+  /** GET /api/bluefin/markets — all available perp markets */
+  app.get('/api/bluefin/markets', async (req: Request, res: Response) => {
+    try {
+      const { bluefinService } = await import('./services/bluefinService');
+      const data = await bluefinService.getMarkets();
+      res.json(data);
+    } catch (err: any) {
+      res.status(502).json({ error: 'Bluefin mainnet unavailable', detail: err.message });
+    }
+  });
+
+  /** GET /api/bluefin/account?address=0x... — account info for connected wallet */
+  app.get('/api/bluefin/account', async (req: Request, res: Response) => {
+    try {
+      const { bluefinService } = await import('./services/bluefinService');
+      const address = req.query.address as string;
+      if (!address) return res.status(400).json({ error: 'address required' });
+      const data = await bluefinService.getAccount(address);
+      res.json(data);
+    } catch (err: any) {
+      res.status(502).json({ error: 'Bluefin mainnet unavailable', detail: err.message });
+    }
+  });
+
+  /** GET /api/bluefin/orders?address=0x...&symbol=BTC-PERP */
+  app.get('/api/bluefin/orders', async (req: Request, res: Response) => {
+    try {
+      const { bluefinService } = await import('./services/bluefinService');
+      const address = req.query.address as string;
+      if (!address) return res.status(400).json({ error: 'address required' });
+      const data = await bluefinService.getOrders(
+        address,
+        req.query.symbol as string | undefined,
+        (req.query.statuses as string) || 'OPEN,PARTIAL_FILLED'
+      );
+      res.json(data);
+    } catch (err: any) {
+      res.status(502).json({ error: 'Bluefin mainnet unavailable', detail: err.message });
+    }
+  });
+
+  /** GET /api/bluefin/user-trades?address=0x... */
+  app.get('/api/bluefin/user-trades', async (req: Request, res: Response) => {
+    try {
+      const { bluefinService } = await import('./services/bluefinService');
+      const address = req.query.address as string;
+      if (!address) return res.status(400).json({ error: 'address required' });
+      const data = await bluefinService.getUserTrades(
+        address,
+        req.query.symbol as string | undefined,
+        Number(req.query.limit) || 50,
+        Number(req.query.pageNumber) || 1
+      );
+      res.json(data);
+    } catch (err: any) {
+      res.status(502).json({ error: 'Bluefin mainnet unavailable', detail: err.message });
+    }
+  });
+
+  /** GET /api/bluefin/funding-history?address=0x... */
+  app.get('/api/bluefin/funding-history', async (req: Request, res: Response) => {
+    try {
+      const { bluefinService } = await import('./services/bluefinService');
+      const address = req.query.address as string;
+      if (!address) return res.status(400).json({ error: 'address required' });
+      const data = await bluefinService.getFundingHistory(
+        address,
+        req.query.symbol as string | undefined,
+        Number(req.query.limit) || 50,
+        Number(req.query.pageNumber) || 1
+      );
+      res.json(data);
+    } catch (err: any) {
+      res.status(502).json({ error: 'Bluefin mainnet unavailable', detail: err.message });
+    }
+  });
+
+  /**
+   * GET /api/bluefin/tx-history?address=0x...
+   * Account transaction history — deposits, withdrawals, transfers
+   */
+  app.get('/api/bluefin/tx-history', async (req: Request, res: Response) => {
+    try {
+      const { bluefinService } = await import('./services/bluefinService');
+      const address = req.query.address as string;
+      if (!address) return res.status(400).json({ error: 'address required' });
+      const data = await bluefinService.getUserTransactionHistory(
+        address,
+        req.query.symbol as string | undefined,
+        Number(req.query.limit) || 50,
+        Number(req.query.pageNumber) || 1,
+        req.query.startTime ? Number(req.query.startTime) : undefined,
+        req.query.endTime   ? Number(req.query.endTime)   : undefined
+      );
+      res.json(data);
+    } catch (err: any) {
+      res.status(502).json({ error: 'Bluefin mainnet unavailable', detail: err.message });
+    }
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+
   return httpServer;
 }
