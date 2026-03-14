@@ -22,6 +22,7 @@
 import { Transaction } from "@mysten/sui/transactions";
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
+import { decodeSuiPrivateKey } from "@mysten/sui/cryptography";
 
 // ── Bluefin Spot CLMM contract ───────────────────────────────────────────────
 const BLUEFIN_SPOT_PKG =
@@ -70,9 +71,15 @@ async function main() {
     process.exit(1);
   }
 
-  const keypair = Ed25519Keypair.fromSecretKey(
-    Buffer.from(privateKeyHex.replace(/^0x/, ""), "hex")
-  );
+  let keypair: Ed25519Keypair;
+  if (privateKeyHex.startsWith("suiprivkey")) {
+    const { secretKey } = decodeSuiPrivateKey(privateKeyHex);
+    keypair = Ed25519Keypair.fromSecretKey(secretKey);
+  } else {
+    keypair = Ed25519Keypair.fromSecretKey(
+      Buffer.from(privateKeyHex.replace(/^0x/, ""), "hex")
+    );
+  }
   const walletAddress = keypair.toSuiAddress();
   console.log("🔑  Admin wallet:", walletAddress);
   console.log("🏊  Pool ID     :", poolId);
