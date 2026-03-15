@@ -186,7 +186,10 @@ export default function AIBettingPage() {
   const [autoLog, setAutoLog] = useState<string[]>([]);
 
   // ── Portfolio ────────────────────────────────────────────────────────────
-  const [portfolioResult, setPortfolioResult] = useState<{ totalStake: number; riskScore: number; exposure: string } | null>(null);
+  const [portfolioResult, setPortfolioResult] = useState<{
+    totalStake: number; riskScore: number; exposure: string;
+    maxWin: number; avgOdds: number; betCount: number; isLive: boolean;
+  } | null>(null);
 
   // ── Value bet min-edge filter ────────────────────────────────────────────
   const [minEdgeFilter, setMinEdgeFilter] = useState(0.01);
@@ -745,11 +748,35 @@ export default function AIBettingPage() {
 
   // ── Portfolio risk ───────────────────────────────────────────────────────
   const calcPortfolioRisk = () => {
-    const bets = selectedBets.length > 0 ? selectedBets : allValueBets.slice(0, 3).map(v => ({ stake: strategy.maxStake, market: v.sport }));
-    const total = bets.reduce((s: number, b: any) => s + (b.stake || 10), 0);
-    const riskScore = +(total * 0.15).toFixed(2);
-    const leagues = [...new Set(bets.map((b: any) => b.market || 'Unknown'))];
-    setPortfolioResult({ totalStake: total, riskScore, exposure: leagues.join(', ') });
+    const source = selectedBets.length > 0
+      ? selectedBets
+      : allValueBets.slice(0, 5).map(v => ({
+          stake: strategy.maxStake,
+          odds: v.marketOdds,
+          leagueName: v.leagueName,
+          eventName: v.eventName,
+          selectionName: v.selection,
+          currency: 'SBETS',
+        }));
+
+    const total = source.reduce((s: number, b: any) => s + Number(b.stake || 1000), 0);
+    const maxWin = source.reduce((s: number, b: any) => s + Number(b.stake || 1000) * Number(b.odds || 2.0), 0);
+    const avgOdds = source.length > 0
+      ? +(source.reduce((s: number, b: any) => s + Number(b.odds || 2.0), 0) / source.length).toFixed(2)
+      : 0;
+    const riskScore = +(total * 0.15).toFixed(0);
+    const leagues = [...new Set(source.map((b: any) => b.leagueName || b.market || b.eventName?.split(' vs ')[0] || 'Unknown'))].filter(Boolean);
+    const exposure = leagues.slice(0, 3).join(', ') + (leagues.length > 3 ? ` +${leagues.length - 3}` : '');
+
+    setPortfolioResult({
+      totalStake: total,
+      riskScore,
+      exposure,
+      maxWin: +maxWin.toFixed(0),
+      avgOdds,
+      betCount: source.length,
+      isLive: selectedBets.length > 0,
+    });
   };
 
   // ── Send agent message ───────────────────────────────────────────────────
@@ -1535,23 +1562,56 @@ export default function AIBettingPage() {
             {activeTab === 'portfolio' && (
               <div className="space-y-4">
                 <div className="text-xs text-gray-400">
-                  Formula: <span className="text-red-400 font-mono">risk_score = total_stake × 0.15</span> — analyses {selectedBets.length > 0 ? `your ${selectedBets.length} active bet(s)` : 'sample portfolio'}
+                  Formula: <span className="text-red-400 font-mono">risk_score = total_stake × 0.15</span>
+                  {' — '}
+                  {selectedBets.length > 0
+                    ? <span className="text-cyan-400">analysing your {selectedBets.length} active bet{selectedBets.length > 1 ? 's' : ''}</span>
+                    : <span className="text-gray-500">add bets to your slip for live analysis, or click below for top value picks</span>}
                 </div>
+
+                {selectedBets.length === 0 && allValueBets.length > 0 && (
+                  <div className="bg-[#0b1618] rounded-lg p-3 border border-[#1e3a3f] space-y-1.5">
+                    <div className="text-xs text-gray-400 font-medium mb-1">Top 5 value picks (preview):</div>
+                    {allValueBets.slice(0, 5).map((v, i) => (
+                      <div key={i} className="flex items-center justify-between text-xs">
+                        <span className="text-gray-300 truncate max-w-[65%]">{v.selection} — {v.eventName}</span>
+                        <span className="text-green-400 font-mono flex-shrink-0">@{v.marketOdds} +{(v.edge * 100).toFixed(1)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <Button onClick={calcPortfolioRisk} className="w-full bg-red-700/70 hover:bg-red-700 text-white" data-testid="calc-portfolio-risk">
                   <BarChart3 className="h-4 w-4 mr-2" /> Analyse Portfolio Risk
                 </Button>
+
                 {portfolioResult && (
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { label: 'Total Stake', value: `${portfolioResult.totalStake} SUI`, color: 'text-white' },
-                      { label: 'Risk Score', value: `${portfolioResult.riskScore} SUI`, color: 'text-red-400' },
-                      { label: 'Exposure', value: portfolioResult.exposure, color: 'text-yellow-400' },
-                    ].map((r, i) => (
-                      <div key={i} className="bg-[#0b1618] rounded-lg p-3 text-center border border-[#1e3a3f]">
-                        <div className={`text-sm font-bold ${r.color} break-words`}>{r.value}</div>
-                        <div className="text-xs text-gray-400">{r.label}</div>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-[#0b1618] rounded-lg p-3 text-center border border-[#1e3a3f]">
+                        <div className="text-base font-bold text-white font-mono">{portfolioResult.totalStake.toLocaleString()}</div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">Total Stake (SBETS)</div>
                       </div>
-                    ))}
+                      <div className="bg-[#0b1618] rounded-lg p-3 text-center border border-red-500/20">
+                        <div className="text-base font-bold text-red-400 font-mono">{portfolioResult.riskScore.toLocaleString()}</div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">Risk Score (SBETS)</div>
+                      </div>
+                      <div className="bg-[#0b1618] rounded-lg p-3 text-center border border-green-500/20">
+                        <div className="text-base font-bold text-green-400 font-mono">{portfolioResult.maxWin.toLocaleString()}</div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">Max Win (SBETS)</div>
+                      </div>
+                      <div className="bg-[#0b1618] rounded-lg p-3 text-center border border-[#1e3a3f]">
+                        <div className="text-base font-bold text-yellow-400 font-mono">{portfolioResult.avgOdds}x</div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">Avg Odds ({portfolioResult.betCount} bets)</div>
+                      </div>
+                    </div>
+                    <div className="bg-[#0b1618] rounded-lg p-3 border border-[#1e3a3f]">
+                      <div className="text-[10px] text-gray-500 mb-1">League Exposure</div>
+                      <div className="text-xs text-yellow-400 break-words">{portfolioResult.exposure || 'N/A'}</div>
+                    </div>
+                    {!portfolioResult.isLive && (
+                      <div className="text-[10px] text-gray-500 text-center">Based on top value picks — add bets to your slip for exact figures</div>
+                    )}
                   </div>
                 )}
               </div>
