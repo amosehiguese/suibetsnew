@@ -466,8 +466,14 @@ export default function AIBettingPage() {
   // ── Core agent result builder ────────────────────────────────────────────
   const buildAgentResult = (action: string, events: any[], params?: any): any => {
     const team = params?.team;
-    const sport = params?.sport && params.sport !== 'football' ? params.sport : undefined;
-    let pool = filterBySport(filterByTeam(events, team), sport);
+    const sport = params?.sport;
+    const league = params?.league || null;
+
+    // Apply filters in priority: team > league > sport
+    let pool = events;
+    if (team) pool = filterByTeam(pool, team);
+    if (league) pool = filterByLeague(pool, league);
+    else if (sport) pool = filterBySport(pool, sport);
     if (pool.length === 0) pool = events;
 
     if (action === 'value_bets') {
@@ -564,7 +570,9 @@ export default function AIBettingPage() {
     }
 
     if (action === 'monte_carlo') {
-      const e = pool[0];
+      const e = pool.find(ev => getRealOdds(ev, 'home') && getRealOdds(ev, 'away'))
+        || pool.find(ev => getRealOdds(ev, 'home'))
+        || pool[0];
       const homeOdds = e ? getRealOdds(e, 'home') : null;
       const runs = params?.runs || 50000;
       const impliedHome = homeOdds ? 1 / homeOdds : (params?.prob || 0.60);
@@ -599,7 +607,10 @@ export default function AIBettingPage() {
     }
 
     if (action === 'predictions') {
-      const e = pool[0];
+      // Prefer events that have real odds; further prefer football/soccer events
+      const e = pool.find(ev => getRealOdds(ev, 'home') && getRealOdds(ev, 'away'))
+        || pool.find(ev => getRealOdds(ev, 'home'))
+        || pool[0];
       if (e) {
         const homeOdds = getRealOdds(e, 'home') || 2.0;
         const drawOdds = getRealOdds(e, 'draw') || 3.3;
@@ -663,6 +674,43 @@ export default function AIBettingPage() {
       if (awayWords.some((w: string) => lower.includes(w))) return e.awayTeam;
     }
     return null;
+  };
+
+  // Extracts a league keyword from the user's message for card filtering
+  const extractLeagueFromMessage = (msg: string): string | null => {
+    const lower = msg.toLowerCase();
+    const leagueMap: Array<[RegExp, string]> = [
+      [/la\s*liga|spanish|spain\b|laliga/, 'La Liga'],
+      [/premier\s*league|epl|english\s*premier|barnsley|arsenal|chelsea|liverpool|man\s*city|man\s*utd|manchester/, 'Premier League'],
+      [/serie\s*a|italian|italy\b|milan|juventus|inter|napoli|roma|lazio/, 'Serie A'],
+      [/bundesliga|german|germany\b|bayern|dortmund|bvb/, 'Bundesliga'],
+      [/ligue\s*1|french|france\b|psg|paris\s*saint/, 'Ligue 1'],
+      [/champions\s*league|ucl|uefa\s*champ/, 'Champions League'],
+      [/europa\s*league|uel/, 'Europa League'],
+      [/eredivisie|dutch|netherlands|ajax/, 'Eredivisie'],
+      [/primeira\s*liga|portuguese|portugal\b|benfica|porto\b/, 'Primeira Liga'],
+      [/super\s*lig|turkish|turkey\b/, 'Super Lig'],
+      [/nba|basketball|lakers|celtics|warriors|bucks/, 'NBA'],
+      [/nfl|american\s*football|nfl/, 'NFL'],
+      [/mls|major\s*league\s*soccer/, 'MLS'],
+      [/championship|efl/, 'Championship'],
+      [/mma|ufc|cage/, 'MMA'],
+    ];
+    for (const [pattern, league] of leagueMap) {
+      if (pattern.test(lower)) return league;
+    }
+    return null;
+  };
+
+  // Filter events by league keyword (partial match on leagueName)
+  const filterByLeague = (events: any[], league: string | null): any[] => {
+    if (!league) return events;
+    const lc = league.toLowerCase();
+    const filtered = events.filter(e =>
+      (e.leagueName || '').toLowerCase().includes(lc) ||
+      (e.league || '').toLowerCase().includes(lc)
+    );
+    return filtered.length > 0 ? filtered : events;
   };
 
   // ── Monte Carlo runner ───────────────────────────────────────────────────
@@ -817,6 +865,10 @@ export default function AIBettingPage() {
       if (!params.team) {
         const found = extractTeamFromMessage(text);
         if (found) params.team = found;
+      }
+      if (!params.league) {
+        const foundLeague = extractLeagueFromMessage(text);
+        if (foundLeague) params.league = foundLeague;
       }
 
       const result = buildAgentResult(action, allEvents, params);
