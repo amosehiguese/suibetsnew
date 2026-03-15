@@ -134,14 +134,25 @@ export default function AIBettingPage() {
 
   // ── Fetch live & upcoming events ──────────────────────────────────────────
   const { data: liveEvents = [], isLoading: eventsLoading } = useQuery<any[]>({
-    queryKey: ['/api/events', 'live'],
+    queryKey: ['/api/events'],
   });
 
-  const { data: upcomingEvents = [], isLoading: upcomingLoading } = useQuery<any[]>({
+  const { data: upcomingEvents = [] } = useQuery<any[]>({
     queryKey: ['/api/events', 'upcoming'],
   });
 
-  const allEvents = [...(liveEvents as any[]), ...(upcomingEvents as any[])].slice(0, 30);
+  // Use ALL events for calculations — no artificial cap
+  const allEvents: any[] = (() => {
+    const combined = [...(liveEvents as any[]), ...(upcomingEvents as any[])];
+    // Deduplicate by id
+    const seen = new Set<string>();
+    return combined.filter(e => {
+      const key = String(e.id ?? e.eventId ?? JSON.stringify(e));
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  })();
 
   // Helper: get real odds value from event
   const getRealOdds = (e: any, market: 'home' | 'draw' | 'away') => {
