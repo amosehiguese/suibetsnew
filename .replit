@@ -32,6 +32,7 @@ author = "agent"
 
 [workflows.workflow.metadata]
 agentRequireRestartOnSave = false
+outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
