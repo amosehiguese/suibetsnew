@@ -516,7 +516,7 @@ function buildMathematicalSuggestions(sport: string, eventName: string, homeTeam
         recommendation: `${ht} Win @ ${homeOdds.toFixed(2)}`,
         confidence: +trueHome.toFixed(2),
         edge: edgeHome,
-        kellyFraction: +kellyHome.toFixed(3),
+        kellyStake: +kellyHome.toFixed(3),
         reasoning: `Bookmaker margin is ${((margin - 1) * 100).toFixed(1)}%. Fair value probability for ${ht} is ${(trueHome * 100).toFixed(1)}% vs implied ${(impliedHome * 100).toFixed(1)}%. Edge of ${(edgeHome * 100).toFixed(1)}% suggests ${edgeHome > 0 ? 'value exists' : 'slight overpriced — lean toward value'}. Kelly stake: ${(kellyHome * 100).toFixed(1)}% of bankroll.`,
       },
       {
@@ -524,7 +524,7 @@ function buildMathematicalSuggestions(sport: string, eventName: string, homeTeam
         recommendation: `BTTS Yes @ 1.85`,
         confidence: +bttsProb.toFixed(2),
         edge: bttsEdge,
-        kellyFraction: 0.02,
+        kellyStake: 0.02,
         reasoning: `Statistical model estimates ${(bttsProb * 100).toFixed(0)}% probability of both teams scoring based on team balance (odds ratio: ${goalSpread.toFixed(2)}). ${sport === 'football' || sport === 'soccer' ? 'BTTS market is often inefficiently priced in balanced matchups.' : 'Score markets tend to be competitive in evenly matched fixtures.'}`,
       },
       {
@@ -532,7 +532,7 @@ function buildMathematicalSuggestions(sport: string, eventName: string, homeTeam
         recommendation: `${at} or Draw (X2) @ ${(1 / (impliedDraw + impliedAway)).toFixed(2)}`,
         confidence: +((impliedDraw + impliedAway) * 1.01).toFixed(2),
         edge: edgeAway,
-        kellyFraction: +kellyAway.toFixed(3),
+        kellyStake: +kellyAway.toFixed(3),
         reasoning: `Combined draw+away probability is ${((impliedDraw + impliedAway) * 100).toFixed(1)}%. ${at} has ${(impliedAway * 100).toFixed(1)}% implied win probability. The Double Chance market reduces variance significantly — useful when away side shows form but faces a strong home team.`,
       },
     ],
@@ -560,7 +560,7 @@ Return ONLY valid JSON with no markdown:
       "recommendation": "Specific bet selection",
       "confidence": 0.82,
       "edge": 0.07,
-      "kellyFraction": 0.05,
+      "kellyStake": 0.05,
       "reasoning": "Detailed 2-3 sentence analysis with specific statistical reasoning"
     }
   ]

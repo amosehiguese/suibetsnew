@@ -277,11 +277,35 @@ export default function AIBettingPage() {
 
   // ── Helper: get real odds ──────────────────────────────────────────────────
   const getRealOdds = (e: any, market: 'home' | 'draw' | 'away') => {
+    // Format 1: e.odds.home/draw/away (football paid API)
     const o = e.odds;
-    if (!o) return null;
-    if (market === 'home') return o.home ?? o.homeWin ?? o['1'] ?? null;
-    if (market === 'draw') return o.draw ?? o['X'] ?? o.x ?? null;
-    if (market === 'away') return o.away ?? o.awayWin ?? o['2'] ?? null;
+    if (o) {
+      if (market === 'home') return o.home ?? o.homeWin ?? o['1'] ?? null;
+      if (market === 'draw') return o.draw ?? o['X'] ?? o.x ?? null;
+      if (market === 'away') return o.away ?? o.awayWin ?? o['2'] ?? null;
+    }
+    // Format 2: e.homeOdds / e.awayOdds / e.drawOdds flat fields (free-sports events)
+    if (market === 'home' && e.homeOdds) return e.homeOdds;
+    if (market === 'away' && e.awayOdds) return e.awayOdds;
+    if (market === 'draw' && e.drawOdds) return e.drawOdds;
+    // Format 3: e.markets array (outcomes by id)
+    if (e.markets && Array.isArray(e.markets)) {
+      const mw = e.markets.find((m: any) => m.id === 'match_winner' || (m.name || '').toLowerCase().includes('match winner') || (m.name || '').toLowerCase().includes('winner'));
+      if (mw && Array.isArray(mw.outcomes)) {
+        if (market === 'home') {
+          const oc = mw.outcomes.find((o: any) => o.id === 'home' || o.name === e.homeTeam);
+          if (oc) return oc.odds;
+        }
+        if (market === 'away') {
+          const oc = mw.outcomes.find((o: any) => o.id === 'away' || o.name === e.awayTeam);
+          if (oc) return oc.odds;
+        }
+        if (market === 'draw') {
+          const oc = mw.outcomes.find((o: any) => o.id === 'draw' || (o.name || '').toLowerCase() === 'draw' || (o.name || '').toLowerCase() === 'x');
+          if (oc) return oc.odds;
+        }
+      }
+    }
     return null;
   };
 
