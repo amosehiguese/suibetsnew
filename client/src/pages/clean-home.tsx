@@ -300,9 +300,9 @@ export default function CleanHome() {
           <div className="hidden md:flex items-center gap-6">
             <Link href="/" className="text-cyan-400 hover:text-cyan-300 transition-colors text-sm font-medium" data-testid="nav-bets">Bets</Link>
             <Link href="/network" className="text-yellow-400 hover:text-yellow-300 transition-colors text-sm font-bold flex items-center gap-1" data-testid="nav-predict">Predict<span className="inline-block w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" /></Link>
-            <Link href="/trading" className="flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 transition-colors text-sm font-bold" data-testid="nav-trade">
-              Trade
-              <span className="bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-[10px] font-bold px-1.5 py-0.5 rounded">DEX</span>
+            <Link href="/ai-betting" className="flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 transition-colors text-sm font-bold" data-testid="nav-ai-betting">
+              AI Betting
+              <span className="bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-[10px] font-bold px-1.5 py-0.5 rounded">AI</span>
             </Link>
             <Link href="/bet-history" className="text-gray-400 hover:text-cyan-400 transition-colors text-sm font-medium" data-testid="nav-my-bets">My Bets</Link>
             <Link href="/revenue" className="text-yellow-400 hover:text-yellow-300 transition-colors text-sm font-bold" data-testid="nav-revenue">Revenue</Link>
@@ -313,9 +313,9 @@ export default function CleanHome() {
                 <MoreHorizontal className="h-4 w-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-[#0b1618] border border-cyan-900/30 min-w-[180px] z-[9999]">
-                <DropdownMenuItem className="cursor-pointer text-cyan-300 hover:text-cyan-200 flex items-center px-4 py-3 text-sm font-medium" onClick={() => setLocation('/ai-betting')} data-testid="nav-more-ai-betting">
-                  <Brain className="h-4 w-4 mr-2" />
-                  AI Betting
+                <DropdownMenuItem className="cursor-pointer text-cyan-300 hover:text-cyan-200 flex items-center px-4 py-3 text-sm font-medium" onClick={() => setLocation('/trading')} data-testid="nav-more-trade">
+                  <ArrowUpDown className="h-4 w-4 mr-2" />
+                  Trade
                 </DropdownMenuItem>
                 <DropdownMenuItem className="cursor-pointer text-gray-200 hover:text-white flex items-center px-4 py-3 text-sm" onClick={() => setLocation('/wallet-dashboard')} data-testid="nav-more-dashboard">
                   <Wallet className="h-4 w-4 mr-2" />
@@ -410,15 +410,15 @@ export default function CleanHome() {
             <div className="flex flex-col gap-3">
               <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="text-cyan-400 hover:text-cyan-300 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-bets">Bets</Link>
               <Link href="/network" onClick={() => setIsMobileMenuOpen(false)} className="text-yellow-400 hover:text-yellow-300 transition-colors text-base font-bold py-2 border-b border-cyan-900/20" data-testid="mobile-nav-predict">Predict</Link>
-              <Link href="/trading" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors text-base font-bold py-2 border-b border-cyan-900/20" data-testid="mobile-nav-trade">
-                Trade <span className="bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-[10px] font-bold px-1.5 py-0.5 rounded">DEX</span>
+              <Link href="/ai-betting" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors text-base font-bold py-2 border-b border-cyan-900/20" data-testid="mobile-nav-ai-betting-main">
+                AI Betting <span className="bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-[10px] font-bold px-1.5 py-0.5 rounded">AI</span>
               </Link>
               <Link href="/bet-history" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-cyan-400 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-my-bets">My Bets</Link>
               <Link href="/revenue" onClick={() => setIsMobileMenuOpen(false)} className="text-yellow-400 hover:text-yellow-300 transition-colors text-base font-bold py-2 border-b border-cyan-900/20" data-testid="mobile-nav-revenue">Revenue</Link>
               <Link href="/staking" onClick={() => setIsMobileMenuOpen(false)} className="text-cyan-400 hover:text-cyan-300 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-staking">Staking</Link>
               <Link href="/wallet-dashboard" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-cyan-400 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-dashboard">Dashboard</Link>
               <Link href="/promotions" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-cyan-400 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-promotions">Promotions</Link>
-              <Link href="/ai-betting" onClick={() => setIsMobileMenuOpen(false)} className="text-cyan-400 hover:text-cyan-300 transition-colors text-base font-bold py-2 border-b border-cyan-900/20" data-testid="mobile-nav-ai-betting">🤖 AI Betting</Link>
+              <Link href="/trading" onClick={() => setIsMobileMenuOpen(false)} className="text-cyan-400 hover:text-cyan-300 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-trade">Trade</Link>
               <Link href="/streaming" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-cyan-400 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-streaming">Streaming</Link>
               <Link href="/leaderboard" onClick={() => setIsMobileMenuOpen(false)} className="text-yellow-400 hover:text-yellow-300 transition-colors text-base font-bold py-2 border-b border-cyan-900/20" data-testid="mobile-nav-leaderboard">Leaderboard</Link>
               <Link href="/results" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-cyan-400 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-activity">Activity</Link>
