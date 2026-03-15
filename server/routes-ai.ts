@@ -50,8 +50,16 @@ function buildRealTimeEventsContext(userMessage: string): {
     ...upcomingEvents.map(e => normalize(e, false)),
   ];
 
-  // Detect team name in user message for highlighting
+  // ── Extract team name from user message by matching against known team names ──
   const msgLower = userMessage.toLowerCase();
+  const isTeamMatch = (teamName: string): boolean => {
+    const teamLower = teamName.toLowerCase();
+    // Full team name match
+    if (msgLower.includes(teamLower)) return true;
+    // Match any significant word (4+ chars) from the team name
+    const words = teamLower.split(/\s+/).filter(w => w.length >= 4);
+    return words.some(w => msgLower.includes(w));
+  };
 
   let contextStr = '\n\n━━━ REAL-TIME MATCH DATA (fetched live right now) ━━━\n';
 
@@ -62,7 +70,7 @@ function buildRealTimeEventsContext(userMessage: string): {
     live.forEach((e, i) => {
       const scoreStr = e.score ? ` [Score: ${e.score}${e.elapsed ? ` · ${e.elapsed}'` : ''}]` : '';
       const oddsStr = e.odds?.home ? `H ${e.odds.home}${e.odds.draw ? ` | D ${e.odds.draw}` : ''} | A ${e.odds.away ?? '?'}` : 'No odds';
-      const isQueryMatch = e.homeTeam.toLowerCase().includes(msgLower.split(' ')[0]) || e.awayTeam.toLowerCase().includes(msgLower.split(' ')[0]);
+      const isQueryMatch = isTeamMatch(e.homeTeam) || isTeamMatch(e.awayTeam);
       const highlight = isQueryMatch ? ' ◀ QUERIED MATCH' : '';
       contextStr += `  ${i + 1}. ${e.homeTeam} vs ${e.awayTeam}${scoreStr} | ${e.league} | Odds: ${oddsStr}${highlight}\n`;
     });
@@ -613,7 +621,7 @@ Return ONLY valid JSON:
           model: 'gpt-4o',
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.3,
-          max_tokens: 500,
+          max_tokens: 800,
           response_format: { type: 'json_object' },
         });
         content = completion2.choices?.[0]?.message?.content || '';
