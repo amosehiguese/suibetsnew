@@ -71,7 +71,7 @@ interface AgentMessage {
 const INIT_MESSAGE: AgentMessage = {
   id: 'init',
   role: 'agent',
-  text: "Hi! I'm your AI Betting Agent — powered by GPT-4o, Groq Llama 3.3 70B, Gemini 2.5 Flash, and DeepSeek V3. I run 9 analysis modules on live real-time market data. Try the quick commands below or type anything naturally.",
+  text: "Hi! I'm your AI Betting Agent. I run 9 analysis modules on live real-time market data. Try the quick commands below or type anything naturally.",
   keyInsights: [
     "Type 'find value bets' to scan all markets for edges",
     "Type 'run all' for a complete 8-module market analysis",
@@ -1069,7 +1069,7 @@ export default function AIBettingPage() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-white">AI Betting Intelligence</h1>
-                <p className="text-cyan-300/70 text-sm">GPT-4o · Groq Llama 3.3 70B · Gemini 2.5 Flash · DeepSeek V3 • Real-time market data • 9-module analysis engine</p>
+                <p className="text-cyan-300/70 text-sm">Real-time market data • 9-module analysis engine</p>
               </div>
             </div>
             <button
@@ -1112,7 +1112,6 @@ export default function AIBettingPage() {
               <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
               <Bot className="h-4 w-4 text-cyan-400" />
               <span className="text-sm font-semibold text-cyan-300">AI Agent</span>
-              <Badge className="text-[10px] bg-cyan-500/15 text-cyan-400 border-cyan-500/30 px-1.5 py-0 ml-1">GPT-4o + Groq + DeepSeek</Badge>
               {allEvents.length > 0 && (
                 <Badge className="text-[10px] bg-green-500/15 text-green-400 border-green-500/30 px-1.5 py-0">
                   {allEvents.length} events
