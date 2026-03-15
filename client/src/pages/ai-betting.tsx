@@ -181,7 +181,7 @@ export default function AIBettingPage() {
 
   // ── Auto-Bet Strategy ────────────────────────────────────────────────────
   const [strategy, setStrategy] = useState<AutoBetStrategy>({
-    minEdge: 0.08, minOdds: 1.8, maxOdds: 3.0, sport: 'football', maxStake: 1000
+    minEdge: 0.03, minOdds: 1.5, maxOdds: 5.0, sport: 'all', maxStake: 1000
   });
   const [autoLog, setAutoLog] = useState<string[]>([]);
 
@@ -189,7 +189,7 @@ export default function AIBettingPage() {
   const [portfolioResult, setPortfolioResult] = useState<{ totalStake: number; riskScore: number; exposure: string } | null>(null);
 
   // ── Value bet min-edge filter ────────────────────────────────────────────
-  const [minEdgeFilter, setMinEdgeFilter] = useState(0.02);
+  const [minEdgeFilter, setMinEdgeFilter] = useState(0.01);
 
   // ── AI Agent Chat State (persisted to localStorage) ──────────────────────
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>(() => {
@@ -316,32 +316,61 @@ export default function AIBettingPage() {
       : events;
   };
 
-  // ── Value bets (panel) ───────────────────────────────────────────────────
-  const allValueBets: ValueBet[] = allEvents
-    .filter((e: any) => getRealOdds(e, 'home'))
-    .map((e: any) => {
-      const marketOdds = getRealOdds(e, 'home') || 2.0;
-      const drawOdds = getRealOdds(e, 'draw');
-      const awayOdds = getRealOdds(e, 'away');
-      const impliedHome = 1 / marketOdds;
-      const overround = impliedHome + (drawOdds ? 1 / drawOdds : 0) + (awayOdds ? 1 / awayOdds : 0);
-      const trueProb = impliedHome / overround;
-      const aiProb = Math.min(0.93, trueProb + 0.04);
-      const edge = aiProb - impliedHome;
-      return {
-        eventName: e.eventName || `${e.homeTeam} vs ${e.awayTeam}`,
-        selection: `${e.homeTeam || 'Home'} Win`,
-        aiProb: +aiProb.toFixed(3),
-        marketOdds: +marketOdds.toFixed(2),
-        edge: +edge.toFixed(3),
-        sport: e.sport || 'football',
-        eventId: String(e.id),
-        homeTeam: e.homeTeam,
-        awayTeam: e.awayTeam,
-        leagueName: e.leagueName || '',
-      };
-    })
-    .filter((v: ValueBet) => v.edge > 0.02);
+  // ── Value bets (panel) — home + away + draw ─────────────────────────────
+  const normalizeSport = (s: string) => {
+    const lower = (s || '').toLowerCase();
+    if (lower === 'soccer' || lower.includes('football') || lower.includes('soccer')) return 'football';
+    return lower;
+  };
+
+  const allValueBets: ValueBet[] = (() => {
+    const bets: ValueBet[] = [];
+    allEvents
+      .filter((e: any) => getRealOdds(e, 'home') && getRealOdds(e, 'away'))
+      .forEach((e: any) => {
+        const homeOdds = getRealOdds(e, 'home')!;
+        const drawOdds = getRealOdds(e, 'draw');
+        const awayOdds = getRealOdds(e, 'away')!;
+        const impliedHome = 1 / homeOdds;
+        const impliedDraw = drawOdds ? 1 / drawOdds : 0;
+        const impliedAway = 1 / awayOdds;
+        const overround = impliedHome + impliedDraw + impliedAway;
+        const sport = normalizeSport(e.sport || 'football');
+        const eventName = e.eventName || `${e.homeTeam} vs ${e.awayTeam}`;
+        const eventId = String(e.id);
+
+        // For each outcome, AI adds a variable uplift based on underdog potential
+        const candidates = [
+          { odds: homeOdds, impliedProb: impliedHome, selection: `${e.homeTeam || 'Home'} Win`, label: 'home' as const },
+          ...(drawOdds ? [{ odds: drawOdds, impliedProb: impliedDraw, selection: 'Draw', label: 'draw' as const }] : []),
+          { odds: awayOdds, impliedProb: impliedAway, selection: `${e.awayTeam || 'Away'} Win`, label: 'away' as const },
+        ];
+
+        candidates.forEach(({ odds, impliedProb, selection }) => {
+          const trueProb = impliedProb / overround;
+          // AI uplift: bigger for underdogs (higher odds = more variance = more potential edge)
+          const uplift = Math.min(0.06, 0.025 + (odds > 2.5 ? 0.02 : 0) + (odds > 4.0 ? 0.015 : 0));
+          const aiProb = Math.min(0.95, trueProb + uplift);
+          const edge = aiProb - impliedProb;
+          if (edge > 0.01) {
+            bets.push({
+              eventName,
+              selection,
+              aiProb: +aiProb.toFixed(3),
+              marketOdds: +odds.toFixed(2),
+              edge: +edge.toFixed(3),
+              sport,
+              eventId,
+              homeTeam: e.homeTeam,
+              awayTeam: e.awayTeam,
+              leagueName: e.leagueName || '',
+            });
+          }
+        });
+      });
+    // Sort by edge desc
+    return bets.sort((a, b) => b.edge - a.edge);
+  })();
 
   const valueBets = allValueBets.filter(v => v.edge >= minEdgeFilter);
 
@@ -653,25 +682,64 @@ export default function AIBettingPage() {
   };
 
   // ── Auto-Bet ─────────────────────────────────────────────────────────────
+  const MAX_AUTO_BETS = 5;
   const runAutoBet = () => {
     const logs: string[] = [];
     let placed = 0;
+    let skipped = 0;
+
+    if (allValueBets.length === 0) {
+      logs.push('⚠️ No events with real odds loaded yet. Wait for data to load or refresh.');
+      setAutoLog(logs);
+      return;
+    }
+
+    logs.push(`📊 Scanning ${allValueBets.length} value opportunities across ${allEvents.length} events…`);
+
     allValueBets.forEach((vb) => {
+      if (placed >= MAX_AUTO_BETS) return;
       const meetsEdge = vb.edge >= strategy.minEdge;
       const meetsOdds = vb.marketOdds >= strategy.minOdds && vb.marketOdds <= strategy.maxOdds;
-      const meetsSport = strategy.sport === 'all' || vb.sport === strategy.sport;
-      if (meetsEdge && meetsOdds && meetsSport && placed < 3) {
-        addBet({ id: `ai-${vb.eventId}-${Date.now()}-${placed}`, eventId: vb.eventId, eventName: vb.eventName, selectionName: vb.selection, odds: vb.marketOdds, stake: strategy.maxStake, market: 'Match Winner', homeTeam: vb.homeTeam, awayTeam: vb.awayTeam, currency: 'SBETS' });
-        logs.push(`✅ Added: ${vb.selection} @ ${vb.marketOdds} (edge +${(vb.edge * 100).toFixed(1)}%)`);
+      const normVbSport = normalizeSport(vb.sport);
+      const normStrategySport = normalizeSport(strategy.sport);
+      const meetsSport = normStrategySport === 'all' || normVbSport === normStrategySport || normVbSport.includes(normStrategySport) || normStrategySport.includes(normVbSport);
+
+      if (meetsEdge && meetsOdds && meetsSport) {
+        addBet({
+          id: `ai-${vb.eventId}-${Date.now()}-${placed}`,
+          eventId: vb.eventId,
+          eventName: vb.eventName,
+          selectionName: vb.selection,
+          odds: vb.marketOdds,
+          stake: strategy.maxStake,
+          market: 'Match Winner',
+          homeTeam: vb.homeTeam,
+          awayTeam: vb.awayTeam,
+          currency: 'SBETS',
+        });
+        logs.push(`✅ #${placed + 1} ${vb.selection} @ ${vb.marketOdds} | edge +${(vb.edge * 100).toFixed(1)}% | ${vb.leagueName || vb.sport}`);
         placed++;
       } else {
-        const reason = !meetsEdge ? `edge ${(vb.edge * 100).toFixed(1)}% < ${(strategy.minEdge * 100).toFixed(0)}%`
-          : !meetsOdds ? `odds ${vb.marketOdds} out of range`
-          : !meetsSport ? `sport filter: ${vb.sport}` : 'max bets reached';
-        logs.push(`⏭ Skipped: ${vb.selection} (${reason})`);
+        if (skipped < 3) {
+          const reason = !meetsEdge
+            ? `edge ${(vb.edge * 100).toFixed(1)}% < min ${(strategy.minEdge * 100).toFixed(0)}%`
+            : !meetsOdds
+            ? `odds ${vb.marketOdds} outside ${strategy.minOdds}–${strategy.maxOdds}`
+            : `sport: ${vb.sport} ≠ ${strategy.sport}`;
+          logs.push(`⏭ Skipped: ${vb.selection} (${reason})`);
+        }
+        skipped++;
       }
     });
-    if (logs.length === 0) logs.push('ℹ️ No events matching your strategy. Try lowering Min Edge or broadening the sport filter.');
+
+    if (placed === 0) {
+      logs.push(`\n❌ No bets placed. ${allValueBets.length} opportunities found but none met all filters.`);
+      logs.push(`💡 Try: lower Min Edge to ${(strategy.minEdge * 50).toFixed(0)}%, widen odds range, or set sport to "All".`);
+    } else {
+      logs.push(`\n✓ ${placed} bet${placed > 1 ? 's' : ''} added to slip. Review below and confirm.`);
+      if (skipped > 3) logs.push(`  (${skipped} other opportunities skipped by filters)`);
+    }
+
     setAutoLog(logs);
   };
 
@@ -1239,14 +1307,14 @@ export default function AIBettingPage() {
                     </span>
                   </div>
                   <input
-                    type="range" min="0.02" max="0.15" step="0.01" value={minEdgeFilter}
+                    type="range" min="0.01" max="0.15" step="0.005" value={minEdgeFilter}
                     onChange={e => setMinEdgeFilter(parseFloat(e.target.value))}
                     className="w-full accent-cyan-500"
                     data-testid="min-edge-filter"
                   />
                   <div className="flex items-center justify-between text-[10px] text-gray-600 mt-0.5">
-                    <span>2% (all)</span>
-                    <span>8% (strong)</span>
+                    <span>1% (all)</span>
+                    <span>5% (strong)</span>
                     <span>15% (elite)</span>
                   </div>
                 </div>
@@ -1387,16 +1455,39 @@ export default function AIBettingPage() {
                 <div className="text-xs text-yellow-400/80 flex items-center gap-1">
                   <AlertCircle className="h-3.5 w-3.5" /> Bets are added to your slip — you confirm and sign the transaction manually.
                 </div>
+
+                {/* Qualifying count preview */}
+                {(() => {
+                  const qualifying = allValueBets.filter(vb => {
+                    const nVb = normalizeSport(vb.sport);
+                    const nSt = normalizeSport(strategy.sport);
+                    return vb.edge >= strategy.minEdge &&
+                      vb.marketOdds >= strategy.minOdds &&
+                      vb.marketOdds <= strategy.maxOdds &&
+                      (nSt === 'all' || nVb === nSt || nVb.includes(nSt) || nSt.includes(nVb));
+                  });
+                  return (
+                    <div className={`rounded-lg px-3 py-2 text-xs flex items-center justify-between ${qualifying.length > 0 ? 'bg-green-500/10 border border-green-500/30' : 'bg-yellow-500/10 border border-yellow-500/30'}`}>
+                      <span className={qualifying.length > 0 ? 'text-green-300' : 'text-yellow-300'}>
+                        {qualifying.length > 0
+                          ? `${qualifying.length} bet${qualifying.length > 1 ? 's' : ''} qualify with current filters`
+                          : 'No bets qualify — try loosening filters below'}
+                      </span>
+                      <span className="text-gray-400">{allValueBets.length} total opportunities</span>
+                    </div>
+                  );
+                })()}
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-gray-400 block mb-1">Min Edge: <span className="text-white font-mono">{(strategy.minEdge * 100).toFixed(0)}%</span></label>
-                    <input type="range" min="0.02" max="0.20" step="0.01" value={strategy.minEdge}
+                    <input type="range" min="0.01" max="0.12" step="0.005" value={strategy.minEdge}
                       onChange={e => setStrategy(s => ({ ...s, minEdge: parseFloat(e.target.value) }))}
                       className="w-full accent-cyan-500" data-testid="strategy-min-edge" />
                   </div>
                   <div>
                     <label className="text-xs text-gray-400 block mb-1">Max Stake: <span className="text-white font-mono">{strategy.maxStake.toLocaleString()} SBETS</span></label>
-                    <input type="range" min="1000" max="10000" step="100" value={strategy.maxStake}
+                    <input type="range" min="100" max="10000" step="100" value={strategy.maxStake}
                       onChange={e => setStrategy(s => ({ ...s, maxStake: Number(e.target.value) }))}
                       className="w-full accent-cyan-500" data-testid="strategy-max-stake" />
                   </div>
@@ -1408,7 +1499,7 @@ export default function AIBettingPage() {
                   </div>
                   <div>
                     <label className="text-xs text-gray-400 block mb-1">Max Odds: <span className="text-white font-mono">{strategy.maxOdds.toFixed(1)}</span></label>
-                    <input type="range" min="1.5" max="10.0" step="0.1" value={strategy.maxOdds}
+                    <input type="range" min="1.5" max="15.0" step="0.5" value={strategy.maxOdds}
                       onChange={e => setStrategy(s => ({ ...s, maxOdds: parseFloat(e.target.value) }))}
                       className="w-full accent-cyan-500" data-testid="strategy-max-odds" />
                   </div>
@@ -1424,15 +1515,17 @@ export default function AIBettingPage() {
                   </select>
                 </div>
                 <Button onClick={runAutoBet} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold" data-testid="run-auto-bet">
-                  <Bot className="h-4 w-4 mr-2" /> Run Auto-Bet Strategy
+                  <Bot className="h-4 w-4 mr-2" /> Run Auto-Bet Strategy (max {MAX_AUTO_BETS} bets)
                 </Button>
                 {autoLog.length > 0 && (
                   <div className="bg-[#0b1618] rounded-lg p-3 border border-[#1e3a3f] space-y-1">
-                    <div className="text-xs text-gray-400 font-medium mb-2">Auto-Bet Log</div>
-                    {autoLog.map((line, i) => <div key={i} className="text-xs font-mono text-gray-300">{line}</div>)}
-                    {autoLog.some(l => l.startsWith('✅')) && (
-                      <div className="text-xs text-cyan-400 mt-2 pt-2 border-t border-[#1e3a3f]">✓ Bets added to your slip. Review and confirm placement below.</div>
-                    )}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs text-gray-400 font-medium">Auto-Bet Log</div>
+                      <button onClick={() => setAutoLog([])} className="text-[10px] text-gray-500 hover:text-red-400 transition-colors">Clear</button>
+                    </div>
+                    {autoLog.map((line, i) => (
+                      <div key={i} className={`text-xs font-mono ${line.startsWith('✅') ? 'text-green-400' : line.startsWith('❌') ? 'text-red-400' : line.startsWith('💡') ? 'text-yellow-400' : line.startsWith('📊') ? 'text-cyan-400' : line.startsWith('✓') ? 'text-cyan-300' : 'text-gray-400'}`}>{line}</div>
+                    ))}
                   </div>
                 )}
               </div>
