@@ -225,16 +225,27 @@ INTENT MAPPING (strict):
 "portfolio" / "risk" / "exposure" / "my bets" → portfolio
 "run all" / "everything" / "full scan" / "comprehensive" → run_all
 "add to bet slip" / "add to my slip" / "put on my slip" / "add to betslip" / "add X to betslip" → add_to_betslip
+"next sport" / "next game" / "next match" / "next event" → marketplace (list upcoming events with odds)
+"what is next" / "what to bet" / "what can I bet" / "what's available" / "what sports" / "sport to bet" / "sport in dapp" / "upcoming" / "coming up" / "show me games" / "what games" / "what matches" / "what events" → marketplace (list ALL upcoming matches from data with real odds)
 specific team/match question + no clear action → predictions (with real odds from context)
 general question → chat (but always reference real data)
+
+SPECIAL RULE — "NEXT/UPCOMING" QUESTIONS:
+If the user asks anything like "what is next sport in dapp", "what to bet", "what's available", "next game", "upcoming matches", "what can I bet on":
+- action: "marketplace"
+- List ALL upcoming events from the UPCOMING section of the data (not just 1)
+- Format: "⏳ [HomeTeam] vs [AwayTeam] — [League] | H: [homeOdds] D: [drawOdds] A: [awayOdds]"
+- List at least 5 upcoming events
+- If there are also LIVE matches, mention those FIRST
+- NEVER say you don't know — the data is RIGHT THERE in the context above
 
 TEAM DETECTION: Find the queried team/league in the ⭐ QUERIED MATCHES section and return "team" in params with the exact team name as it appears in the data.
 
 Return ONLY valid JSON, no markdown, no code blocks:
 {
   "action": "<action_name>",
-  "message": "<3-5 sentence expert response referencing EXACT real-time data — use teams/scores/odds from ⭐ QUERIED MATCHES section first>",
-  "keyInsights": ["<specific insight with real numbers>", "<specific insight>", "<specific insight>"],
+  "message": "<For MARKETPLACE/upcoming queries: start with any LIVE matches, then list at least 5 UPCOMING events from the data with real odds in format 'HomeTeam vs AwayTeam (League) H:X.XX D:X.XX A:X.XX'. For other queries: 3-5 sentence expert response referencing EXACT real-time data — use teams/scores/odds from ⭐ QUERIED MATCHES section first>",
+  "keyInsights": ["<specific insight with real numbers from the data>", "<specific insight>", "<specific insight>"],
   "params": {
     "sport": "<football|basketball|tennis|baseball|hockey|mma|all>",
     "team": "<exact team name from data or null>",
@@ -384,7 +395,10 @@ Return ONLY valid JSON, no markdown, no code blocks:
       parsed = buildSmartFallback(message, {
         liveEventCount: liveCount,
         upcomingEventCount: upcomingCount,
-        topEvents: rtEvents.slice(0, 20) as any,
+        topEvents: [
+          ...rtEvents.filter(e => e.isLive).slice(0, 10),
+          ...rtEvents.filter(e => !e.isLive).slice(0, 40),
+        ] as any,
         featuredOverride: featuredEvent as any,
       });
 
@@ -743,14 +757,16 @@ function buildSmartFallback(message: string, context?: AgentContext): any {
   if (/add.*(to|on).*(bet.?slip|slip|betslip)|put.*(on|to).*(bet.?slip|slip)|add.*bet.?slip/.test(lower)) action = 'add_to_betslip';
   else if (/run all|full scan|all module|do everything|comprehens|complete scan/.test(lower) || (lower.includes('everything') && lower.includes('run'))) action = 'run_all';
   else if (/\barb\b|arbitrage|risk.free|guaranteed|no.risk|lock profit/.test(lower)) action = 'arbitrage';
-  else if (/value|edge|good bet|what should|any tip|best value|find bet/.test(lower)) action = 'value_bets';
   else if (/simulat|monte.carlo|run sim|how likely/.test(lower)) action = 'monte_carlo';
   else if (/movement|sharp money|steam|line move|odds change|insider/.test(lower)) action = 'odds_movement';
   else if (/\blive\b|in.play|live signal|live bet/.test(lower) && !/\bdeliver\b|\believe\b/.test(lower)) action = 'live_signals';
   else if (/predict|who wins|who will|forecast|who should i bet|preview/.test(lower)) action = 'predictions';
-  else if (/top pick|best bet|market place|ranking|\brank\b|top bet/.test(lower)) action = 'marketplace';
   else if (/portfolio|exposure|how much at risk|my bets|balance|kelly stake/.test(lower)) action = 'portfolio';
   else if (/probability|chance|simulate|simulation/.test(lower)) action = 'monte_carlo';
+  // "next/upcoming/what to bet" queries — route to marketplace to show ranked real events
+  else if (/next.*(sport|bet|game|match|event)|what.*(next|upcoming|sport|game|match|available|can i bet|should i bet|to bet)|upcoming.*(sport|game|bet|match)|sport.*(to bet|in dapp|available|on dapp|coming|up next)|games.*(to bet|available|coming)|what('s| is).*(on|available|up|happening)|show.*(sport|event|game|match)|list.*(sport|event|game|match)|available.*(bet|market|event|sport)|coming up|what.*bet.*today|today.*bet|tonight.*bet/.test(lower)) action = 'marketplace';
+  else if (/value|edge|good bet|any tip|best value|find bet/.test(lower)) action = 'value_bets';
+  else if (/top pick|best bet|market place|ranking|\brank\b|top bet/.test(lower)) action = 'marketplace';
 
   // Detect sport
   let sport = 'football';
@@ -828,12 +844,28 @@ function buildSmartFallback(message: string, context?: AgentContext): any {
       ],
     },
     marketplace: {
-      message: `Ranking today's ${liveCount + upcomingCount} markets by composite AI score. ${featured ? `Featured: ${featuredStr} ${oddsStr}.` : ''} Bets are sorted by edge size × confidence — highest scoring opportunities shown first.`,
-      insights: [
-        'Score = (true_prob / implied_prob - 1) × confidence',
-        `${liveCount} live + ${upcomingCount} upcoming events ranked`,
-        'Top 5 bets shown with stake allocation and expected value',
-      ],
+      message: (() => {
+        const upcomingList = events.filter(e => !e.isLive).slice(0, 5);
+        const liveList = events.filter(e => e.isLive).slice(0, 3);
+        let msg = '';
+        if (liveList.length > 0) {
+          msg += `🔴 ${liveList.length} match${liveList.length > 1 ? 'es' : ''} LIVE right now: ${liveList.map(e => `${e.homeTeam} vs ${e.awayTeam}${e.odds?.home ? ` @ ${e.odds.home}` : ''}`).join(' | ')}. `;
+        }
+        if (upcomingList.length > 0) {
+          msg += `⏳ Next up: ${upcomingList.map(e => `${e.homeTeam} vs ${e.awayTeam}${e.odds?.home ? ` (${e.odds.home}/${e.odds.draw ?? '-'}/${e.odds.away ?? '?'})` : ''}`).join(' | ')}. `;
+        }
+        if (!msg) msg = `${liveCount + upcomingCount} markets loaded. `;
+        msg += `All ranked below by composite AI score — highest edge opportunities first.`;
+        return msg;
+      })(),
+      insights: (() => {
+        const upNext = events.filter(e => !e.isLive).slice(0, 3);
+        return [
+          `${liveCount} live + ${upcomingCount} upcoming events available to bet`,
+          upNext.length > 0 ? `Next: ${upNext[0].homeTeam} vs ${upNext[0].awayTeam}${upNext[0].odds?.home ? ` — odds H:${upNext[0].odds.home} D:${upNext[0].odds.draw} A:${upNext[0].odds.away}` : ''}` : 'Events ranked by edge × confidence',
+          upNext.length > 1 ? `Also: ${upNext[1].homeTeam} vs ${upNext[1].awayTeam}${upNext[1].odds?.home ? ` — odds H:${upNext[1].odds.home} D:${upNext[1].odds.draw} A:${upNext[1].odds.away}` : ''}` : 'Top 5 bets shown with expected value',
+        ];
+      })(),
     },
     portfolio: {
       message: `Analysing your active bet portfolio. Current slip has ${context?.betSlipCount ?? 0} selections. Showing total exposure, Kelly-optimal stake per bet, and diversification score across markets.`,
@@ -852,12 +884,27 @@ function buildSmartFallback(message: string, context?: AgentContext): any {
       ],
     },
     chat: {
-      message: `I'm SuiBets AI — your real-time sports betting intelligence assistant. I have ${liveCount + upcomingCount} live & upcoming events loaded with real bookmaker odds. Ask me to find value bets, run simulations, scan for arbitrage, analyse odds movement, or get live signals.`,
-      insights: [
-        `${liveCount} live events + ${upcomingCount} upcoming events ready to analyse`,
-        'Try: "Find value bets", "Run Monte Carlo on Man City", "Show arbitrage", "Run all"',
-        'All analysis uses real bookmaker odds — zero mock data',
-      ],
+      message: (() => {
+        const liveList = events.filter(e => e.isLive).slice(0, 3);
+        const upcomingList = events.filter(e => !e.isLive).slice(0, 5);
+        let msg = `I'm SuiBets AI with ${liveCount + upcomingCount} real events loaded right now. `;
+        if (liveList.length > 0) {
+          msg += `🔴 Live: ${liveList.map(e => `${e.homeTeam} vs ${e.awayTeam}${e.odds?.home ? ` (H:${e.odds.home} A:${e.odds.away})` : ''}`).join(' | ')}. `;
+        }
+        if (upcomingList.length > 0) {
+          msg += `⏳ Up next: ${upcomingList.map(e => `${e.homeTeam} vs ${e.awayTeam}${e.odds?.home ? ` (H:${e.odds.home} A:${e.odds.away})` : ''}`).join(' | ')}. `;
+        }
+        msg += `Ask me anything — "find value bets", "run all modules", "predict [team]", or "show arbitrage".`;
+        return msg;
+      })(),
+      insights: (() => {
+        const upNext = events.filter(e => !e.isLive).slice(0, 2);
+        return [
+          `${liveCount} live + ${upcomingCount} upcoming events with real bookmaker odds`,
+          upNext[0] ? `Next: ${upNext[0].homeTeam} vs ${upNext[0].awayTeam}${upNext[0].odds?.home ? ` | H:${upNext[0].odds.home} D:${upNext[0].odds.draw} A:${upNext[0].odds.away}` : ''}` : 'Try: "Find value bets", "Run Monte Carlo", "Show arbitrage"',
+          upNext[1] ? `Also: ${upNext[1].homeTeam} vs ${upNext[1].awayTeam}${upNext[1].odds?.home ? ` | H:${upNext[1].odds.home} D:${upNext[1].odds.draw} A:${upNext[1].odds.away}` : ''}` : 'Zero mock data — all analysis from live feeds',
+        ];
+      })(),
     },
   };
 
