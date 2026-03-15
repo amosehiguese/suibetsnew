@@ -1044,7 +1044,6 @@ export default function AIBettingPage() {
                 { label: 'Live Sports APIs', status: `${(liveEvents as any[]).length} live events`, icon: <Network className="h-4 w-4" />, color: 'green' },
                 { label: 'Odds Providers', status: `${allEvents.filter((e: any) => getRealOdds(e, 'home')).length} markets loaded`, icon: <BarChart3 className="h-4 w-4" />, color: 'blue' },
                 { label: 'Value Bet Scanner', status: `${valueBets.length} edges found`, icon: <Target className="h-4 w-4" />, color: 'purple' },
-                { label: 'AI Model', status: 'GPT-4o · Active', icon: <Brain className="h-4 w-4" />, color: 'yellow' },
               ].map((source, i) => (
                 <div key={i} className="flex items-center gap-3 bg-[#0b1618] rounded-lg p-3 border border-[#1e3a3f]">
                   <div className={`text-${source.color}-400`}>{source.icon}</div>
