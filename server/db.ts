@@ -138,6 +138,8 @@ async function seedSports() {
         { name: 'Horse Racing', slug: 'horse-racing', icon: '🏇', wurlusSportId: 'horse_racing_wurlus_id', isActive: true, providerId: 'sports_provider_1' },
         { name: 'Cricket', slug: 'cricket', icon: '🏏', wurlusSportId: 'cricket_wurlus_id', isActive: true, providerId: 'sports_provider_1' },
         { name: 'Boxing', slug: 'boxing', icon: '🥊', wurlusSportId: 'boxing_wurlus_id', isActive: true, providerId: 'sports_provider_1' },
+        { name: 'Chess', slug: 'chess', icon: '♟️', wurlusSportId: 'chess_wurlus_id', isActive: true, providerId: 'sports_provider_1' },
+        { name: 'Armwrestling', slug: 'armwrestling', icon: '💪', wurlusSportId: 'armwrestling_wurlus_id', isActive: true, providerId: 'sports_provider_1' },
       ].filter(s => !existingSlugs.has(s.slug));
       if (missingSports.length > 0) {
         await db.insert(schema.sports).values(missingSports);
@@ -284,6 +286,22 @@ async function seedSports() {
         slug: 'horse-racing',
         icon: '🏇',
         wurlusSportId: 'horse_racing_wurlus_id',
+        isActive: true,
+        providerId: 'sports_provider_1'
+      },
+      {
+        name: 'Chess',
+        slug: 'chess',
+        icon: '♟️',
+        wurlusSportId: 'chess_wurlus_id',
+        isActive: true,
+        providerId: 'sports_provider_1'
+      },
+      {
+        name: 'Armwrestling',
+        slug: 'armwrestling',
+        icon: '💪',
+        wurlusSportId: 'armwrestling_wurlus_id',
         isActive: true,
         providerId: 'sports_provider_1'
       }

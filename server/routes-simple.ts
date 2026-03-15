@@ -2213,7 +2213,8 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       // FAST PATH: Free sports (non-football, non-esports) - return from daily cache
       // IDs match DB sport table: 2=Basketball,3=Tennis,4=Baseball,5=Baseball,6=Ice Hockey,
       // 7=MMA,8=Boxing,9=Esports,10=AFL,11=Formula 1,12=Handball,13=NBA,14=NFL,15=Rugby,16=Volleyball,17=Horse Racing
-      const FREE_SPORT_IDS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+      // 18=Cricket,19=MotoGP,20=WWE,21=Darts,22=Snooker,23=Table Tennis,24=Water Polo,25=Badminton,26=Chess,27=Armwrestling
+      const FREE_SPORT_IDS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27];
       if (reqSportId && FREE_SPORT_IDS.includes(reqSportId)) {
         const freeSportsEvents = freeSportsService.getUpcomingEvents();
         const now = Date.now();
