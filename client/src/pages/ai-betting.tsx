@@ -181,7 +181,7 @@ export default function AIBettingPage() {
 
   // ── Auto-Bet Strategy ────────────────────────────────────────────────────
   const [strategy, setStrategy] = useState<AutoBetStrategy>({
-    minEdge: 0.03, minOdds: 1.5, maxOdds: 5.0, sport: 'all', maxStake: 1000
+    minEdge: 0.03, minOdds: 1.5, maxOdds: 5.0, sport: 'all', maxStake: 100000
   });
   const [autoLog, setAutoLog] = useState<string[]>([]);
 
@@ -357,7 +357,34 @@ export default function AIBettingPage() {
   const normalizeSport = (s: string) => {
     const lower = (s || '').toLowerCase();
     if (lower === 'soccer' || lower.includes('football') || lower.includes('soccer')) return 'football';
+    if (lower.includes('formula') || lower.includes('f1') || lower.includes('motorsport') || lower.includes('grand prix') || lower.includes('nascar') || lower.includes('indycar')) return 'motorsport';
+    if (lower.includes('basketball') || lower.includes('nba') || lower.includes('euroleague')) return 'basketball';
+    if (lower.includes('tennis') || lower.includes('atp') || lower.includes('wta')) return 'tennis';
+    if (lower.includes('baseball') || lower.includes('mlb')) return 'baseball';
+    if (lower.includes('hockey') || lower.includes('nhl') || lower.includes('ice hockey')) return 'hockey';
+    if (lower.includes('mma') || lower.includes('ufc') || lower.includes('boxing')) return 'mma';
+    if (lower.includes('rugby')) return 'rugby';
+    if (lower.includes('cricket')) return 'cricket';
+    if (lower.includes('volleyball')) return 'volleyball';
+    if (lower.includes('handball')) return 'handball';
     return lower;
+  };
+
+  const detectEventSport = (e: any): string => {
+    if (e.sport) return normalizeSport(e.sport);
+    const league = (e.leagueName || '').toLowerCase();
+    const name = (e.eventName || `${e.homeTeam || ''} vs ${e.awayTeam || ''}`).toLowerCase();
+    const combined = league + ' ' + name;
+    if (combined.includes('formula') || combined.includes('grand prix') || combined.includes('f1') || combined.includes('nascar') || combined.includes('motorsport')) return 'motorsport';
+    if (combined.includes('basketball') || combined.includes('nba') || combined.includes('euroleague')) return 'basketball';
+    if (combined.includes('tennis') || combined.includes('atp') || combined.includes('wta') || combined.includes('wimbledon') || combined.includes('open')) return 'tennis';
+    if (combined.includes('baseball') || combined.includes('mlb')) return 'baseball';
+    if (combined.includes('hockey') || combined.includes('nhl')) return 'hockey';
+    if (combined.includes('mma') || combined.includes('ufc') || combined.includes('boxing')) return 'mma';
+    if (combined.includes('rugby')) return 'rugby';
+    if (combined.includes('cricket')) return 'cricket';
+    if (combined.includes('premier') || combined.includes('bundesliga') || combined.includes('serie a') || combined.includes('la liga') || combined.includes('ligue 1') || combined.includes('champions league') || combined.includes('europa') || combined.includes('copa') || combined.includes('fa cup') || combined.includes('mls') || combined.includes('eredivisie') || combined.includes('soccer') || combined.includes('football')) return 'football';
+    return 'unknown';
   };
 
   const allValueBets: ValueBet[] = (() => {
@@ -372,7 +399,7 @@ export default function AIBettingPage() {
         const impliedDraw = drawOdds ? 1 / drawOdds : 0;
         const impliedAway = 1 / awayOdds;
         const overround = impliedHome + impliedDraw + impliedAway;
-        const sport = normalizeSport(e.sport || 'football');
+        const sport = detectEventSport(e);
         const eventName = e.eventName || `${e.homeTeam} vs ${e.awayTeam}`;
         const eventId = String(e.id);
 
@@ -585,7 +612,7 @@ export default function AIBettingPage() {
               homeTeam: e.homeTeam, awayTeam: e.awayTeam, leagueName: e.leagueName || '',
               selection,
               aiProb: +aiProb.toFixed(3), marketOdds: +odds.toFixed(2), edge: +edge.toFixed(3),
-              sport: e.sport || 'football',
+              sport: detectEventSport(e),
             });
           }
         });
@@ -603,7 +630,7 @@ export default function AIBettingPage() {
             homeTeam: e.homeTeam, awayTeam: e.awayTeam, leagueName: e.leagueName || '',
             selection: e.homeTeam || 'Home Win',
             aiProb: +aiProb.toFixed(3), marketOdds: +homeOdds.toFixed(2), edge: 0.03,
-            sport: e.sport || 'football',
+            sport: detectEventSport(e),
           });
         });
       }
@@ -637,7 +664,7 @@ export default function AIBettingPage() {
               homeTeam: e.homeTeam, awayTeam: e.awayTeam, leagueName: e.leagueName || '',
               selection,
               aiProb: +aiProb.toFixed(3), marketOdds: +odds.toFixed(2), edge: +edge.toFixed(3),
-              sport: e.sport || 'football', moduleType: 'value_bets',
+              sport: detectEventSport(e), moduleType: 'value_bets',
             });
           }
         });
@@ -1785,7 +1812,7 @@ export default function AIBettingPage() {
                   </div>
                   <div>
                     <label className="text-xs text-gray-400 block mb-1">Max Stake: <span className="text-white font-mono">{strategy.maxStake.toLocaleString()} SBETS</span></label>
-                    <input type="range" min="100" max="10000" step="100" value={strategy.maxStake}
+                    <input type="range" min="1000" max="100000" step="1000" value={strategy.maxStake}
                       onChange={e => setStrategy(s => ({ ...s, maxStake: Number(e.target.value) }))}
                       className="w-full accent-cyan-500" data-testid="strategy-max-stake" />
                   </div>
@@ -1807,7 +1834,7 @@ export default function AIBettingPage() {
                   <select value={strategy.sport} onChange={e => setStrategy(s => ({ ...s, sport: e.target.value }))}
                     className="w-full bg-[#0b1618] border border-[#1e3a3f] text-white text-sm rounded-lg px-3 py-2"
                     data-testid="strategy-sport">
-                    {['all', 'football', 'basketball', 'tennis', 'baseball', 'hockey', 'mma'].map(sp => (
+                    {['all', 'football', 'basketball', 'tennis', 'baseball', 'hockey', 'mma', 'motorsport', 'rugby', 'cricket'].map(sp => (
                       <option key={sp} value={sp}>{sp.charAt(0).toUpperCase() + sp.slice(1)}</option>
                     ))}
                   </select>
