@@ -2,14 +2,34 @@ import { Router, Request, Response } from 'express';
 import OpenAI from 'openai';
 import { getLiveSnapshot, getUpcomingSnapshot } from './services/apiSportsService';
 
-// Resolve the OpenAI API key from multiple possible env var names
+// Resolve API keys
 const resolveOpenAIKey = () =>
   process.env.AI_INTEGRATIONS_OPENAI_API_KEY ||
   process.env.OPENAI_API_KEY ||
   process.env.OPEN_AI_API_KEY ||
   '';
 
+const resolveGroqKey = () =>
+  process.env.GROQ_API_KEY || '';
+
+const resolveGeminiKey = () =>
+  process.env.AI_INTEGRATIONS_GEMINI_API_KEY ||
+  process.env.GEMINI_API_KEY || '';
+
+const resolveDeepSeekKey = () =>
+  process.env.DEEPSEEK_API_KEY || '';
+
 const getOpenAIClient = () => new OpenAI({ apiKey: resolveOpenAIKey() });
+
+const getGroqClient = () => new OpenAI({
+  apiKey: resolveGroqKey(),
+  baseURL: 'https://api.groq.com/openai/v1',
+});
+
+const getDeepSeekClient = () => new OpenAI({
+  apiKey: resolveDeepSeekKey(),
+  baseURL: 'https://api.deepseek.com/v1',
+});
 
 const router = Router();
 
@@ -19,6 +39,7 @@ function buildRealTimeEventsContext(userMessage: string): {
   liveCount: number;
   upcomingCount: number;
   allEvents: Array<{ homeTeam: string; awayTeam: string; league: string; sport: string; odds: any; isLive: boolean; score: string; elapsed?: number }>;
+  matchedEvents: Array<{ homeTeam: string; awayTeam: string; league: string; sport: string; odds: any; isLive: boolean; score: string; elapsed?: number }>;
 } {
   const liveSnap = getLiveSnapshot();
   const upcomingSnap = getUpcomingSnapshot();
@@ -50,41 +71,93 @@ function buildRealTimeEventsContext(userMessage: string): {
     ...upcomingEvents.map(e => normalize(e, false)),
   ];
 
-  // ── Extract team name from user message by matching against known team names ──
   const msgLower = userMessage.toLowerCase();
+
+  // ── Smart matching: team name AND league/keyword matching ──────────────────
   const isTeamMatch = (teamName: string): boolean => {
+    if (!teamName) return false;
     const teamLower = teamName.toLowerCase();
-    // Full team name match
     if (msgLower.includes(teamLower)) return true;
-    // Match any significant word (4+ chars) from the team name
     const words = teamLower.split(/\s+/).filter(w => w.length >= 4);
     return words.some(w => msgLower.includes(w));
   };
 
+  const isLeagueMatch = (leagueName: string): boolean => {
+    if (!leagueName) return false;
+    const leagueLower = leagueName.toLowerCase();
+    // Direct league name match
+    if (msgLower.includes(leagueLower)) return true;
+    // League keyword mappings
+    const leagueKeywords: Record<string, string[]> = {
+      'la liga': ['la liga', 'spain', 'spanish league', 'laliga'],
+      'serie a': ['serie a', 'italy', 'italian league', 'milan', 'roma', 'lazio', 'juventus', 'inter', 'napoli'],
+      'premier league': ['premier league', 'english', 'epl', 'england'],
+      'bundesliga': ['bundesliga', 'germany', 'german', 'bundesliga'],
+      'ligue 1': ['ligue 1', 'france', 'french league', 'psg'],
+      'champions league': ['champions league', 'ucl', 'cl'],
+      'world cup': ['world cup', 'wc'],
+      'serie a women': ['italy w', 'italian women', 'women'],
+    };
+    for (const [key, keywords] of Object.entries(leagueKeywords)) {
+      if (leagueLower.includes(key) && keywords.some(kw => msgLower.includes(kw))) return true;
+    }
+    const words = leagueLower.split(/\s+/).filter(w => w.length >= 5);
+    return words.some(w => msgLower.includes(w));
+  };
+
+  // Find events that match the user's query (team OR league)
+  const matchedEvents = allEvents.filter(e =>
+    isTeamMatch(e.homeTeam) ||
+    isTeamMatch(e.awayTeam) ||
+    isLeagueMatch(e.league)
+  );
+
+  // Exclude women's/reserve matches unless query explicitly mentions them
+  const isWomenQuery = /\bwomen\b|\bwomens\b|\bfeminine\b|\bw\b/.test(msgLower);
+  const filteredMatched = matchedEvents.filter(e => {
+    const leagueLower = e.league.toLowerCase();
+    const isWomensLeague = /women|feminine|\bw\b|ladies/.test(leagueLower);
+    return isWomenQuery || !isWomensLeague;
+  });
+
+  const finalMatched = filteredMatched.length > 0 ? filteredMatched : matchedEvents;
+
   let contextStr = '\n\n━━━ REAL-TIME MATCH DATA (fetched live right now) ━━━\n';
 
-  // Live matches first with scores
-  const live = allEvents.filter(e => e.isLive);
-  if (live.length > 0) {
-    contextStr += `\n🔴 LIVE RIGHT NOW (${live.length} matches):\n`;
-    live.forEach((e, i) => {
+  // ── Matched events section (pinned to top for focused queries) ─────────────
+  if (finalMatched.length > 0) {
+    contextStr += `\n⭐ QUERIED MATCHES (best matches for this query):\n`;
+    finalMatched.slice(0, 15).forEach((e, i) => {
       const scoreStr = e.score ? ` [Score: ${e.score}${e.elapsed ? ` · ${e.elapsed}'` : ''}]` : '';
       const oddsStr = e.odds?.home ? `H ${e.odds.home}${e.odds.draw ? ` | D ${e.odds.draw}` : ''} | A ${e.odds.away ?? '?'}` : 'No odds';
-      const isQueryMatch = isTeamMatch(e.homeTeam) || isTeamMatch(e.awayTeam);
-      const highlight = isQueryMatch ? ' ◀ QUERIED MATCH' : '';
-      contextStr += `  ${i + 1}. ${e.homeTeam} vs ${e.awayTeam}${scoreStr} | ${e.league} | Odds: ${oddsStr}${highlight}\n`;
+      const liveTag = e.isLive ? ' 🔴 LIVE' : ' ⏳ Upcoming';
+      contextStr += `  ${i + 1}. ${e.homeTeam} vs ${e.awayTeam}${scoreStr}${liveTag} | ${e.league} | Odds: ${oddsStr}\n`;
     });
+    if (finalMatched.length > 15) contextStr += `  ... and ${finalMatched.length - 15} more matching events\n`;
+    contextStr += '\n';
   }
 
-  // Upcoming matches
+  // ── All live matches ────────────────────────────────────────────────────────
+  const live = allEvents.filter(e => e.isLive);
+  if (live.length > 0) {
+    contextStr += `🔴 LIVE RIGHT NOW (${live.length} matches):\n`;
+    live.slice(0, 30).forEach((e, i) => {
+      const scoreStr = e.score ? ` [Score: ${e.score}${e.elapsed ? ` · ${e.elapsed}'` : ''}]` : '';
+      const oddsStr = e.odds?.home ? `H ${e.odds.home}${e.odds.draw ? ` | D ${e.odds.draw}` : ''} | A ${e.odds.away ?? '?'}` : 'No odds';
+      contextStr += `  ${i + 1}. ${e.homeTeam} vs ${e.awayTeam}${scoreStr} | ${e.league} | Odds: ${oddsStr}\n`;
+    });
+    if (live.length > 30) contextStr += `  ... and ${live.length - 30} more live\n`;
+  }
+
+  // ── Upcoming matches ────────────────────────────────────────────────────────
   const upcoming = allEvents.filter(e => !e.isLive);
   if (upcoming.length > 0) {
     contextStr += `\n⏳ UPCOMING (${upcoming.length} matches):\n`;
-    upcoming.slice(0, 30).forEach((e, i) => {
+    upcoming.slice(0, 40).forEach((e, i) => {
       const oddsStr = e.odds?.home ? `H ${e.odds.home}${e.odds.draw ? ` | D ${e.odds.draw}` : ''} | A ${e.odds.away ?? '?'}` : 'No odds';
       contextStr += `  ${i + 1}. ${e.homeTeam} vs ${e.awayTeam} | ${e.league} | Odds: ${oddsStr}\n`;
     });
-    if (upcoming.length > 30) contextStr += `  ... and ${upcoming.length - 30} more upcoming matches\n`;
+    if (upcoming.length > 40) contextStr += `  ... and ${upcoming.length - 40} more upcoming matches\n`;
   }
 
   if (allEvents.length === 0) {
@@ -93,20 +166,262 @@ function buildRealTimeEventsContext(userMessage: string): {
 
   contextStr += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
 
-  return { contextStr, liveCount: live.length, upcomingCount: upcoming.length, allEvents };
+  return { contextStr, liveCount: live.length, upcomingCount: upcoming.length, allEvents, matchedEvents: finalMatched };
 }
 
-// AI Betting Suggestion endpoint with provider selection
+// ── AI Agent Endpoint ─────────────────────────────────────────────────────────
+router.post('/api/ai/agent', async (req: Request, res: Response) => {
+  try {
+    const { message, context, history } = req.body as {
+      message: string;
+      context?: { betSlipCount?: number };
+      history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+    };
+
+    // ── Fetch REAL-TIME data from server-side snapshots ────────────────────
+    const { contextStr: realTimeContext, liveCount, upcomingCount, allEvents: rtEvents, matchedEvents } = buildRealTimeEventsContext(message || '');
+
+    const systemPrompt = `You are SuiBets AI Agent — an advanced sports betting intelligence system with 100% REAL-TIME data access. You have live match scores, current odds, and all upcoming fixtures fetched RIGHT NOW from our sports data feed. Never say you don't have real-time data — you DO.
+
+TODAY'S LIVE DATA (as of this moment):
+- Live matches in progress: ${liveCount}
+- Upcoming fixtures loaded: ${upcomingCount}
+- Active bet slip selections: ${context?.betSlipCount ?? 0}
+${realTimeContext}
+
+CRITICAL RULES:
+1. ALWAYS reference the ⭐ QUERIED MATCHES section first — these are the best matches for this specific query
+2. Use EXACT team names, scores, and odds from the data above — never invent data
+3. If a match is LIVE, include the current score and elapsed time in your answer
+4. If a match is upcoming, state the current market odds
+5. NEVER answer about teams or matches not in the data above — if not found, say so and suggest alternatives from the list
+6. Match "la liga" / "spain" queries → look for La Liga in the league column
+7. Match "italy" / "serie a" queries → look for Serie A in the league column (NOT women's unless asked)
+8. Match "milan" → look for AC Milan or Inter Milan in the teams
+9. NEVER answer with teams from a completely different country/league than what was asked
+10. If no exact match: say which similar league/team IS available from the data
+
+AVAILABLE ACTIONS:
+- value_bets: Scan for edges where AI probability > market implied probability (Kelly Criterion)
+- monte_carlo: 50,000+ iteration match simulation with confidence intervals
+- arbitrage: Risk-free profit opportunities where sum(1/odds) < 1.0
+- odds_movement: Sharp money detection, steam moves, line movement analysis
+- live_signals: In-play analysis using current score, momentum, xG estimates
+- predictions: Deep match prediction — win/draw/loss probabilities + recommendation
+- marketplace: Top bets ranked by composite AI score
+- portfolio: Portfolio risk analysis and Kelly stake recommendations
+- run_all: Full 8-module scan — value bets, arb, live signals, odds movement
+- chat: Expert answers, strategy advice, explain concepts using real data
+
+INTENT MAPPING (strict):
+"find value" / "value bets" / "edges" / "good bets" / "tips" → value_bets
+"simulate" / "monte carlo" / "probability" / "run sim" → monte_carlo
+"arbitrage" / "arb" / "risk free" / "guaranteed" → arbitrage
+"odds movement" / "sharp money" / "steam" / "line movement" → odds_movement
+"live" / "in-play" / "happening now" / "current score" / "live bet" → live_signals
+"predict" / "who wins" / "who will win" / "forecast" / "analyse" → predictions
+"top picks" / "best bets" / "marketplace" / "rankings" → marketplace
+"portfolio" / "risk" / "exposure" / "my bets" → portfolio
+"run all" / "everything" / "full scan" / "comprehensive" → run_all
+specific team/match question + no clear action → predictions (with real odds from context)
+general question → chat (but always reference real data)
+
+TEAM DETECTION: Find the queried team/league in the ⭐ QUERIED MATCHES section and return "team" in params with the exact team name as it appears in the data.
+
+Return ONLY valid JSON, no markdown, no code blocks:
+{
+  "action": "<action_name>",
+  "message": "<3-5 sentence expert response referencing EXACT real-time data — use teams/scores/odds from ⭐ QUERIED MATCHES section first>",
+  "keyInsights": ["<specific insight with real numbers>", "<specific insight>", "<specific insight>"],
+  "params": {
+    "sport": "<football|basketball|tennis|baseball|hockey|mma|all>",
+    "team": "<exact team name from data or null>",
+    "prob": <probability 0.0-1.0 or 0.6>,
+    "runs": <50000>,
+    "league": "<league name or null>"
+  }
+}`;
+
+    // Build messages array with conversation history
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      { role: 'system', content: systemPrompt },
+    ];
+
+    if (history && history.length > 0) {
+      history.slice(-6).forEach(h => {
+        messages.push({ role: h.role, content: h.content });
+      });
+    }
+
+    messages.push({ role: 'user', content: message });
+
+    // ── Provider cascade: GPT-4o → Groq Llama 3.3 → DeepSeek V3 → fallback ──
+    let parsed: any = null;
+
+    // 1. Try GPT-4o
+    const openAIKey = resolveOpenAIKey();
+    if (openAIKey && !parsed) {
+      try {
+        const openai = getOpenAIClient();
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-4o',
+          messages,
+          temperature: 0.2,
+          max_tokens: 800,
+          response_format: { type: 'json_object' },
+        });
+        const content = completion.choices?.[0]?.message?.content || '';
+        if (content) {
+          try { parsed = JSON.parse(content); }
+          catch { const m = content.match(/\{[\s\S]*\}/); if (m) parsed = JSON.parse(m[0]); }
+        }
+      } catch (err: any) {
+        console.error('[AI Agent] OpenAI error:', err.message || err);
+      }
+    }
+
+    // 2. Try Groq + Llama 3.3 70B (fastest — 300+ tokens/sec, 14K req/day free)
+    const groqKey = resolveGroqKey();
+    if (groqKey && !parsed) {
+      try {
+        const groq = getGroqClient();
+        const completion = await groq.chat.completions.create({
+          model: 'llama-3.3-70b-versatile',
+          messages,
+          temperature: 0.2,
+          max_tokens: 800,
+        });
+        const content = completion.choices?.[0]?.message?.content || '';
+        if (content) {
+          try { parsed = JSON.parse(content); }
+          catch { const m = content.match(/\{[\s\S]*\}/); if (m) parsed = JSON.parse(m[0]); }
+        }
+      } catch (err: any) {
+        console.error('[AI Agent] Groq error:', err.message || err);
+      }
+    }
+
+    // 3. Try Google Gemini 2.5 Flash (1M context, 250 req/day free)
+    const geminiKey = resolveGeminiKey();
+    if (geminiKey && !parsed) {
+      try {
+        const geminiMessages = messages.filter(m => m.role !== 'system');
+        const systemContent = messages.find(m => m.role === 'system')?.content || '';
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
+          {
+            method: 'POST',
+            headers: {
+              'x-goog-api-key': geminiKey,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: systemContent }] },
+              contents: geminiMessages.map(m => ({
+                role: m.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: m.content as string }],
+              })),
+              generationConfig: { temperature: 0.2, maxOutputTokens: 800 },
+            }),
+          }
+        );
+        const data = await response.json() as any;
+        const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (content) {
+          try { parsed = JSON.parse(content); }
+          catch { const m = content.match(/\{[\s\S]*\}/); if (m) parsed = JSON.parse(m[0]); }
+        }
+      } catch (err: any) {
+        console.error('[AI Agent] Gemini error:', err.message || err);
+      }
+    }
+
+    // 4. Try DeepSeek V3 (best reasoning, no hard rate limits, $0.28/M tokens)
+    const deepSeekKey = resolveDeepSeekKey();
+    if (deepSeekKey && !parsed) {
+      try {
+        const deepseek = getDeepSeekClient();
+        const completion = await deepseek.chat.completions.create({
+          model: 'deepseek-chat',
+          messages,
+          temperature: 0.2,
+          max_tokens: 800,
+          response_format: { type: 'json_object' },
+        } as any);
+        const content = (completion as any).choices?.[0]?.message?.content || '';
+        if (content) {
+          try { parsed = JSON.parse(content); }
+          catch { const m = content.match(/\{[\s\S]*\}/); if (m) parsed = JSON.parse(m[0]); }
+        }
+      } catch (err: any) {
+        console.error('[AI Agent] DeepSeek error:', err.message || err);
+      }
+    }
+
+    // 5. Smart keyword-based fallback using matched events
+    if (!parsed) {
+      const msgL = (message || '').toLowerCase();
+
+      // Use matched events first for the featured event
+      let detectedTeam: string | null = null;
+      let featuredEvent = matchedEvents[0] ?? null;
+
+      // Try to detect exact team from message against matched events first, then all
+      const searchPool = [...matchedEvents, ...rtEvents];
+      for (const e of searchPool) {
+        const home = e.homeTeam.toLowerCase();
+        const away = e.awayTeam.toLowerCase();
+        if (home.length >= 3 && msgL.includes(home)) { detectedTeam = e.homeTeam; featuredEvent = e; break; }
+        if (away.length >= 3 && msgL.includes(away)) { detectedTeam = e.awayTeam; featuredEvent = e; break; }
+        const hw = home.split(/\s+/).filter(w => w.length >= 4);
+        const aw = away.split(/\s+/).filter(w => w.length >= 4);
+        if (hw.some(w => msgL.includes(w))) { detectedTeam = e.homeTeam; featuredEvent = e; break; }
+        if (aw.some(w => msgL.includes(w))) { detectedTeam = e.awayTeam; featuredEvent = e; break; }
+      }
+
+      parsed = buildSmartFallback(message, {
+        liveEventCount: liveCount,
+        upcomingEventCount: upcomingCount,
+        topEvents: rtEvents.slice(0, 20) as any,
+        featuredOverride: featuredEvent as any,
+      });
+
+      if (detectedTeam && parsed.params) parsed.params.team = detectedTeam;
+    }
+
+    // Validate and normalise the action
+    const validActions = ['value_bets', 'monte_carlo', 'arbitrage', 'odds_movement', 'live_signals', 'predictions', 'marketplace', 'portfolio', 'run_all', 'chat'];
+    if (!validActions.includes(parsed.action)) {
+      parsed.action = 'chat';
+    }
+
+    res.json(parsed);
+  } catch (error) {
+    console.error('AI agent error:', error);
+    res.json({
+      action: 'chat',
+      message: "I'm ready to help analyse the markets. Try: 'find value bets', 'check arbitrage', 'run Monte Carlo simulation', or 'run all modules'.",
+      keyInsights: ["Use 'run all' for a comprehensive market scan", "Ask about specific teams for targeted analysis"],
+      params: { sport: 'football', prob: 0.6, runs: 50000 }
+    });
+  }
+});
+
+// ── AI Betting Suggestion endpoint ────────────────────────────────────────────
 router.post('/api/ai/betting-suggestion', async (req: Request, res: Response) => {
   try {
     const { eventName, sport, homeTeam, awayTeam, provider = 'openai' } = req.body;
 
     let content = '';
 
-    if (provider === 'anthropic') {
-      content = await getAnthropicSuggestion(sport, eventName, homeTeam, awayTeam);
+    if (provider === 'groq') {
+      content = await getGroqSuggestion(sport, eventName, homeTeam, awayTeam);
     } else if (provider === 'gemini') {
       content = await getGeminiSuggestion(sport, eventName, homeTeam, awayTeam);
+    } else if (provider === 'deepseek') {
+      content = await getDeepSeekSuggestion(sport, eventName, homeTeam, awayTeam);
+    } else if (provider === 'anthropic') {
+      content = await getAnthropicSuggestion(sport, eventName, homeTeam, awayTeam);
     } else {
       content = await getOpenAISuggestion(sport, eventName, homeTeam, awayTeam);
     }
@@ -125,22 +440,9 @@ router.post('/api/ai/betting-suggestion', async (req: Request, res: Response) =>
   }
 });
 
-// OpenAI - GPT-4o
-async function getOpenAISuggestion(sport: string, eventName: string, homeTeam: string, awayTeam: string): Promise<string> {
-  const apiKey = resolveOpenAIKey();
-  if (!apiKey) return '';
-  try {
-    const openai = getOpenAIClient();
-    const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an elite sports betting analyst with deep expertise in probability theory, market inefficiencies, and value betting. You use sharp-money concepts, implied probability analysis, and statistical modeling. Return ONLY valid JSON with no markdown.`,
-          },
-          {
-            role: 'user',
-            content: `Analyze this ${sport} event and provide sharp betting recommendations:
+// ── Shared suggestion prompt builder ─────────────────────────────────────────
+function buildSuggestionPrompt(sport: string, eventName: string, homeTeam: string, awayTeam: string): string {
+  return `Analyze this ${sport} event and provide sharp betting recommendations:
 Event: ${eventName}
 ${homeTeam ? `Home Team: ${homeTeam}` : ''}
 ${awayTeam ? `Away Team: ${awayTeam}` : ''}
@@ -151,7 +453,7 @@ Provide 3 betting recommendations across different markets. For each, calculate:
 - edge = true_prob - implied_prob
 - kelly criterion stake suggestion
 
-Return JSON:
+Return ONLY valid JSON with no markdown:
 {
   "suggestions": [
     {
@@ -163,16 +465,55 @@ Return JSON:
       "reasoning": "Detailed 2-3 sentence analysis with specific statistical reasoning"
     }
   ]
-}`,
-          },
-        ],
-        temperature: 0.4,
-        max_tokens: 600,
-      });
+}`;
+}
 
+// OpenAI - GPT-4o
+async function getOpenAISuggestion(sport: string, eventName: string, homeTeam: string, awayTeam: string): Promise<string> {
+  const apiKey = resolveOpenAIKey();
+  if (!apiKey) return '';
+  try {
+    const openai = getOpenAIClient();
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: `You are an elite sports betting analyst with deep expertise in probability theory, market inefficiencies, and value betting. Return ONLY valid JSON with no markdown.`,
+        },
+        { role: 'user', content: buildSuggestionPrompt(sport, eventName, homeTeam, awayTeam) },
+      ],
+      temperature: 0.4,
+      max_tokens: 800,
+    });
     return completion.choices?.[0]?.message?.content || '';
   } catch (error) {
     console.error('OpenAI error:', error);
+    return '';
+  }
+}
+
+// Groq - Llama 3.3 70B (fastest on the planet — 300+ tokens/sec, 14K req/day free)
+async function getGroqSuggestion(sport: string, eventName: string, homeTeam: string, awayTeam: string): Promise<string> {
+  const apiKey = resolveGroqKey();
+  if (!apiKey) return '';
+  try {
+    const groq = getGroqClient();
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        {
+          role: 'system',
+          content: `You are an elite sports betting analyst. Return ONLY valid JSON with no markdown.`,
+        },
+        { role: 'user', content: buildSuggestionPrompt(sport, eventName, homeTeam, awayTeam) },
+      ],
+      temperature: 0.4,
+      max_tokens: 800,
+    });
+    return completion.choices?.[0]?.message?.content || '';
+  } catch (error) {
+    console.error('Groq error:', error);
     return '';
   }
 }
@@ -191,34 +532,12 @@ async function getAnthropicSuggestion(sport: string, eventName: string, homeTeam
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-5',
-          max_tokens: 600,
+          max_tokens: 800,
           system: `You are an elite sports betting analyst with deep expertise in probability theory, market inefficiencies, and value betting. Return ONLY valid JSON with no markdown.`,
-          messages: [
-            {
-              role: 'user',
-              content: `Analyze this ${sport} event and provide sharp betting recommendations:
-Event: ${eventName}
-${homeTeam ? `Home Team: ${homeTeam}` : ''}
-${awayTeam ? `Away Team: ${awayTeam}` : ''}
-
-Return JSON:
-{
-  "suggestions": [
-    {
-      "market": "Market Name",
-      "recommendation": "Specific bet",
-      "confidence": 0.82,
-      "edge": 0.07,
-      "reasoning": "Detailed analysis"
-    }
-  ]
-}`,
-            },
-          ],
+          messages: [{ role: 'user', content: buildSuggestionPrompt(sport, eventName, homeTeam, awayTeam) }],
         }),
       }
     );
-
     const data = await response.json() as any;
     return data.content?.[0]?.text || '';
   } catch (error) {
@@ -227,15 +546,17 @@ Return JSON:
   }
 }
 
-// Gemini - Google
+// Google Gemini 2.5 Flash (1M token context, 250 req/day free)
 async function getGeminiSuggestion(sport: string, eventName: string, homeTeam: string, awayTeam: string): Promise<string> {
+  const apiKey = resolveGeminiKey();
+  if (!apiKey) return '';
   try {
     const response = await fetch(
-      `${process.env.AI_INTEGRATIONS_GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com'}/v1beta/models/gemini-2.5-flash:generateContent`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
       {
         method: 'POST',
         headers: {
-          'x-goog-api-key': process.env.AI_INTEGRATIONS_GEMINI_API_KEY || '',
+          'x-goog-api-key': apiKey,
           'content-type': 'application/json',
         },
         body: JSON.stringify({
@@ -243,36 +564,18 @@ async function getGeminiSuggestion(sport: string, eventName: string, homeTeam: s
             {
               parts: [
                 {
-                  text: `You are an elite sports betting analyst. Analyze this ${sport} event and provide betting recommendations. Return ONLY valid JSON.
-
-Event: ${eventName}
-${homeTeam ? `Home Team: ${homeTeam}` : ''}
-${awayTeam ? `Away Team: ${awayTeam}` : ''}
-
-Return JSON:
-{
-  "suggestions": [
-    {
-      "market": "Market Name",
-      "recommendation": "Specific bet",
-      "confidence": 0.82,
-      "edge": 0.07,
-      "reasoning": "Detailed analysis"
-    }
-  ]
-}`,
+                  text: `You are an elite sports betting analyst. ${buildSuggestionPrompt(sport, eventName, homeTeam, awayTeam)}`,
                 },
               ],
             },
           ],
           generationConfig: {
             temperature: 0.4,
-            maxOutputTokens: 600,
+            maxOutputTokens: 800,
           },
         }),
       }
     );
-
     const data = await response.json() as any;
     return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
   } catch (error) {
@@ -281,11 +584,47 @@ Return JSON:
   }
 }
 
-// ── Smart keyword-based intent detector (used when no OpenAI key) ─────────────
+// DeepSeek V3 (best reasoning, no hard rate limits, $0.28/M tokens)
+async function getDeepSeekSuggestion(sport: string, eventName: string, homeTeam: string, awayTeam: string): Promise<string> {
+  const apiKey = resolveDeepSeekKey();
+  if (!apiKey) return '';
+  try {
+    const deepseek = getDeepSeekClient();
+    const completion = await deepseek.chat.completions.create({
+      model: 'deepseek-chat',
+      messages: [
+        {
+          role: 'system',
+          content: `You are an elite sports betting analyst. Return ONLY valid JSON with no markdown.`,
+        },
+        { role: 'user', content: buildSuggestionPrompt(sport, eventName, homeTeam, awayTeam) },
+      ],
+      temperature: 0.4,
+      max_tokens: 800,
+    } as any);
+    return (completion as any).choices?.[0]?.message?.content || '';
+  } catch (error) {
+    console.error('DeepSeek error:', error);
+    return '';
+  }
+}
+
+// ── Smart keyword-based intent detector (used when no AI key available) ───────
 type AgentContext = {
   liveEventCount?: number;
   upcomingEventCount?: number;
   betSlipCount?: number;
+  featuredOverride?: {
+    homeTeam: string;
+    awayTeam: string;
+    leagueName?: string;
+    league?: string;
+    sport?: string;
+    odds?: { home?: number; draw?: number; away?: number; homeWin?: number; awayWin?: number };
+    isLive?: boolean;
+    score?: string;
+    elapsed?: number;
+  };
   topEvents?: Array<{
     homeTeam: string;
     awayTeam: string;
@@ -322,19 +661,20 @@ function buildSmartFallback(message: string, context?: AgentContext): any {
   else if (/mma|ufc|boxing|fight/.test(lower)) sport = 'mma';
   else if (/all sport|every sport/.test(lower)) sport = 'all';
 
-  // Pick a featured live event from context for specific responses
   const liveCount = context?.liveEventCount ?? 0;
   const upcomingCount = context?.upcomingEventCount ?? 0;
   const events = context?.topEvents ?? [];
+
+  // Use featuredOverride (matched event from query) first, then fallback to first live/upcoming
   const liveEvents = events.filter(e => e.isLive);
-  const featured = liveEvents[0] ?? events[0];
+  const featured = context?.featuredOverride ?? liveEvents[0] ?? events[0];
 
   const featuredStr = featured
-    ? `${featured.homeTeam} vs ${featured.awayTeam}${featured.isLive ? ` [LIVE ${featured.score ?? ''}]` : ''}`
+    ? `${featured.homeTeam} vs ${featured.awayTeam}${featured.isLive ? ` [LIVE ${(featured as any).score ?? ''}]` : ''}`
     : 'current markets';
 
-  const homeOdds = featured?.odds?.home ?? featured?.odds?.homeWin;
-  const awayOdds = featured?.odds?.away ?? featured?.odds?.awayWin;
+  const homeOdds = featured?.odds?.home ?? (featured?.odds as any)?.homeWin;
+  const awayOdds = featured?.odds?.away ?? (featured?.odds as any)?.awayWin;
   const drawOdds = featured?.odds?.draw;
   const oddsStr = homeOdds ? `(H: ${homeOdds}${drawOdds ? ` D: ${drawOdds}` : ''} A: ${awayOdds ?? '?'})` : '';
 
@@ -375,7 +715,7 @@ function buildSmartFallback(message: string, context?: AgentContext): any {
       message: `${liveCount > 0 ? `${liveCount} live matches active right now.` : 'No live events at the moment.'} ${featured?.isLive ? `${featuredStr} — analysing possession, pressure and xG in real time.` : ''} In-play signals are updated continuously for momentum-based edges.`,
       insights: [
         liveCount > 0 ? `${liveCount} live markets with real-time odds` : 'Upcoming events flagged for pre-match entry signals',
-        featured?.isLive ? `${featured.homeTeam} vs ${featured.awayTeam}: live score ${featured.score ?? 'N/A'}` : 'Live data ingestion begins at kick-off',
+        featured?.isLive ? `${featured.homeTeam} vs ${featured.awayTeam}: live score ${(featured as any).score ?? 'N/A'}` : 'Live data ingestion begins at kick-off',
         'Momentum score = possession × shots-on-target weighting',
       ],
     },
@@ -436,165 +776,11 @@ function buildSmartFallback(message: string, context?: AgentContext): any {
   };
 }
 
-// ── AI Agent Endpoint ─────────────────────────────────────────────────────────
-router.post('/api/ai/agent', async (req: Request, res: Response) => {
-  try {
-    const { message, context, history } = req.body as {
-      message: string;
-      context?: { betSlipCount?: number };
-      history?: Array<{ role: 'user' | 'assistant'; content: string }>;
-    };
-
-    // ── Fetch REAL-TIME data from server-side snapshots ────────────────────
-    const { contextStr: realTimeContext, liveCount, upcomingCount, allEvents: rtEvents } = buildRealTimeEventsContext(message || '');
-
-    const systemPrompt = `You are SuiBets AI Agent — an advanced sports betting intelligence system with 100% REAL-TIME data access. You have live match scores, current odds, and all upcoming fixtures fetched RIGHT NOW from our sports data feed. Never say you don't have real-time data — you DO.
-
-TODAY'S LIVE DATA (as of this moment):
-- Live matches in progress: ${liveCount}
-- Upcoming fixtures loaded: ${upcomingCount}
-- Active bet slip selections: ${context?.betSlipCount ?? 0}
-${realTimeContext}
-
-CRITICAL RULES:
-1. ALWAYS reference specific teams, scores, and odds from the real-time data above
-2. If a user asks about a specific team/match, SEARCH the data above and give exact odds and score
-3. If a match is LIVE, tell the user the current score and elapsed time
-4. If a match is upcoming, tell the user the current market odds
-5. For live matches: reference current score, elapsed minutes, and live odds
-6. NEVER give generic responses — always cite real data from the list above
-7. If the team is not in the list, say so honestly and note what similar matches are available
-
-AVAILABLE ACTIONS:
-- value_bets: Scan for edges where AI probability > market implied probability (Kelly Criterion)
-- monte_carlo: 50,000+ iteration match simulation with confidence intervals
-- arbitrage: Risk-free profit opportunities where sum(1/odds) < 1.0
-- odds_movement: Sharp money detection, steam moves, line movement analysis
-- live_signals: In-play analysis using current score, momentum, xG estimates
-- predictions: Deep match prediction — win/draw/loss probabilities + recommendation
-- marketplace: Top bets ranked by composite AI score
-- portfolio: Portfolio risk analysis and Kelly stake recommendations
-- run_all: Full 8-module scan — value bets, arb, live signals, odds movement
-- chat: Expert answers, strategy advice, explain concepts using real data
-
-INTENT MAPPING (strict):
-"find value" / "value bets" / "edges" / "good bets" / "tips" → value_bets
-"simulate" / "monte carlo" / "probability" / "run sim" → monte_carlo
-"arbitrage" / "arb" / "risk free" / "guaranteed" → arbitrage
-"odds movement" / "sharp money" / "steam" / "line movement" → odds_movement
-"live" / "in-play" / "happening now" / "current score" / "live bet" → live_signals
-"predict" / "who wins" / "who will win" / "forecast" / "analyse" → predictions
-"top picks" / "best bets" / "marketplace" / "rankings" → marketplace
-"portfolio" / "risk" / "exposure" / "my bets" → portfolio
-"run all" / "everything" / "full scan" / "comprehensive" → run_all
-specific team/match question + no clear action → predictions (with real odds from context)
-general question → chat (but always reference real data)
-
-TEAM DETECTION: If the user mentions a team name, find that exact match in the data above and return "team" in params with the exact team name as it appears in the data.
-
-Return ONLY valid JSON, no markdown, no code blocks:
-{
-  "action": "<action_name>",
-  "message": "<3-5 sentence expert response referencing EXACT real-time data — teams, scores, odds, elapsed time from the list above>",
-  "keyInsights": ["<specific insight with real numbers>", "<specific insight>", "<specific insight>"],
-  "params": {
-    "sport": "<football|basketball|tennis|baseball|hockey|mma|all>",
-    "team": "<exact team name from data or null>",
-    "prob": <probability 0.0-1.0 or 0.6>,
-    "runs": <50000>,
-    "league": "<league name or null>"
-  }
-}`;
-
-    // Build messages array with conversation history
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-      { role: 'system', content: systemPrompt },
-    ];
-
-    if (history && history.length > 0) {
-      history.slice(-6).forEach(h => {
-        messages.push({ role: h.role, content: h.content });
-      });
-    }
-
-    messages.push({ role: 'user', content: message });
-
-    // ── Try GPT-4o first, fall back to smart keyword parser ───────────────
-    const apiKey = resolveOpenAIKey();
-    let parsed: any = null;
-
-    if (apiKey) {
-      try {
-        const openai = getOpenAIClient();
-        const completion = await openai.chat.completions.create({
-          model: 'gpt-4o',
-          messages,
-          temperature: 0.2,
-          max_tokens: 800,
-          response_format: { type: 'json_object' },
-        });
-        const content = completion.choices?.[0]?.message?.content || '';
-        if (content) {
-          try { parsed = JSON.parse(content); }
-          catch { const m = content.match(/\{[\s\S]*\}/); if (m) parsed = JSON.parse(m[0]); }
-        }
-      } catch (err: any) {
-        console.error('[AI Agent] OpenAI error:', err.message || err);
-      }
-    }
-
-    // ── Smart keyword-based fallback ──────────────────────────────────────
-    if (!parsed) {
-      // Extract team name from message against real event data
-      const msgL = (message || '').toLowerCase();
-      let detectedTeam: string | null = null;
-      for (const e of rtEvents) {
-        const home = e.homeTeam.toLowerCase();
-        const away = e.awayTeam.toLowerCase();
-        if (home.length >= 3 && msgL.includes(home)) { detectedTeam = e.homeTeam; break; }
-        if (away.length >= 3 && msgL.includes(away)) { detectedTeam = e.awayTeam; break; }
-        const hw = home.split(/\s+/).filter(w => w.length >= 4);
-        const aw = away.split(/\s+/).filter(w => w.length >= 4);
-        if (hw.some(w => msgL.includes(w))) { detectedTeam = e.homeTeam; break; }
-        if (aw.some(w => msgL.includes(w))) { detectedTeam = e.awayTeam; break; }
-      }
-
-      parsed = buildSmartFallback(message, {
-        liveEventCount: liveCount,
-        upcomingEventCount: upcomingCount,
-        topEvents: rtEvents.slice(0, 20) as any,
-      });
-
-      // Inject detected team into params
-      if (detectedTeam && parsed.params) {
-        parsed.params.team = detectedTeam;
-      }
-    }
-
-    // Validate and normalise the action
-    const validActions = ['value_bets', 'monte_carlo', 'arbitrage', 'odds_movement', 'live_signals', 'predictions', 'marketplace', 'portfolio', 'run_all', 'chat'];
-    if (!validActions.includes(parsed.action)) {
-      parsed.action = 'chat';
-    }
-
-    res.json(parsed);
-  } catch (error) {
-    console.error('AI agent error:', error);
-    res.json({
-      action: 'chat',
-      message: "I'm ready to help analyse the markets. Try: 'find value bets', 'check arbitrage', 'run Monte Carlo simulation', or 'run all modules'.",
-      keyInsights: ["Use 'run all' for a comprehensive market scan", "Ask about specific teams for targeted analysis"],
-      params: { sport: 'football', prob: 0.6, runs: 50000 }
-    });
-  }
-});
-
 // ── AI Agent Predictions endpoint (detailed match analysis) ───────────────────
 router.post('/api/ai/agent/predict', async (req: Request, res: Response) => {
   try {
     const { homeTeam, awayTeam, sport, odds, league } = req.body;
 
-    // Calculate implied probabilities from real odds
     const homeOdds = odds?.home || odds?.homeWin || 2.0;
     const drawOdds = odds?.draw || 3.3;
     const awayOdds = odds?.away || odds?.awayWin || 3.5;
@@ -604,7 +790,6 @@ router.post('/api/ai/agent/predict', async (req: Request, res: Response) => {
     const impliedAway = 1 / awayOdds;
     const overround = impliedHome + impliedDraw + impliedAway;
 
-    // Normalised true implied probs (removing bookmaker margin)
     const trueHome = (impliedHome / overround * 100).toFixed(1);
     const trueDraw = (impliedDraw / overround * 100).toFixed(1);
     const trueAway = (impliedAway / overround * 100).toFixed(1);
@@ -622,35 +807,64 @@ Your task: Provide your TRUE probability estimates (may differ from market), ide
 Return ONLY valid JSON:
 {
   "prediction": "Home Win" | "Draw" | "Away Win",
-  "confidence": <0.0-1.0, your confidence in this prediction>,
-  "homeWinProb": <your true probability 0.0-1.0>,
-  "drawProb": <your true probability 0.0-1.0>,
-  "awayWinProb": <your true probability 0.0-1.0>,
-  "marketEdge": <positive = value, negative = no value, e.g. 0.07 means 7% edge>,
+  "confidence": <0.0-1.0>,
+  "homeWinProb": <0.0-1.0>,
+  "drawProb": <0.0-1.0>,
+  "awayWinProb": <0.0-1.0>,
+  "marketEdge": <positive = value, negative = no value>,
   "valueExists": <true|false>,
   "keyFactors": ["factor 1", "factor 2", "factor 3", "factor 4"],
   "recommendedBet": "specific bet description",
-  "reasoning": "3-4 sentence expert analysis referencing odds, form, and statistical reasoning",
+  "reasoning": "3-4 sentence expert analysis",
   "riskLevel": "Low" | "Medium" | "High",
-  "kellyStake": <recommended Kelly fraction 0.0-0.25>
+  "kellyStake": <0.0-0.25>
 }`;
 
-    const apiKey2 = resolveOpenAIKey();
+    // Provider cascade for predictions: GPT-4o → Groq → DeepSeek → Gemini → fallback
     let content = '';
-    if (apiKey2) {
+
+    if (!content && resolveOpenAIKey()) {
       try {
-        const openai2 = getOpenAIClient();
-        const completion2 = await openai2.chat.completions.create({
+        const openai = getOpenAIClient();
+        const completion = await openai.chat.completions.create({
           model: 'gpt-4o',
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.3,
           max_tokens: 800,
           response_format: { type: 'json_object' },
         });
-        content = completion2.choices?.[0]?.message?.content || '';
-      } catch (err: any) {
-        console.error('[AI Prediction] OpenAI error:', err.message || err);
-      }
+        content = completion.choices?.[0]?.message?.content || '';
+      } catch (err: any) { console.error('[AI Prediction] OpenAI error:', err.message || err); }
+    }
+
+    if (!content && resolveGroqKey()) {
+      try {
+        const groq = getGroqClient();
+        const completion = await groq.chat.completions.create({
+          model: 'llama-3.3-70b-versatile',
+          messages: [
+            { role: 'system', content: 'You are an elite sports analyst. Return ONLY valid JSON with no markdown.' },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.3,
+          max_tokens: 800,
+        });
+        content = completion.choices?.[0]?.message?.content || '';
+      } catch (err: any) { console.error('[AI Prediction] Groq error:', err.message || err); }
+    }
+
+    if (!content && resolveDeepSeekKey()) {
+      try {
+        const deepseek = getDeepSeekClient();
+        const completion = await deepseek.chat.completions.create({
+          model: 'deepseek-chat',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.3,
+          max_tokens: 800,
+          response_format: { type: 'json_object' },
+        } as any);
+        content = (completion as any).choices?.[0]?.message?.content || '';
+      } catch (err: any) { console.error('[AI Prediction] DeepSeek error:', err.message || err); }
     }
 
     let result: any;
@@ -662,8 +876,6 @@ Return ONLY valid JSON:
     }
 
     if (!result) {
-      // Fallback based on real odds math
-      const bestOdds = Math.min(homeOdds, awayOdds);
       const isFavHome = homeOdds <= awayOdds;
       return res.json({
         prediction: isFavHome ? 'Home Win' : 'Away Win',

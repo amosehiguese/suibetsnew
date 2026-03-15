@@ -15,7 +15,7 @@ interface AIBettingAdvisorProps {
   teams?: { home: string; away: string };
 }
 
-type AIProvider = 'openai' | 'anthropic' | 'gemini';
+type AIProvider = 'openai' | 'groq' | 'gemini' | 'deepseek' | 'anthropic';
 
 export function AIBettingAdvisor({ eventName, sport, teams }: AIBettingAdvisorProps) {
   const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
