@@ -92,13 +92,13 @@ const Layout: React.FC<LayoutProps> = ({
     { label: 'My Bets', href: '/bet-history' },
     { label: 'Revenue', href: '/revenue' },
     { label: 'Staking', href: '/staking' },
-    { label: 'Trade', href: '/trading', badge: 'DEX' },
+    { label: 'AI Betting', href: '/ai-betting', badge: 'AI' },
     { label: 'Dashboard', href: '/wallet-dashboard', icon: <Wallet className="h-4 w-4 mr-2" /> },
     { label: 'Promotions', href: '/promotions', icon: <Target className="h-4 w-4 mr-2" /> },
   ];
 
   const moreMenuItems = [
-    { label: 'AI Betting', href: '/ai-betting', icon: <TrendingDown className="h-4 w-4 mr-2" /> },
+    { label: 'Trade', href: '/trading', icon: <ArrowUpDown className="h-4 w-4 mr-2" /> },
     { label: 'Streaming', href: '/streaming', icon: <TrendingUp className="h-4 w-4 mr-2" /> },
     { label: 'Leaderboard', href: '/leaderboard', icon: <Target className="h-4 w-4 mr-2" /> },
     { label: 'Activity', href: '/results', icon: <Activity className="h-4 w-4 mr-2" /> },
