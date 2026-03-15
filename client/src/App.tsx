@@ -60,6 +60,7 @@ import WalrusReceiptPage from "@/pages/walrus-receipt";
 import StreamingPage from "@/pages/streaming";
 import AuthCallback from "@/pages/auth-callback";
 const TradingPage = lazy(() => import("@/pages/trading"));
+import AIBettingPage from "@/pages/ai-betting";
 
 // Informational Pages
 import PrivacyPolicy from "@/pages/privacy";
@@ -232,6 +233,9 @@ function App() {
                           
                           {/* Walrus Receipt Page */}
                           <Route path="/walrus-receipt/:blobId" component={WalrusReceiptPage} />
+                          
+                          {/* AI Betting Intelligence */}
+                          <Route path="/ai-betting" component={AIBettingPage} />
                           
                           {/* Streaming */}
                           <Route path="/streaming" component={StreamingPage} />
