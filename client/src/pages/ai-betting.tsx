@@ -657,6 +657,7 @@ export default function AIBettingPage() {
     }
 
     if (action === 'odds_movement') return { type: 'odds_movement', movements: buildOddsMovements(pool) };
+    if (action === 'add_to_betslip') return { type: 'add_to_betslip', addedBets: params?.addedBets || [] };
     return { type: 'info' };
   };
 
@@ -871,6 +872,70 @@ export default function AIBettingPage() {
         if (foundLeague) params.league = foundLeague;
       }
 
+      // ── Add-to-betslip: actually call addBet for each matched event ──────────
+      if (action === 'add_to_betslip') {
+        const eventsToAdd: any[] = params.eventsToAdd || [];
+        const addedBets: any[] = [];
+
+        // For each event the server matched, find the real event in allEvents to get ID + full odds
+        for (const serverEvent of eventsToAdd) {
+          const found = allEvents.find((e: any) => {
+            const homeMatch = (e.homeTeam || '').toLowerCase() === serverEvent.homeTeam.toLowerCase();
+            const awayMatch = (e.awayTeam || '').toLowerCase() === serverEvent.awayTeam.toLowerCase();
+            return homeMatch && awayMatch;
+          });
+          const eventSource = found || serverEvent;
+          const homeOdds = getRealOdds(eventSource, 'home') || serverEvent.homeOdds;
+          if (!homeOdds) continue;
+          const betObj = {
+            id: `ai-slip-${eventSource.id || serverEvent.homeTeam}-${Date.now()}`,
+            eventId: eventSource.id || `ai-${serverEvent.homeTeam}-${serverEvent.awayTeam}`,
+            eventName: eventSource.eventName || `${serverEvent.homeTeam} vs ${serverEvent.awayTeam}`,
+            selectionName: serverEvent.homeTeam,
+            odds: homeOdds,
+            stake: 1000,
+            market: 'Match Winner',
+            homeTeam: serverEvent.homeTeam,
+            awayTeam: serverEvent.awayTeam,
+            currency: 'SBETS',
+          };
+          addBet(betObj);
+          addedBets.push(betObj);
+        }
+
+        // If server didn't return events (e.g. fallback), try matching from user's text in allEvents
+        if (addedBets.length === 0) {
+          const msgLower = text.toLowerCase();
+          const clientMatched = allEvents.filter((e: any) => {
+            const home = (e.homeTeam || '').toLowerCase();
+            const away = (e.awayTeam || '').toLowerCase();
+            return msgLower.includes(home) || msgLower.includes(away) ||
+              home.split(' ').some((w: string) => w.length >= 4 && msgLower.includes(w)) ||
+              away.split(' ').some((w: string) => w.length >= 4 && msgLower.includes(w));
+          }).slice(0, 5);
+          for (const e of clientMatched) {
+            const homeOdds = getRealOdds(e, 'home');
+            if (!homeOdds) continue;
+            const betObj = {
+              id: `ai-slip-${e.id}-${Date.now()}`,
+              eventId: e.id,
+              eventName: e.eventName || `${e.homeTeam} vs ${e.awayTeam}`,
+              selectionName: e.homeTeam,
+              odds: homeOdds,
+              stake: 1000,
+              market: 'Match Winner',
+              homeTeam: e.homeTeam,
+              awayTeam: e.awayTeam,
+              currency: 'SBETS',
+            };
+            addBet(betObj);
+            addedBets.push(betObj);
+          }
+        }
+
+        params.addedBets = addedBets;
+      }
+
       const result = buildAgentResult(action, allEvents, params);
 
       let messageText = data.message || `Completed ${action.replace(/_/g, ' ')} analysis.`;
@@ -1036,6 +1101,39 @@ export default function AIBettingPage() {
                             <span>{insight}</span>
                           </div>
                         ))}
+                      </div>
+                    )}
+
+                    {/* Rich result: add to betslip confirmation */}
+                    {msg.result?.type === 'add_to_betslip' && (
+                      <div className="mt-3 space-y-2">
+                        {msg.result.addedBets?.length > 0 ? (
+                          <>
+                            <div className="text-[11px] text-green-400 mb-1 flex items-center gap-1.5">
+                              <span>✓</span>
+                              <span>{msg.result.addedBets.length} match{msg.result.addedBets.length !== 1 ? 'es' : ''} added to your bet slip</span>
+                            </div>
+                            {msg.result.addedBets.map((bet: any, i: number) => (
+                              <div key={i} className="bg-[#0d1f24] border border-green-900/30 rounded-lg p-2.5">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-medium text-white truncate">{bet.homeTeam} vs {bet.awayTeam}</div>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                      <span className="text-[11px] text-gray-400">{bet.selectionName}</span>
+                                      <span className="text-[11px] text-cyan-400">@ {bet.odds}</span>
+                                      <span className="text-[10px] text-gray-600">1K SBETS</span>
+                                    </div>
+                                  </div>
+                                  <span className="text-[10px] text-green-400 border border-green-500/30 rounded px-1.5 py-0.5 flex-shrink-0">Added ✓</span>
+                                </div>
+                              </div>
+                            ))}
+                          </>
+                        ) : (
+                          <div className="text-[11px] text-yellow-400 text-center py-2">
+                            No matching events found with available odds. Try browsing the Bets page and clicking a match directly.
+                          </div>
+                        )}
                       </div>
                     )}
 

@@ -211,6 +211,7 @@ AVAILABLE ACTIONS:
 - marketplace: Top bets ranked by composite AI score
 - portfolio: Portfolio risk analysis and Kelly stake recommendations
 - run_all: Full 8-module scan — value bets, arb, live signals, odds movement
+- add_to_betslip: Add specific matches to the user's bet slip — use this when user says "add X to bet slip" or "put X on my slip"
 - chat: Expert answers, strategy advice, explain concepts using real data
 
 INTENT MAPPING (strict):
@@ -223,6 +224,7 @@ INTENT MAPPING (strict):
 "top picks" / "best bets" / "marketplace" / "rankings" → marketplace
 "portfolio" / "risk" / "exposure" / "my bets" → portfolio
 "run all" / "everything" / "full scan" / "comprehensive" → run_all
+"add to bet slip" / "add to my slip" / "put on my slip" / "add to betslip" / "add X to betslip" → add_to_betslip
 specific team/match question + no clear action → predictions (with real odds from context)
 general question → chat (but always reference real data)
 
@@ -390,9 +392,25 @@ Return ONLY valid JSON, no markdown, no code blocks:
     }
 
     // Validate and normalise the action
-    const validActions = ['value_bets', 'monte_carlo', 'arbitrage', 'odds_movement', 'live_signals', 'predictions', 'marketplace', 'portfolio', 'run_all', 'chat'];
+    const validActions = ['value_bets', 'monte_carlo', 'arbitrage', 'odds_movement', 'live_signals', 'predictions', 'marketplace', 'portfolio', 'run_all', 'add_to_betslip', 'chat'];
     if (!validActions.includes(parsed.action)) {
       parsed.action = 'chat';
+    }
+
+    // For add_to_betslip, inject the matched events so the client can actually add them
+    if (parsed.action === 'add_to_betslip') {
+      const eventsToAdd = matchedEvents.slice(0, 10).map(e => ({
+        homeTeam: e.homeTeam,
+        awayTeam: e.awayTeam,
+        league: e.league,
+        sport: e.sport,
+        homeOdds: e.odds?.home ?? null,
+        drawOdds: e.odds?.draw ?? null,
+        awayOdds: e.odds?.away ?? null,
+        isLive: e.isLive,
+      }));
+      if (!parsed.params) parsed.params = {};
+      parsed.params.eventsToAdd = eventsToAdd;
     }
 
     res.json(parsed);
@@ -641,7 +659,8 @@ function buildSmartFallback(message: string, context?: AgentContext): any {
 
   // Detect action from keywords — run_all checked FIRST (highest specificity)
   let action = 'chat';
-  if (/run all|full scan|all module|do everything|comprehens|complete scan/.test(lower) || (lower.includes('everything') && lower.includes('run'))) action = 'run_all';
+  if (/add.*(to|on).*(bet.?slip|slip|betslip)|put.*(on|to).*(bet.?slip|slip)|add.*bet.?slip/.test(lower)) action = 'add_to_betslip';
+  else if (/run all|full scan|all module|do everything|comprehens|complete scan/.test(lower) || (lower.includes('everything') && lower.includes('run'))) action = 'run_all';
   else if (/\barb\b|arbitrage|risk.free|guaranteed|no.risk|lock profit/.test(lower)) action = 'arbitrage';
   else if (/value|edge|good bet|what should|any tip|best value|find bet/.test(lower)) action = 'value_bets';
   else if (/simulat|monte.carlo|run sim|how likely/.test(lower)) action = 'monte_carlo';
