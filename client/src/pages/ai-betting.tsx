@@ -201,7 +201,12 @@ export default function AIBettingPage() {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }));
+          const mapped = parsed.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }));
+          // Replace outdated init message if it contains old AI model names
+          if (mapped[0]?.id === 'init' && mapped[0]?.text?.includes('GPT-4o')) {
+            mapped[0] = INIT_MESSAGE;
+          }
+          return mapped;
         }
       }
     } catch {}
