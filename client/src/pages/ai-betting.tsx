@@ -807,7 +807,7 @@ export default function AIBettingPage() {
                             className="text-[10px] h-6 px-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 border border-green-500/30 flex-shrink-0"
                             data-testid={`agent-add-bet-${i}`}
                           >
-                            + Slip
+                            + 1K SBETS
                           </Button>
                         </div>
                       ))}
@@ -917,7 +917,7 @@ export default function AIBettingPage() {
                           className="text-[10px] h-6 px-3 w-full bg-green-600/20 hover:bg-green-600/30 text-green-400 border border-green-500/30"
                           data-testid="agent-add-prediction"
                         >
-                          + Add {msg.result.recommendation} @ {msg.result.odds} to Slip
+                          + Add {msg.result.recommendation} @ {msg.result.odds} · 1,000 SBETS
                         </Button>
                       )}
                     </div>
@@ -939,7 +939,7 @@ export default function AIBettingPage() {
                             className="text-[10px] h-6 px-2 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 border border-cyan-500/30 flex-shrink-0"
                             data-testid={`agent-add-market-${i}`}
                           >
-                            + Slip
+                            + 1K SBETS
                           </Button>
                         </div>
                       ))}
@@ -984,7 +984,7 @@ export default function AIBettingPage() {
                           </div>
                           <Button size="sm" onClick={() => addBet({ id: `agent-all-${i}-${Date.now()}`, eventId: bet.eventId, eventName: bet.eventName, selectionName: bet.selection, odds: bet.marketOdds, stake: 1000, market: 'Match Winner', homeTeam: bet.homeTeam, awayTeam: bet.awayTeam, currency: 'SBETS' })}
                             className="text-[10px] h-6 px-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 border border-green-500/30 flex-shrink-0" data-testid={`agent-all-add-${i}`}>
-                            + Slip
+                            + 1K SBETS
                           </Button>
                         </div>
                       ))}
@@ -1116,7 +1116,7 @@ export default function AIBettingPage() {
                     className="h-7 text-xs bg-green-600/15 hover:bg-green-600/30 text-green-400 border border-green-500/30"
                     data-testid={`add-value-bet-${i}`}
                   >
-                    + Add
+                    + 1K SBETS
                   </Button>
                 </div>
               </div>
@@ -1378,7 +1378,7 @@ export default function AIBettingPage() {
                   })}
                   data-testid={`add-market-bet-${i}`}
                 >
-                  + Add
+                  + 1K SBETS
                 </Button>
               </div>
             ))}
