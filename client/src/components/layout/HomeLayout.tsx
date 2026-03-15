@@ -4,7 +4,7 @@ import { useMobile } from "@/hooks/use-mobile";
 import { Grid2X2, Home, User } from "lucide-react";
 import { BiFootball } from "react-icons/bi";
 import { useLocation } from "wouter";
-import suibetsBackground from '@/assets/images/suibets-background.png';
+const suibetsBackground = `${import.meta.env.VITE_API_BASE_URL || ''}/images/suibets-background.png`;
 
 interface HomeLayoutProps {
   children: ReactNode;

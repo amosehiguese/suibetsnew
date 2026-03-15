@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
+import path from "path";
 import { registerRoutes } from "./routes-simple"; // Main SuiBets API implementation
 import { setupVite, serveStatic, log } from "./vite";
 import { initDb, seedDb } from "./db";
@@ -88,6 +89,9 @@ app.options('*', cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Serve large static images directly from server (used by Walrus Sites build)
+app.use('/images', express.static(path.join(import.meta.dirname, 'images')));
 
 // Content Security Policy headers for Railway deployment
 // Allow inline scripts and eval for Vite/React/Sui wallet libraries

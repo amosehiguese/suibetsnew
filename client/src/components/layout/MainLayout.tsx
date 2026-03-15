@@ -1,7 +1,7 @@
 import React from 'react';
 import Navbar from './Navbar';
 import { Toaster } from '@/components/ui/toaster';
-import suibetsBackground from '@/assets/images/suibets-background.png';
+const suibetsBackground = `${import.meta.env.VITE_API_BASE_URL || ''}/images/suibets-background.png`;
 
 interface MainLayoutProps {
   children: React.ReactNode;

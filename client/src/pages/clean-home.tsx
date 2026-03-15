@@ -18,7 +18,7 @@ import Footer from "@/components/layout/Footer";
 import { useLiveEvents, useUpcomingEvents } from "@/hooks/useEvents";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import suibetsHeroImage from "../assets/images/hero-banner.png";
+const suibetsHeroImage = `${import.meta.env.VITE_API_BASE_URL || ''}/images/hero-banner.png`;
 
 // Favorites management using localStorage
 const FAVORITES_KEY = 'suibets_favorites';

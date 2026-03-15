@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ConnectWalletModal } from '@/components/modals/ConnectWalletModal';
-import suibetsBackground from '@/assets/images/suibets-background.png';
+const suibetsBackground = `${import.meta.env.VITE_API_BASE_URL || ''}/images/suibets-background.png`;
 const suibetsLogo = "/images/suibets-logo.jpg";
 
 export interface LayoutProps {
