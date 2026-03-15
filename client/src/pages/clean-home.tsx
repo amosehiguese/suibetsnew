@@ -58,6 +58,11 @@ const SPORTS_LIST = [
   { id: 18, name: "Cricket", icon: "🏏" },
   { id: 3, name: "Tennis", icon: "🎾" },
   { id: 20, name: "WWE", icon: "🎭" },
+  { id: 21, name: "Darts", icon: "🎯" },
+  { id: 22, name: "Snooker", icon: "🎱" },
+  { id: 23, name: "Table Tennis", icon: "🏓" },
+  { id: 24, name: "Water Polo", icon: "🤽" },
+  { id: 25, name: "Badminton", icon: "🏸" },
 ];
 
 interface Outcome {

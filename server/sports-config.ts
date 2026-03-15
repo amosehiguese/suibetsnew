@@ -17,7 +17,7 @@ const ALL_SPORTS = [
   'football', 'basketball', 'tennis', 'baseball', 'hockey', 'handball', 'volleyball',
   'rugby', 'cricket', 'golf', 'boxing', 'mma', 'formula-1', 'cycling',
   'american-football', 'aussie-rules', 'snooker', 'darts', 'table-tennis',
-  'badminton', 'motorsport', 'esports', 'netball'
+  'badminton', 'motorsport', 'esports', 'netball', 'water-polo'
 ];
 
 /**
