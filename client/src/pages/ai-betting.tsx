@@ -1918,20 +1918,6 @@ export default function AIBettingPage() {
           </div>
         </div>
 
-        {/* Infrastructure note */}
-        <div className="rounded-xl border border-[#1e3a3f] bg-[#0d1f24] p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Cpu className="h-4 w-4 text-gray-400" />
-            <span className="text-sm text-gray-400 font-medium">System Infrastructure</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {['PostgreSQL DB', 'GPT-4o / Groq / DeepSeek', 'API-Sports Live', 'Walrus Protocol', 'Sui Blockchain', 'WebSocket Scores', 'Real-time Odds'].map((s, i) => (
-              <span key={i} className="text-xs bg-[#0b1618] border border-[#1e3a3f] text-gray-400 px-2 py-1 rounded-full flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />{s}
-              </span>
-            ))}
-          </div>
-        </div>
 
       </div>
     </Layout>
