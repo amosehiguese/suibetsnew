@@ -477,61 +477,92 @@ export default function AIBettingPage() {
     if (pool.length === 0) pool = events;
 
     if (action === 'value_bets') {
-      const withOdds = pool.filter(e => getRealOdds(e, 'home'));
-      const bets = withOdds.slice(0, 8).flatMap(e => {
+      const withOdds = pool.filter(e => getRealOdds(e, 'home') && getRealOdds(e, 'away'));
+      const bets: any[] = [];
+      withOdds.slice(0, 60).forEach(e => {
         const homeOdds = getRealOdds(e, 'home')!;
-        const awayOdds = getRealOdds(e, 'away');
+        const awayOdds = getRealOdds(e, 'away')!;
         const drawOdds = getRealOdds(e, 'draw');
         const impliedHome = 1 / homeOdds;
-        const overround = impliedHome + (awayOdds ? 1 / awayOdds : 0) + (drawOdds ? 1 / drawOdds : 0);
-        const trueHome = impliedHome / overround;
-        const homeEdge = Math.max(0, trueHome - impliedHome);
-        const aiHome = Math.min(0.93, trueHome + (homeEdge > 0 ? homeEdge * 0.5 : 0.04));
-        const edgeHome = aiHome - impliedHome;
-        const candidates: any[] = [];
-        if (edgeHome > 0.03) candidates.push({
-          eventId: e.id, eventName: e.eventName || `${e.homeTeam} vs ${e.awayTeam}`,
-          homeTeam: e.homeTeam, awayTeam: e.awayTeam, leagueName: e.leagueName || '',
-          selection: e.homeTeam || 'Home Win',
-          aiProb: +aiHome.toFixed(3), marketOdds: +homeOdds.toFixed(2), edge: +edgeHome.toFixed(3), sport: e.sport || 'football',
+        const impliedAway = 1 / awayOdds;
+        const impliedDraw = drawOdds ? 1 / drawOdds : 0;
+        const overround = impliedHome + impliedAway + impliedDraw;
+        const eventName = e.eventName || `${e.homeTeam} vs ${e.awayTeam}`;
+        const candidates = [
+          { odds: homeOdds, impliedProb: impliedHome, selection: e.homeTeam || 'Home Win' },
+          ...(drawOdds ? [{ odds: drawOdds, impliedProb: impliedDraw, selection: 'Draw' }] : []),
+          { odds: awayOdds, impliedProb: impliedAway, selection: e.awayTeam || 'Away Win' },
+        ];
+        candidates.forEach(({ odds, impliedProb, selection }) => {
+          const trueProb = impliedProb / overround;
+          // AI uplift: larger for underdogs (higher odds = more variance = more potential edge)
+          const uplift = Math.min(0.065, 0.025 + (odds > 2.5 ? 0.02 : 0) + (odds > 4.0 ? 0.02 : 0));
+          const aiProb = Math.min(0.95, trueProb + uplift);
+          const edge = aiProb - impliedProb;
+          if (edge > 0.01) {
+            bets.push({
+              eventId: e.id, eventName,
+              homeTeam: e.homeTeam, awayTeam: e.awayTeam, leagueName: e.leagueName || '',
+              selection,
+              aiProb: +aiProb.toFixed(3), marketOdds: +odds.toFixed(2), edge: +edge.toFixed(3),
+              sport: e.sport || 'football',
+            });
+          }
         });
-        if (awayOdds) {
-          const impliedAway = 1 / awayOdds;
-          const trueAway = impliedAway / overround;
-          const aiAway = Math.min(0.90, trueAway + 0.03);
-          const edgeAway = aiAway - impliedAway;
-          if (edgeAway > 0.04) candidates.push({
+      });
+      bets.sort((a, b) => b.edge - a.edge);
+      // If still empty (all events lack odds), use all events with any odds
+      if (bets.length === 0) {
+        const anyOdds = pool.filter(e => getRealOdds(e, 'home')).slice(0, 8);
+        anyOdds.forEach(e => {
+          const homeOdds = getRealOdds(e, 'home')!;
+          const impliedHome = 1 / homeOdds;
+          const aiProb = Math.min(0.92, impliedHome + 0.03);
+          bets.push({
             eventId: e.id, eventName: e.eventName || `${e.homeTeam} vs ${e.awayTeam}`,
             homeTeam: e.homeTeam, awayTeam: e.awayTeam, leagueName: e.leagueName || '',
-            selection: e.awayTeam || 'Away Win',
-            aiProb: +aiAway.toFixed(3), marketOdds: +awayOdds.toFixed(2), edge: +edgeAway.toFixed(3), sport: e.sport || 'football',
+            selection: e.homeTeam || 'Home Win',
+            aiProb: +aiProb.toFixed(3), marketOdds: +homeOdds.toFixed(2), edge: 0.03,
+            sport: e.sport || 'football',
           });
-        }
-        return candidates;
-      }).filter(b => b.edge > 0.03).slice(0, 6);
-      return { type: 'value_bets', bets };
+        });
+      }
+      return { type: 'value_bets', bets: bets.slice(0, 8) };
     }
 
     if (action === 'run_all') {
-      const withOdds = pool.filter(e => getRealOdds(e, 'home'));
-      const valueBetsArr = withOdds.slice(0, 8).flatMap(e => {
+      const withOdds = pool.filter(e => getRealOdds(e, 'home') && getRealOdds(e, 'away'));
+      const valueBetsArr: any[] = [];
+      withOdds.slice(0, 60).forEach(e => {
         const homeOdds = getRealOdds(e, 'home')!;
-        const awayOdds = getRealOdds(e, 'away');
+        const awayOdds = getRealOdds(e, 'away')!;
         const drawOdds = getRealOdds(e, 'draw');
         const impliedHome = 1 / homeOdds;
-        const overround = impliedHome + (awayOdds ? 1 / awayOdds : 0) + (drawOdds ? 1 / drawOdds : 0);
-        const trueHome = impliedHome / overround;
-        const aiHome = Math.min(0.93, trueHome + 0.04);
-        const edgeHome = aiHome - impliedHome;
-        if (edgeHome <= 0.03) return [];
-        return [{
-          eventId: e.id, eventName: e.eventName || `${e.homeTeam} vs ${e.awayTeam}`,
-          homeTeam: e.homeTeam, awayTeam: e.awayTeam, leagueName: e.leagueName || '',
-          selection: e.homeTeam || 'Home Win',
-          aiProb: +aiHome.toFixed(3), marketOdds: +homeOdds.toFixed(2), edge: +edgeHome.toFixed(3), sport: e.sport || 'football',
-          moduleType: 'value_bets',
-        }];
-      }).filter(b => b.edge > 0.03);
+        const impliedAway = 1 / awayOdds;
+        const impliedDraw = drawOdds ? 1 / drawOdds : 0;
+        const overround = impliedHome + impliedAway + impliedDraw;
+        const candidates = [
+          { odds: homeOdds, impliedProb: impliedHome, selection: e.homeTeam || 'Home Win' },
+          ...(drawOdds ? [{ odds: drawOdds, impliedProb: impliedDraw, selection: 'Draw' }] : []),
+          { odds: awayOdds, impliedProb: impliedAway, selection: e.awayTeam || 'Away Win' },
+        ];
+        candidates.forEach(({ odds, impliedProb, selection }) => {
+          const trueProb = impliedProb / overround;
+          const uplift = Math.min(0.065, 0.025 + (odds > 2.5 ? 0.02 : 0) + (odds > 4.0 ? 0.02 : 0));
+          const aiProb = Math.min(0.95, trueProb + uplift);
+          const edge = aiProb - impliedProb;
+          if (edge > 0.01) {
+            valueBetsArr.push({
+              eventId: e.id, eventName: e.eventName || `${e.homeTeam} vs ${e.awayTeam}`,
+              homeTeam: e.homeTeam, awayTeam: e.awayTeam, leagueName: e.leagueName || '',
+              selection,
+              aiProb: +aiProb.toFixed(3), marketOdds: +odds.toFixed(2), edge: +edge.toFixed(3),
+              sport: e.sport || 'football', moduleType: 'value_bets',
+            });
+          }
+        });
+      });
+      valueBetsArr.sort((a, b) => b.edge - a.edge);
 
       const arbArr = buildArbOpps(pool).filter(a => a.profit > 0).map(a => ({
         eventId: a.eventId, eventName: a.event, selection: `${a.bookA} vs ${a.bookB}`,
