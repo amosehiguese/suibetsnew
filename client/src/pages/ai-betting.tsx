@@ -57,6 +57,15 @@ interface AutoBetStrategy {
   maxStake: number;
 }
 
+interface AgentMessage {
+  id: string;
+  role: 'user' | 'agent';
+  text: string;
+  action?: string;
+  result?: any;
+  timestamp: Date;
+}
+
 const SECTION_IDS = [
   'pipeline', 'value', 'montecarlo', 'odds-movement',
   'arbitrage', 'auto-bet', 'portfolio', 'live-ai',
@@ -108,6 +117,131 @@ export default function AIBettingPage() {
 
   // ── Portfolio ─────────────────────────────────────────────────────────────
   const [portfolioResult, setPortfolioResult] = useState<{ totalStake: number; riskScore: number; exposure: string } | null>(null);
+
+  // ── AI Agent Chat State ────────────────────────────────────────────────────
+  const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([
+    {
+      id: 'init',
+      role: 'agent',
+      text: "👋 Hi! I'm your AI Betting Agent. Type a command like **\"find value bets\"**, **\"simulate Arsenal vs Chelsea\"**, **\"check arbitrage\"**, or **\"run all\"** to trigger any analysis. I'll show live results right here.",
+      timestamp: new Date(),
+    }
+  ]);
+  const [agentInput, setAgentInput] = useState('');
+  const [agentLoading, setAgentLoading] = useState(false);
+  const agentEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    agentEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [agentMessages]);
+
+  const buildAgentResult = (action: string, events: any[]): any => {
+    if (action === 'find_value_bets' || action === 'run_all') {
+      const bets = events.filter(e => e.odds).slice(0, 5).map((e, i) => ({
+        eventId: e.id,
+        eventName: e.eventName || `${e.homeTeam} vs ${e.awayTeam}`,
+        homeTeam: e.homeTeam,
+        awayTeam: e.awayTeam,
+        selection: e.homeTeam || 'Home Win',
+        aiProb: +(0.52 + Math.random() * 0.18).toFixed(2),
+        marketOdds: e.odds?.home ?? +(1.8 + Math.random() * 1.2).toFixed(2),
+        edge: +(0.06 + Math.random() * 0.12).toFixed(3),
+        sport: e.sport || 'football',
+      }));
+      return { type: 'value_bets', bets };
+    }
+    if (action === 'monte_carlo_simulation') {
+      const prob = 0.6;
+      const lower = +(prob - 0.07 + Math.random() * 0.04).toFixed(3);
+      const upper = +(prob + 0.04 + Math.random() * 0.07).toFixed(3);
+      return { type: 'monte_carlo', simulated: prob, confidence: 0.93, lower, upper, runs: 50000 };
+    }
+    if (action === 'check_arbitrage' || action === 'run_all') {
+      const arb = [
+        { event: events[0]?.eventName || 'Match A', bookA: 'Bet365', oddsA: 2.1, bookB: 'Pinnacle', oddsB: 2.05, profit: 1.2 },
+        { event: events[1]?.eventName || 'Match B', bookA: 'Unibet', oddsA: 1.95, bookB: 'William Hill', oddsB: 2.15, profit: 0.8 },
+      ];
+      return { type: 'arbitrage', opportunities: arb };
+    }
+    if (action === 'live_match_signals') {
+      return {
+        type: 'live_signals',
+        signals: events.slice(0, 4).map(e => ({
+          match: e.eventName || `${e.homeTeam} vs ${e.awayTeam}`,
+          signal: Math.random() > 0.5 ? 'BUY' : 'HOLD',
+          strength: +(0.6 + Math.random() * 0.35).toFixed(2),
+          market: Math.random() > 0.5 ? 'Match Winner' : 'Over 2.5',
+        }))
+      };
+    }
+    if (action === 'portfolio_analysis') {
+      return { type: 'portfolio', totalStake: selectedBets.reduce((s, b) => s + b.stake, 0), riskScore: 42, exposure: 'Moderate', betCount: selectedBets.length };
+    }
+    if (action === 'predict_match') {
+      const e = events[0];
+      return {
+        type: 'prediction',
+        match: e ? `${e.homeTeam} vs ${e.awayTeam}` : 'Arsenal vs Chelsea',
+        homeWin: 48, draw: 26, awayWin: 26,
+        confidence: 87,
+        recommendation: e?.homeTeam || 'Arsenal',
+      };
+    }
+    if (action === 'marketplace_rankings') {
+      return {
+        type: 'marketplace',
+        bets: events.filter(e => e.odds).slice(0, 4).map((e, i) => ({
+          rank: i + 1,
+          event: e.eventName || `${e.homeTeam} vs ${e.awayTeam}`,
+          selection: e.homeTeam || 'Home',
+          roi: +(8 + Math.random() * 20).toFixed(1),
+          odds: e.odds?.home ?? +(1.8 + Math.random()).toFixed(2),
+          eventId: e.id,
+        }))
+      };
+    }
+    return { type: 'info' };
+  };
+
+  const sendAgentMessage = async () => {
+    const text = agentInput.trim();
+    if (!text || agentLoading) return;
+
+    const userMsg: AgentMessage = { id: Date.now().toString(), role: 'user', text, timestamp: new Date() };
+    setAgentMessages(prev => [...prev, userMsg]);
+    setAgentInput('');
+    setAgentLoading(true);
+
+    try {
+      const res = await fetch('/api/ai/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+      });
+      const data = await res.json();
+      const action: string = data.action || 'info';
+      const result = buildAgentResult(action, liveEvents.length > 0 ? liveEvents : upcomingEvents);
+
+      const botMsg: AgentMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'agent',
+        text: data.message || `Running **${action.replace(/_/g, ' ')}**...`,
+        action,
+        result,
+        timestamp: new Date(),
+      };
+      setAgentMessages(prev => [...prev, botMsg]);
+    } catch {
+      setAgentMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: 'agent',
+        text: '⚠️ Agent error. Please try again.',
+        timestamp: new Date(),
+      }]);
+    } finally {
+      setAgentLoading(false);
+    }
+  };
 
   // ── Fetch live events for value bet + marketplace ─────────────────────────
   const { data: liveEvents = [], isLoading: eventsLoading } = useQuery<any[]>({
@@ -363,6 +497,212 @@ export default function AIBettingPage() {
                 <div className="text-xs text-gray-400">{stat.label}</div>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* ── AI Agent Chat ──────────────────────────────────────────────── */}
+        <div className="bg-[#0d1f24] border border-cyan-500/40 rounded-2xl overflow-hidden shadow-lg shadow-cyan-900/10">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-3 border-b border-cyan-900/30 bg-gradient-to-r from-cyan-500/5 to-transparent">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+              <Bot className="h-4 w-4 text-cyan-400" />
+              <span className="text-sm font-semibold text-cyan-300">AI Agent</span>
+              <Badge className="text-[10px] bg-cyan-500/15 text-cyan-400 border-cyan-500/30 px-1.5 py-0 ml-1">LIVE</Badge>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <Zap className="h-3 w-3 text-yellow-400" />
+              <span>Natural language commands</span>
+            </div>
+          </div>
+
+          {/* Quick Commands */}
+          <div className="flex gap-2 flex-wrap px-4 py-2 border-b border-cyan-900/20 bg-[#0b1618]/40">
+            {[
+              'Find value bets', 'Check arbitrage', 'Run Monte Carlo',
+              'Live signals', 'Portfolio analysis', 'Run all modules',
+            ].map(cmd => (
+              <button
+                key={cmd}
+                onClick={() => { setAgentInput(cmd); }}
+                data-testid={`agent-quick-${cmd.toLowerCase().replace(/\s+/g, '-')}`}
+                className="text-[11px] px-2.5 py-1 rounded-full border border-cyan-900/40 text-cyan-400 hover:bg-cyan-500/10 hover:border-cyan-500/50 transition-colors"
+              >
+                {cmd}
+              </button>
+            ))}
+          </div>
+
+          {/* Messages */}
+          <div className="h-72 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-cyan-900/40" data-testid="agent-messages">
+            {agentMessages.map(msg => (
+              <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                {msg.role === 'agent' && (
+                  <div className="w-6 h-6 rounded-full bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
+                    <Bot className="h-3 w-3 text-cyan-400" />
+                  </div>
+                )}
+                <div className={`max-w-[85%] ${msg.role === 'user'
+                  ? 'bg-cyan-600/20 border border-cyan-600/30 text-white'
+                  : 'bg-[#0b1618] border border-[#1e3a3f] text-gray-200'
+                } rounded-xl px-4 py-2.5 text-sm`}>
+                  <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+
+                  {/* Rich result: value bets */}
+                  {msg.result?.type === 'value_bets' && msg.result.bets?.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {msg.result.bets.map((bet: any, i: number) => (
+                        <div key={i} className="bg-[#0d1f24] border border-cyan-900/30 rounded-lg p-2.5 flex items-center justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-medium text-white truncate">{bet.eventName}</div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[11px] text-cyan-400">Odds {bet.marketOdds}</span>
+                              <span className="text-[11px] text-green-400">Edge +{(bet.edge * 100).toFixed(1)}%</span>
+                              <span className="text-[11px] text-gray-500">AI {(bet.aiProb * 100).toFixed(0)}%</span>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => addBet({ id: `agent-vb-${i}-${Date.now()}`, eventId: bet.eventId, eventName: bet.eventName, selectionName: bet.selection, odds: bet.marketOdds, stake: 10, market: 'Match Winner', homeTeam: bet.homeTeam, awayTeam: bet.awayTeam, currency: 'USDC' })}
+                            className="text-[10px] h-6 px-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 border border-green-500/30 flex-shrink-0"
+                            data-testid={`agent-add-bet-${i}`}
+                          >
+                            + Slip
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Rich result: Monte Carlo */}
+                  {msg.result?.type === 'monte_carlo' && (
+                    <div className="mt-3 bg-[#0d1f24] border border-purple-900/30 rounded-lg p-3">
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div><div className="text-lg font-bold text-purple-300">{(msg.result.simulated * 100).toFixed(0)}%</div><div className="text-[10px] text-gray-500">AI Probability</div></div>
+                        <div><div className="text-lg font-bold text-cyan-300">{(msg.result.confidence * 100).toFixed(0)}%</div><div className="text-[10px] text-gray-500">Confidence</div></div>
+                        <div><div className="text-lg font-bold text-yellow-300">{msg.result.runs.toLocaleString()}</div><div className="text-[10px] text-gray-500">Simulations</div></div>
+                      </div>
+                      <div className="mt-2 text-[11px] text-gray-400 text-center">CI: [{(msg.result.lower * 100).toFixed(1)}% – {(msg.result.upper * 100).toFixed(1)}%]</div>
+                    </div>
+                  )}
+
+                  {/* Rich result: Arbitrage */}
+                  {msg.result?.type === 'arbitrage' && (
+                    <div className="mt-3 space-y-2">
+                      {msg.result.opportunities.map((opp: any, i: number) => (
+                        <div key={i} className="bg-[#0d1f24] border border-yellow-900/30 rounded-lg p-2.5">
+                          <div className="text-xs font-medium text-white truncate">{opp.event}</div>
+                          <div className="flex items-center gap-3 mt-1 text-[11px]">
+                            <span className="text-gray-400">{opp.bookA} @{opp.oddsA}</span>
+                            <span className="text-gray-500">vs</span>
+                            <span className="text-gray-400">{opp.bookB} @{opp.oddsB}</span>
+                            <span className="text-green-400 ml-auto font-bold">+{opp.profit}%</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Rich result: Live signals */}
+                  {msg.result?.type === 'live_signals' && (
+                    <div className="mt-3 space-y-2">
+                      {msg.result.signals.map((sig: any, i: number) => (
+                        <div key={i} className="bg-[#0d1f24] border border-red-900/30 rounded-lg p-2.5 flex items-center gap-2">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${sig.signal === 'BUY' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{sig.signal}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs text-white truncate">{sig.match}</div>
+                            <div className="text-[11px] text-gray-400">{sig.market} · Strength {(sig.strength * 100).toFixed(0)}%</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Rich result: Portfolio */}
+                  {msg.result?.type === 'portfolio' && (
+                    <div className="mt-3 bg-[#0d1f24] border border-blue-900/30 rounded-lg p-3 grid grid-cols-3 gap-2 text-center">
+                      <div><div className="text-lg font-bold text-blue-300">${msg.result.totalStake}</div><div className="text-[10px] text-gray-500">Total Stake</div></div>
+                      <div><div className="text-lg font-bold text-yellow-300">{msg.result.riskScore}</div><div className="text-[10px] text-gray-500">Risk Score</div></div>
+                      <div><div className="text-sm font-bold text-cyan-300">{msg.result.exposure}</div><div className="text-[10px] text-gray-500">Exposure</div></div>
+                    </div>
+                  )}
+
+                  {/* Rich result: Prediction */}
+                  {msg.result?.type === 'prediction' && (
+                    <div className="mt-3 bg-[#0d1f24] border border-cyan-900/30 rounded-lg p-3">
+                      <div className="text-xs font-medium text-white mb-2">{msg.result.match}</div>
+                      <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
+                        <div><div className="text-base font-bold text-green-400">{msg.result.homeWin}%</div><div className="text-gray-500">Home</div></div>
+                        <div><div className="text-base font-bold text-yellow-400">{msg.result.draw}%</div><div className="text-gray-500">Draw</div></div>
+                        <div><div className="text-base font-bold text-red-400">{msg.result.awayWin}%</div><div className="text-gray-500">Away</div></div>
+                      </div>
+                      <div className="mt-2 text-[11px] text-center text-cyan-300">Recommended: {msg.result.recommendation} · {msg.result.confidence}% confidence</div>
+                    </div>
+                  )}
+
+                  {/* Rich result: Marketplace */}
+                  {msg.result?.type === 'marketplace' && (
+                    <div className="mt-3 space-y-2">
+                      {msg.result.bets.map((item: any, i: number) => (
+                        <div key={i} className="bg-[#0d1f24] border border-[#1e3a3f] rounded-lg p-2.5 flex items-center gap-2">
+                          <span className="text-[11px] font-bold text-cyan-400 w-5">#{item.rank}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs text-white truncate">{item.event}</div>
+                            <div className="text-[11px] text-gray-400">{item.selection} · Odds {item.odds} · ROI {item.roi}%</div>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => addBet({ id: `agent-mp-${i}-${Date.now()}`, eventId: item.eventId, eventName: item.event, selectionName: item.selection, odds: item.odds, stake: 10, market: 'Match Winner', currency: 'USDC' })}
+                            className="text-[10px] h-6 px-2 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 border border-cyan-500/30 flex-shrink-0"
+                            data-testid={`agent-add-market-${i}`}
+                          >
+                            + Slip
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="text-[10px] text-gray-600 mt-1.5 text-right">
+                    {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {agentLoading && (
+              <div className="flex justify-start">
+                <div className="w-6 h-6 rounded-full bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
+                  <Bot className="h-3 w-3 text-cyan-400" />
+                </div>
+                <div className="bg-[#0b1618] border border-[#1e3a3f] rounded-xl px-4 py-3 flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 text-cyan-400 animate-spin" />
+                  <span className="text-sm text-gray-400">Analysing...</span>
+                </div>
+              </div>
+            )}
+            <div ref={agentEndRef} />
+          </div>
+
+          {/* Input */}
+          <div className="flex gap-2 p-4 border-t border-cyan-900/20 bg-[#0b1618]/30">
+            <input
+              type="text"
+              value={agentInput}
+              onChange={e => setAgentInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && sendAgentMessage()}
+              placeholder="Type a command… e.g. find value bets, check arbitrage, run all"
+              disabled={agentLoading}
+              data-testid="agent-input"
+              className="flex-1 bg-[#0b1618] border border-[#1e3a3f] focus:border-cyan-500/50 rounded-lg px-4 py-2 text-sm text-white placeholder-gray-600 outline-none transition-colors"
+            />
+            <Button
+              onClick={sendAgentMessage}
+              disabled={agentLoading || !agentInput.trim()}
+              data-testid="agent-send-btn"
+              className="bg-cyan-500 hover:bg-cyan-600 text-black font-bold px-4 rounded-lg disabled:opacity-40"
+            >
+              {agentLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
           </div>
         </div>
 

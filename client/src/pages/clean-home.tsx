@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Link, useLocation } from "wouter";
-import { Search, Clock, TrendingUp, TrendingDown, Wallet, LogOut, RefreshCw, Menu, X, Star, ChevronUp, ChevronDown, Trash2, Info, MoreHorizontal, FileText, Activity, ArrowUpDown, Target, Trophy } from "lucide-react";
+import { Search, Clock, TrendingUp, TrendingDown, Wallet, LogOut, RefreshCw, Menu, X, Star, ChevronUp, ChevronDown, Trash2, Info, MoreHorizontal, FileText, Activity, ArrowUpDown, Target, Trophy, Brain } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -313,6 +313,10 @@ export default function CleanHome() {
                 <MoreHorizontal className="h-4 w-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-[#0b1618] border border-cyan-900/30 min-w-[180px] z-[9999]">
+                <DropdownMenuItem className="cursor-pointer text-cyan-300 hover:text-cyan-200 flex items-center px-4 py-3 text-sm font-medium" onClick={() => setLocation('/ai-betting')} data-testid="nav-more-ai-betting">
+                  <Brain className="h-4 w-4 mr-2" />
+                  AI Betting
+                </DropdownMenuItem>
                 <DropdownMenuItem className="cursor-pointer text-gray-200 hover:text-white flex items-center px-4 py-3 text-sm" onClick={() => setLocation('/wallet-dashboard')} data-testid="nav-more-dashboard">
                   <Wallet className="h-4 w-4 mr-2" />
                   Dashboard
@@ -414,6 +418,7 @@ export default function CleanHome() {
               <Link href="/staking" onClick={() => setIsMobileMenuOpen(false)} className="text-cyan-400 hover:text-cyan-300 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-staking">Staking</Link>
               <Link href="/wallet-dashboard" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-cyan-400 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-dashboard">Dashboard</Link>
               <Link href="/promotions" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-cyan-400 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-promotions">Promotions</Link>
+              <Link href="/ai-betting" onClick={() => setIsMobileMenuOpen(false)} className="text-cyan-400 hover:text-cyan-300 transition-colors text-base font-bold py-2 border-b border-cyan-900/20" data-testid="mobile-nav-ai-betting">🤖 AI Betting</Link>
               <Link href="/streaming" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-cyan-400 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-streaming">Streaming</Link>
               <Link href="/leaderboard" onClick={() => setIsMobileMenuOpen(false)} className="text-yellow-400 hover:text-yellow-300 transition-colors text-base font-bold py-2 border-b border-cyan-900/20" data-testid="mobile-nav-leaderboard">Leaderboard</Link>
               <Link href="/results" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-cyan-400 transition-colors text-base font-medium py-2 border-b border-cyan-900/20" data-testid="mobile-nav-activity">Activity</Link>
