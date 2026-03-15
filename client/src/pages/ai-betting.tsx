@@ -99,7 +99,7 @@ export default function AIBettingPage() {
 
   // ── Auto-Bet Strategy ─────────────────────────────────────────────────────
   const [strategy, setStrategy] = useState<AutoBetStrategy>({
-    minEdge: 0.08, minOdds: 1.8, maxOdds: 3.0, sport: 'football', maxStake: 10
+    minEdge: 0.08, minOdds: 1.8, maxOdds: 3.0, sport: 'football', maxStake: 1000
   });
   const [autoLog, setAutoLog] = useState<string[]>([]);
 
@@ -137,22 +137,9 @@ export default function AIBettingPage() {
     queryKey: ['/api/events'],
   });
 
-  const { data: upcomingEvents = [] } = useQuery<any[]>({
+  const { data: upcomingEvents = [], isLoading: upcomingLoading } = useQuery<any[]>({
     queryKey: ['/api/events', 'upcoming'],
   });
-
-  // Use ALL events for calculations — no artificial cap
-  const allEvents: any[] = (() => {
-    const combined = [...(liveEvents as any[]), ...(upcomingEvents as any[])];
-    // Deduplicate by id
-    const seen = new Set<string>();
-    return combined.filter(e => {
-      const key = String(e.id ?? e.eventId ?? JSON.stringify(e));
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  })();
 
   // Helper: get real odds value from event
   const getRealOdds = (e: any, market: 'home' | 'draw' | 'away') => {
@@ -163,6 +150,24 @@ export default function AIBettingPage() {
     if (market === 'away') return o.away ?? o.awayWin ?? o['2'] ?? null;
     return null;
   };
+
+  // Combine and deduplicate — no artificial cap
+  const allEvents: any[] = (() => {
+    const combined = [...(liveEvents as any[]), ...(upcomingEvents as any[])];
+    const seen = new Set<string>();
+    return combined.filter(e => {
+      const key = String(e.id ?? e.eventId ?? JSON.stringify(e));
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  })();
+
+  // Prioritise events with real odds for the AI context window (top 12)
+  const topEventsForAI = [
+    ...allEvents.filter(e => getRealOdds(e, 'home')),
+    ...allEvents.filter(e => !getRealOdds(e, 'home')),
+  ].slice(0, 12);
 
   // Helper: filter events by team name
   const filterByTeam = (events: any[], team?: string) => {
@@ -477,8 +482,8 @@ export default function AIBettingPage() {
     else setAgentThinking('Thinking…');
 
     try {
-      // Build events context for the AI
-      const topEvents = allEvents.slice(0, 12).map(e => ({
+      // Build events context for the AI — odds-first ordering, capped at 12
+      const topEvents = topEventsForAI.map(e => ({
         homeTeam: e.homeTeam,
         awayTeam: e.awayTeam,
         leagueName: e.leagueName || '',
@@ -509,10 +514,7 @@ export default function AIBettingPage() {
       const data = await res.json();
       const action: string = data.action || 'chat';
       const params = data.params || {};
-      const pool = (liveEvents as any[]).length > 0
-        ? [...(liveEvents as any[]), ...(upcomingEvents as any[])]
-        : upcomingEvents as any[];
-      const result = buildAgentResult(action, pool, params);
+      const result = buildAgentResult(action, allEvents, params);
 
       // Update conversation history
       setChatHistory(prev => [
@@ -544,10 +546,9 @@ export default function AIBettingPage() {
     }
   };
 
-  // ── Value Bet Detection (panel section) ───────────────────────────────────
+  // ── Value Bet Detection (panel section) — no cap, use all events with odds ─
   const valueBets: ValueBet[] = allEvents
-    .filter((e: any) => e.odds && (e.odds.homeWin || e.odds.home))
-    .slice(0, 10)
+    .filter((e: any) => getRealOdds(e, 'home'))
     .map((e: any) => {
       const marketOdds = getRealOdds(e, 'home') || 2.0;
       const drawOdds = getRealOdds(e, 'draw');
@@ -616,7 +617,7 @@ export default function AIBettingPage() {
           market: 'Match Winner',
           homeTeam: vb.homeTeam,
           awayTeam: vb.awayTeam,
-          currency: 'SUI',
+          currency: 'SBETS',
         });
         logs.push(`✅ Added: ${vb.selection} @ ${vb.marketOdds} (edge +${(vb.edge * 100).toFixed(1)}%)`);
         placed++;
@@ -802,7 +803,7 @@ export default function AIBettingPage() {
                           </div>
                           <Button
                             size="sm"
-                            onClick={() => addBet({ id: `agent-vb-${i}-${Date.now()}`, eventId: bet.eventId, eventName: bet.eventName, selectionName: bet.selection, odds: bet.marketOdds, stake: 10, market: 'Match Winner', homeTeam: bet.homeTeam, awayTeam: bet.awayTeam, currency: 'SUI' })}
+                            onClick={() => addBet({ id: `agent-vb-${i}-${Date.now()}`, eventId: bet.eventId, eventName: bet.eventName, selectionName: bet.selection, odds: bet.marketOdds, stake: 1000, market: 'Match Winner', homeTeam: bet.homeTeam, awayTeam: bet.awayTeam, currency: 'SBETS' })}
                             className="text-[10px] h-6 px-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 border border-green-500/30 flex-shrink-0"
                             data-testid={`agent-add-bet-${i}`}
                           >
@@ -912,7 +913,7 @@ export default function AIBettingPage() {
                       {msg.result.eventId && (
                         <Button
                           size="sm"
-                          onClick={() => addBet({ id: `agent-pred-${Date.now()}`, eventId: msg.result.eventId, eventName: msg.result.match, selectionName: `${msg.result.recommendation} Win`, odds: msg.result.odds || 2.0, stake: 10, market: msg.result.market || 'Match Winner', homeTeam: msg.result.homeTeam, awayTeam: msg.result.awayTeam, currency: 'SUI' })}
+                          onClick={() => addBet({ id: `agent-pred-${Date.now()}`, eventId: msg.result.eventId, eventName: msg.result.match, selectionName: `${msg.result.recommendation} Win`, odds: msg.result.odds || 2.0, stake: 1000, market: msg.result.market || 'Match Winner', homeTeam: msg.result.homeTeam, awayTeam: msg.result.awayTeam, currency: 'SBETS' })}
                           className="text-[10px] h-6 px-3 w-full bg-green-600/20 hover:bg-green-600/30 text-green-400 border border-green-500/30"
                           data-testid="agent-add-prediction"
                         >
@@ -934,7 +935,7 @@ export default function AIBettingPage() {
                           </div>
                           <Button
                             size="sm"
-                            onClick={() => addBet({ id: `agent-mp-${i}-${Date.now()}`, eventId: item.eventId, eventName: item.event, selectionName: item.selection, odds: item.odds, stake: 10, market: 'Match Winner', currency: 'SUI' })}
+                            onClick={() => addBet({ id: `agent-mp-${i}-${Date.now()}`, eventId: item.eventId, eventName: item.event, selectionName: item.selection, odds: item.odds, stake: 1000, market: 'Match Winner', currency: 'SBETS' })}
                             className="text-[10px] h-6 px-2 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 border border-cyan-500/30 flex-shrink-0"
                             data-testid={`agent-add-market-${i}`}
                           >
@@ -981,7 +982,7 @@ export default function AIBettingPage() {
                             <div className="text-[11px] text-white truncate">{bet.eventName}</div>
                             <div className="text-[10px] text-gray-400">{bet.selection} · @{bet.marketOdds} · +{(bet.edge * 100).toFixed(1)}% edge</div>
                           </div>
-                          <Button size="sm" onClick={() => addBet({ id: `agent-all-${i}-${Date.now()}`, eventId: bet.eventId, eventName: bet.eventName, selectionName: bet.selection, odds: bet.marketOdds, stake: 10, market: 'Match Winner', homeTeam: bet.homeTeam, awayTeam: bet.awayTeam, currency: 'SUI' })}
+                          <Button size="sm" onClick={() => addBet({ id: `agent-all-${i}-${Date.now()}`, eventId: bet.eventId, eventName: bet.eventName, selectionName: bet.selection, odds: bet.marketOdds, stake: 1000, market: 'Match Winner', homeTeam: bet.homeTeam, awayTeam: bet.awayTeam, currency: 'SBETS' })}
                             className="text-[10px] h-6 px-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 border border-green-500/30 flex-shrink-0" data-testid={`agent-all-add-${i}`}>
                             + Slip
                           </Button>
@@ -1061,7 +1062,7 @@ export default function AIBettingPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
                 { label: 'Live Sports APIs', status: `${(liveEvents as any[]).length} live events`, icon: <Network className="h-4 w-4" />, color: 'green' },
-                { label: 'Odds Providers', status: `${allEvents.filter((e: any) => e.odds).length} markets loaded`, icon: <BarChart3 className="h-4 w-4" />, color: 'blue' },
+                { label: 'Odds Providers', status: `${allEvents.filter((e: any) => getRealOdds(e, 'home')).length} markets loaded`, icon: <BarChart3 className="h-4 w-4" />, color: 'blue' },
                 { label: 'Value Bet Scanner', status: `${valueBets.length} edges found`, icon: <Target className="h-4 w-4" />, color: 'purple' },
                 { label: 'AI Model', status: 'GPT-4o · Active', icon: <Brain className="h-4 w-4" />, color: 'yellow' },
               ].map((source, i) => (
@@ -1111,7 +1112,7 @@ export default function AIBettingPage() {
                   <div className={`w-2 h-2 rounded-full flex-shrink-0 ${v.edge > 0.10 ? 'bg-green-400' : v.edge > 0.05 ? 'bg-yellow-400' : 'bg-gray-500'}`} />
                   <Button
                     size="sm"
-                    onClick={() => addBet({ id: `vb-${v.eventId}-${i}`, eventId: v.eventId, eventName: v.eventName, selectionName: v.selection, odds: v.marketOdds, stake: 10, market: 'Match Winner', homeTeam: v.homeTeam, awayTeam: v.awayTeam, currency: 'SUI' })}
+                    onClick={() => addBet({ id: `vb-${v.eventId}-${i}`, eventId: v.eventId, eventName: v.eventName, selectionName: v.selection, odds: v.marketOdds, stake: 1000, market: 'Match Winner', homeTeam: v.homeTeam, awayTeam: v.awayTeam, currency: 'SBETS' })}
                     className="h-7 text-xs bg-green-600/15 hover:bg-green-600/30 text-green-400 border border-green-500/30"
                     data-testid={`add-value-bet-${i}`}
                   >
@@ -1236,8 +1237,8 @@ export default function AIBettingPage() {
                   className="w-full accent-cyan-500" data-testid="strategy-min-edge" />
               </div>
               <div>
-                <label className="text-xs text-gray-400 block mb-1">Max Stake: <span className="text-white font-mono">{strategy.maxStake} SUI</span></label>
-                <input type="range" min="1" max="100" step="1" value={strategy.maxStake}
+                <label className="text-xs text-gray-400 block mb-1">Max Stake: <span className="text-white font-mono">{strategy.maxStake.toLocaleString()} SBETS</span></label>
+                <input type="range" min="1000" max="10000" step="100" value={strategy.maxStake}
                   onChange={e => setStrategy(s => ({ ...s, maxStake: Number(e.target.value) }))}
                   className="w-full accent-cyan-500" data-testid="strategy-max-stake" />
               </div>
@@ -1369,11 +1370,11 @@ export default function AIBettingPage() {
                     eventName: b.event,
                     selectionName: b.selection,
                     odds: b.odds,
-                    stake: 10,
+                    stake: 1000,
                     market: 'Match Winner',
                     homeTeam: b.homeTeam,
                     awayTeam: b.awayTeam,
-                    currency: 'SUI',
+                    currency: 'SBETS',
                   })}
                   data-testid={`add-market-bet-${i}`}
                 >
