@@ -599,10 +599,20 @@ export class FreeSportsService {
       const sofaScoreResults = await this.fetchSofaScoreResults();
       if (sofaScoreResults.length > 0) {
         results.push(...sofaScoreResults);
-        console.log(`[FreeSports] 🎯 SofaScore results: ${sofaScoreResults.length} finished matches for settlement`);
+        console.log(`[FreeSports] 🎯 SofaScore results: ${sofaScoreResults.length} finished niche sport matches for settlement`);
       }
     } catch (error: any) {
       console.error(`[FreeSports] SofaScore results fetch error:`, error.message);
+    }
+
+    try {
+      const wweResults = this.generateWWEResults();
+      if (wweResults.length > 0) {
+        results.push(...wweResults);
+        console.log(`[FreeSports] 🎭 WWE results: ${wweResults.length} matches auto-settled`);
+      }
+    } catch (error: any) {
+      console.error(`[FreeSports] WWE results generation error:`, error.message);
     }
 
     lastResultsFetchTime = Date.now();
@@ -1279,52 +1289,36 @@ export class FreeSportsService {
       const rawDateStr = new Date(mondayMs + 3600000).toISOString().split('T')[0];
       const rv = rawVenues[venueIdx];
 
+      // Raw: exactly 4 matches per episode (Main Event, Women's, Title, Tag)
       const [m1, m2, mo1, mo2, mt] = rawMain[weekOffset % rawMain.length];
-      events.push({ id: `raw-${rawDateStr}-main`, wrestler1: m1, wrestler2: m2, odds1: mo1, odds2: mo2, title: mt, venue: rv, date: new Date(mondayMs + 4 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Singles Match' });
+      events.push({ id: `raw-${rawDateStr}-main`, wrestler1: m1, wrestler2: m2, odds1: mo1, odds2: mo2, title: mt, venue: rv, date: new Date(mondayMs + 4 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Main Event' });
 
       const [w1, w2, wo1, wo2, wt] = rawWomens[weekOffset % rawWomens.length];
-      events.push({ id: `raw-${rawDateStr}-women`, wrestler1: w1, wrestler2: w2, odds1: wo1, odds2: wo2, title: wt, venue: rv, date: new Date(mondayMs + 3.5 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Singles Match' });
+      events.push({ id: `raw-${rawDateStr}-women`, wrestler1: w1, wrestler2: w2, odds1: wo1, odds2: wo2, title: wt, venue: rv, date: new Date(mondayMs + 3 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: "Women's Match" });
 
       const [rt1, rt2, rto1, rto2, rtt] = rawTitle[weekOffset % rawTitle.length];
-      events.push({ id: `raw-${rawDateStr}-title`, wrestler1: rt1, wrestler2: rt2, odds1: rto1, odds2: rto2, title: rtt, venue: rv, date: new Date(mondayMs + 3 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Championship Match' });
-
-      const [md1, md2, mdo1, mdo2, mdt] = rawMid[weekOffset % rawMid.length];
-      events.push({ id: `raw-${rawDateStr}-mid`, wrestler1: md1, wrestler2: md2, odds1: mdo1, odds2: mdo2, title: mdt, venue: rv, date: new Date(mondayMs + 2.5 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Singles Match' });
-
-      const [md21, md22, md2o1, md2o2, md2t] = rawMid2[weekOffset % rawMid2.length];
-      events.push({ id: `raw-${rawDateStr}-mid2`, wrestler1: md21, wrestler2: md22, odds1: md2o1, odds2: md2o2, title: md2t, venue: rv, date: new Date(mondayMs + 2 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Singles Match' });
+      events.push({ id: `raw-${rawDateStr}-title`, wrestler1: rt1, wrestler2: rt2, odds1: rto1, odds2: rto2, title: rtt, venue: rv, date: new Date(mondayMs + 2 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Championship Match' });
 
       const [t1, t2, to1, to2, tt] = rawTag[weekOffset % rawTag.length];
-      events.push({ id: `raw-${rawDateStr}-tag`, wrestler1: t1, wrestler2: t2, odds1: to1, odds2: to2, title: tt, venue: rv, date: new Date(mondayMs + 1.5 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Tag Team Match' });
-
-      const [ro1, ro2, roo1, roo2, rot] = rawOpener[weekOffset % rawOpener.length];
-      events.push({ id: `raw-${rawDateStr}-opener`, wrestler1: ro1, wrestler2: ro2, odds1: roo1, odds2: roo2, title: rot, venue: rv, date: new Date(mondayMs + 1 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Singles Match' });
+      events.push({ id: `raw-${rawDateStr}-tag`, wrestler1: t1, wrestler2: t2, odds1: to1, odds2: to2, title: tt, venue: rv, date: new Date(mondayMs + 1 * 3600000).toISOString(), show: 'Monday Night Raw', matchType: 'Tag Team Match' });
 
       const fridayMs = mondayMs + 4 * 86400000;
       const sdVenueIdx = weekOffset % sdVenues.length;
       const sdDateStr = new Date(fridayMs + 3600000).toISOString().split('T')[0];
       const sv = sdVenues[sdVenueIdx];
 
+      // SmackDown: exactly 4 matches per episode (Main Event, Women's, Title, Tag)
       const [s1, s2, so1, so2, st] = sdMain[weekOffset % sdMain.length];
-      events.push({ id: `sd-${sdDateStr}-main`, wrestler1: s1, wrestler2: s2, odds1: so1, odds2: so2, title: st, venue: sv, date: new Date(fridayMs + 4 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Singles Match' });
+      events.push({ id: `sd-${sdDateStr}-main`, wrestler1: s1, wrestler2: s2, odds1: so1, odds2: so2, title: st, venue: sv, date: new Date(fridayMs + 4 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Main Event' });
 
       const [sw1, sw2, swo1, swo2, swt] = sdWomens[weekOffset % sdWomens.length];
-      events.push({ id: `sd-${sdDateStr}-women`, wrestler1: sw1, wrestler2: sw2, odds1: swo1, odds2: swo2, title: swt, venue: sv, date: new Date(fridayMs + 3.5 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Singles Match' });
+      events.push({ id: `sd-${sdDateStr}-women`, wrestler1: sw1, wrestler2: sw2, odds1: swo1, odds2: swo2, title: swt, venue: sv, date: new Date(fridayMs + 3 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: "Women's Match" });
 
       const [sdt1, sdt2, sdto1, sdto2, sdtt] = sdTitle[weekOffset % sdTitle.length];
-      events.push({ id: `sd-${sdDateStr}-title`, wrestler1: sdt1, wrestler2: sdt2, odds1: sdto1, odds2: sdto2, title: sdtt, venue: sv, date: new Date(fridayMs + 3 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Championship Match' });
-
-      const [smd1, smd2, smdo1, smdo2, smdt] = sdMid[weekOffset % sdMid.length];
-      events.push({ id: `sd-${sdDateStr}-mid`, wrestler1: smd1, wrestler2: smd2, odds1: smdo1, odds2: smdo2, title: smdt, venue: sv, date: new Date(fridayMs + 2.5 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Singles Match' });
-
-      const [smd21, smd22, smd2o1, smd2o2, smd2t] = sdMid2[weekOffset % sdMid2.length];
-      events.push({ id: `sd-${sdDateStr}-mid2`, wrestler1: smd21, wrestler2: smd22, odds1: smd2o1, odds2: smd2o2, title: smd2t, venue: sv, date: new Date(fridayMs + 2 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Singles Match' });
+      events.push({ id: `sd-${sdDateStr}-title`, wrestler1: sdt1, wrestler2: sdt2, odds1: sdto1, odds2: sdto2, title: sdtt, venue: sv, date: new Date(fridayMs + 2 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Championship Match' });
 
       const [st1, st2, sto1, sto2, stt] = sdTag[weekOffset % sdTag.length];
-      events.push({ id: `sd-${sdDateStr}-tag`, wrestler1: st1, wrestler2: st2, odds1: sto1, odds2: sto2, title: stt, venue: sv, date: new Date(fridayMs + 1.5 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Tag Team Match' });
-
-      const [sop1, sop2, sopo1, sopo2, sopt] = sdOpener[weekOffset % sdOpener.length];
-      events.push({ id: `sd-${sdDateStr}-opener`, wrestler1: sop1, wrestler2: sop2, odds1: sopo1, odds2: sopo2, title: sopt, venue: sv, date: new Date(fridayMs + 1 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Singles Match' });
+      events.push({ id: `sd-${sdDateStr}-tag`, wrestler1: st1, wrestler2: st2, odds1: sto1, odds2: sto2, title: stt, venue: sv, date: new Date(fridayMs + 1 * 3600000).toISOString(), show: 'Friday Night SmackDown', matchType: 'Tag Team Match' });
     }
 
     return events;
@@ -1627,6 +1621,105 @@ export class FreeSportsService {
         eventTitle: event.title,
       } as SportEvent;
     });
+  }
+
+  /**
+   * Generate deterministic settlement results for past WWE events.
+   * Covers:
+   *   1. Fixed PPV events whose start time has passed
+   *   2. Past Raw/SmackDown episodes (14-day lookback) using the same ID pattern the upcoming generator uses
+   * The same event ID always produces the same winner (seeded hash), so bets settle consistently.
+   */
+  private generateWWEResults(): FreeSportsResult[] {
+    const now = new Date();
+    const SETTLE_DELAY_MS = 4 * 60 * 60 * 1000; // 4 hours post-start
+    const results: FreeSportsResult[] = [];
+
+    const seededWinner = (eventId: string, homeOdds: number): 'home' | 'away' => {
+      const seed = eventId.split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
+      const rand = Math.abs(Math.sin(seed) * 10000) % 1;
+      const homeProb = homeOdds ? 1 / homeOdds : 0.5;
+      return rand < homeProb ? 'home' : 'away';
+    };
+
+    // ── 1. Fixed PPV events (pull from the main list, settle past ones) ──
+    const fixedPPVMatches: { id: string; wrestler1: string; wrestler2: string; odds1: number; odds2: number; date: string }[] = [
+      { id: 'wrestlemania42-punk-reigns', wrestler1: 'CM Punk (c)', wrestler2: 'Roman Reigns', odds1: 1.65, odds2: 2.20, date: '2026-04-19T22:00:00Z' },
+      { id: 'wrestlemania42-rhodes-orton', wrestler1: 'Cody Rhodes (c)', wrestler2: 'Randy Orton', odds1: 1.50, odds2: 2.50, date: '2026-04-18T22:00:00Z' },
+      { id: 'wrestlemania42-cargill-ripley', wrestler1: 'Jade Cargill (c)', wrestler2: 'Rhea Ripley', odds1: 2.10, odds2: 1.72, date: '2026-04-18T20:00:00Z' },
+      { id: 'wrestlemania42-vaquer-morgan', wrestler1: 'Stephanie Vaquer (c)', wrestler2: 'Liv Morgan', odds1: 1.80, odds2: 2.00, date: '2026-04-19T20:00:00Z' },
+      { id: 'wrestlemania42-lee-lynch', wrestler1: 'AJ Lee (c)', wrestler2: 'Becky Lynch', odds1: 1.90, odds2: 1.90, date: '2026-04-18T19:00:00Z' },
+      { id: 'wrestlemania42-rollins-paul', wrestler1: 'Seth Rollins', wrestler2: 'Logan Paul', odds1: 1.40, odds2: 2.90, date: '2026-04-19T19:30:00Z' },
+      { id: 'wrestlemania42-lesnar-open', wrestler1: 'Brock Lesnar', wrestler2: 'Oba Femi', odds1: 2.10, odds2: 1.72, date: '2026-04-18T21:00:00Z' },
+      { id: 'wrestlemania42-giulia-flair', wrestler1: 'Giulia (c)', wrestler2: 'Charlotte Flair', odds1: 2.20, odds2: 1.65, date: '2026-04-19T18:30:00Z' },
+      { id: 'wrestlemania42-hayes-williams', wrestler1: 'Carmelo Hayes', wrestler2: 'Trick Williams', odds1: 1.85, odds2: 1.95, date: '2026-04-18T18:30:00Z' },
+      { id: 'backlash2026-main', wrestler1: 'CM Punk', wrestler2: 'Seth Rollins', odds1: 1.55, odds2: 2.40, date: '2026-05-03T23:00:00Z' },
+      { id: 'backlash2026-womens', wrestler1: 'Rhea Ripley', wrestler2: 'Bianca Belair', odds1: 1.60, odds2: 2.30, date: '2026-05-03T22:00:00Z' },
+      { id: 'backlash2026-tag', wrestler1: 'The Usos', wrestler2: 'DIY', odds1: 1.70, odds2: 2.10, date: '2026-05-03T21:00:00Z' },
+      { id: 'clash-italy-main', wrestler1: 'Cody Rhodes', wrestler2: 'Gunther', odds1: 1.75, odds2: 2.05, date: '2026-05-31T20:00:00Z' },
+      { id: 'clash-italy-womens', wrestler1: 'Liv Morgan', wrestler2: 'IYO SKY', odds1: 1.65, odds2: 2.20, date: '2026-05-31T19:00:00Z' },
+      { id: 'summerslam2026-main', wrestler1: 'Roman Reigns', wrestler2: 'John Cena', odds1: 1.45, odds2: 2.75, date: '2026-08-01T23:00:00Z' },
+      { id: 'summerslam2026-wh', wrestler1: 'CM Punk', wrestler2: 'Drew McIntyre', odds1: 1.60, odds2: 2.30, date: '2026-08-02T23:00:00Z' },
+      { id: 'summerslam2026-womens', wrestler1: 'Rhea Ripley', wrestler2: 'Charlotte Flair', odds1: 1.55, odds2: 2.40, date: '2026-08-01T21:00:00Z' },
+      { id: 'mitb2026-mens', wrestler1: 'LA Knight', wrestler2: 'Jey Uso', odds1: 2.50, odds2: 3.00, date: '2026-09-06T23:00:00Z' },
+      { id: 'mitb2026-womens', wrestler1: 'Bianca Belair', wrestler2: 'Bayley', odds1: 2.80, odds2: 3.20, date: '2026-09-06T22:00:00Z' },
+      { id: 'survivor2026-main', wrestler1: 'Team Raw', wrestler2: 'Team SmackDown', odds1: 1.75, odds2: 2.05, date: '2026-11-29T23:00:00Z' },
+      { id: 'survivor2026-womens', wrestler1: 'Team Raw Women', wrestler2: 'Team SmackDown Women', odds1: 1.85, odds2: 1.95, date: '2026-11-29T22:00:00Z' },
+    ];
+
+    for (const match of fixedPPVMatches) {
+      const startTime = new Date(match.date);
+      if (now.getTime() - startTime.getTime() < SETTLE_DELAY_MS) continue;
+      const w = seededWinner(`wwe_${match.id}`, match.odds1);
+      results.push({
+        eventId: `wwe_${match.id}`,
+        homeTeam: match.wrestler1,
+        awayTeam: match.wrestler2,
+        homeScore: w === 'home' ? 1 : 0,
+        awayScore: w === 'away' ? 1 : 0,
+        winner: w,
+        status: 'finished',
+      });
+    }
+
+    // ── 2. Weekly Raw (Monday) + SmackDown (Friday) episodes — 14-day lookback ──
+    // We use the same date-based ID pattern the upcoming generator uses so bets match.
+    const rawSlots = ['-main', '-women', '-title', '-tag'];
+    const sdSlots  = ['-main', '-women', '-title', '-tag'];
+
+    const nowUtc = now.getTime();
+    const nowUtcMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+
+    for (let dayOffset = -14; dayOffset <= -1; dayOffset++) {
+      const dayMs = nowUtcMidnight + dayOffset * 86400000;
+      const dayOfWeek = new Date(dayMs).getUTCDay(); // 0=Sun, 1=Mon, 5=Fri
+
+      if (dayOfWeek === 1) {
+        // Monday Night Raw
+        const showDateStr = new Date(dayMs).toISOString().split('T')[0];
+        const showStartMs = dayMs + 4 * 3600000; // 4am UTC (Raw airs 8pm EST)
+        if (nowUtc - showStartMs < SETTLE_DELAY_MS) continue;
+
+        for (const slot of rawSlots) {
+          const eventId = `wwe_raw-${showDateStr}${slot}`;
+          const w = seededWinner(eventId, 1.60); // default 1.60 if no odds stored
+          results.push({ eventId, homeTeam: 'Wrestler A', awayTeam: 'Wrestler B', homeScore: w === 'home' ? 1 : 0, awayScore: w === 'away' ? 1 : 0, winner: w, status: 'finished' });
+        }
+      } else if (dayOfWeek === 5) {
+        // Friday Night SmackDown
+        const showDateStr = new Date(dayMs).toISOString().split('T')[0];
+        const showStartMs = dayMs + 4 * 3600000; // 4am UTC (SmackDown airs 8pm EST)
+        if (nowUtc - showStartMs < SETTLE_DELAY_MS) continue;
+
+        for (const slot of sdSlots) {
+          const eventId = `wwe_sd-${showDateStr}${slot}`;
+          const w = seededWinner(eventId, 1.60);
+          results.push({ eventId, homeTeam: 'Wrestler A', awayTeam: 'Wrestler B', homeScore: w === 'home' ? 1 : 0, awayScore: w === 'away' ? 1 : 0, winner: w, status: 'finished' });
+        }
+      }
+    }
+
+    return results;
   }
 
   private generateF1Schedule(): SportEvent[] {
