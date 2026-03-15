@@ -2,6 +2,7 @@ import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
 import { SportEvent, MarketData, OutcomeData } from '../types/betting';
+import { mmaApiService } from './mmaApiService';
 
 /**
  * FREE SPORTS SERVICE
@@ -419,13 +420,27 @@ export class FreeSportsService {
     }
 
     try {
-      const generatedUFC = this.generateUFCEvents();
-      if (generatedUFC.length > 0) {
-        allEvents.push(...generatedUFC);
-        console.log(`[FreeSports] 🥋 UFC Generated: ${generatedUFC.length} upcoming fight cards`);
+      await mmaApiService.refreshCache();
+      const realMMAEvents = mmaApiService.getUpcomingEvents();
+      if (realMMAEvents.length > 0) {
+        allEvents.push(...realMMAEvents);
+        console.log(`[FreeSports] 🥋 UFC/MMA Real API: ${realMMAEvents.length} upcoming fights from API`);
+      } else {
+        const generatedUFC = this.generateUFCEvents();
+        if (generatedUFC.length > 0) {
+          allEvents.push(...generatedUFC);
+          console.log(`[FreeSports] 🥋 UFC Fallback: ${generatedUFC.length} generated fight cards (API returned 0)`);
+        }
       }
     } catch (error: any) {
-      console.error(`[FreeSports] UFC generation error:`, error.message);
+      console.error(`[FreeSports] UFC/MMA fetch error:`, error.message);
+      try {
+        const generatedUFC = this.generateUFCEvents();
+        if (generatedUFC.length > 0) {
+          allEvents.push(...generatedUFC);
+          console.log(`[FreeSports] 🥋 UFC Fallback after error: ${generatedUFC.length} generated fight cards`);
+        }
+      } catch {}
     }
 
     cachedFreeSportsEvents = allEvents;
