@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import OpenAI from 'openai';
+import { getLiveSnapshot, getUpcomingSnapshot } from './services/apiSportsService';
 
 // Resolve the OpenAI API key from multiple possible env var names
 const resolveOpenAIKey = () =>
@@ -11,6 +12,81 @@ const resolveOpenAIKey = () =>
 const getOpenAIClient = () => new OpenAI({ apiKey: resolveOpenAIKey() });
 
 const router = Router();
+
+// ── Build real-time events context from server-side snapshots ─────────────────
+function buildRealTimeEventsContext(userMessage: string): {
+  contextStr: string;
+  liveCount: number;
+  upcomingCount: number;
+  allEvents: Array<{ homeTeam: string; awayTeam: string; league: string; sport: string; odds: any; isLive: boolean; score: string; elapsed?: number }>;
+} {
+  const liveSnap = getLiveSnapshot();
+  const upcomingSnap = getUpcomingSnapshot();
+  const liveEvents = liveSnap.events || [];
+  const upcomingEvents = upcomingSnap.events || [];
+
+  const normalize = (e: any, isLive: boolean) => {
+    const homeOdds = e.odds?.home ?? e.odds?.homeWin ?? e.homeOdds ?? null;
+    const drawOdds = e.odds?.draw ?? e.drawOdds ?? null;
+    const awayOdds = e.odds?.away ?? e.odds?.awayWin ?? e.awayOdds ?? null;
+    const homeScore = e.homeScore ?? e.goals?.home ?? null;
+    const awayScore = e.awayScore ?? e.goals?.away ?? null;
+    const score = (homeScore !== null && awayScore !== null) ? `${homeScore}-${awayScore}` : '';
+    const elapsed = e.elapsed ?? e.fixture?.status?.elapsed ?? null;
+    return {
+      homeTeam: e.homeTeam || e.teams?.home?.name || 'Home',
+      awayTeam: e.awayTeam || e.teams?.away?.name || 'Away',
+      league: e.leagueName || e.league?.name || '',
+      sport: e.sport || 'football',
+      odds: homeOdds ? { home: homeOdds, draw: drawOdds, away: awayOdds } : null,
+      isLive,
+      score,
+      elapsed: elapsed ? Number(elapsed) : undefined,
+    };
+  };
+
+  const allEvents = [
+    ...liveEvents.map(e => normalize(e, true)),
+    ...upcomingEvents.map(e => normalize(e, false)),
+  ];
+
+  // Detect team name in user message for highlighting
+  const msgLower = userMessage.toLowerCase();
+
+  let contextStr = '\n\n━━━ REAL-TIME MATCH DATA (fetched live right now) ━━━\n';
+
+  // Live matches first with scores
+  const live = allEvents.filter(e => e.isLive);
+  if (live.length > 0) {
+    contextStr += `\n🔴 LIVE RIGHT NOW (${live.length} matches):\n`;
+    live.forEach((e, i) => {
+      const scoreStr = e.score ? ` [Score: ${e.score}${e.elapsed ? ` · ${e.elapsed}'` : ''}]` : '';
+      const oddsStr = e.odds?.home ? `H ${e.odds.home}${e.odds.draw ? ` | D ${e.odds.draw}` : ''} | A ${e.odds.away ?? '?'}` : 'No odds';
+      const isQueryMatch = e.homeTeam.toLowerCase().includes(msgLower.split(' ')[0]) || e.awayTeam.toLowerCase().includes(msgLower.split(' ')[0]);
+      const highlight = isQueryMatch ? ' ◀ QUERIED MATCH' : '';
+      contextStr += `  ${i + 1}. ${e.homeTeam} vs ${e.awayTeam}${scoreStr} | ${e.league} | Odds: ${oddsStr}${highlight}\n`;
+    });
+  }
+
+  // Upcoming matches
+  const upcoming = allEvents.filter(e => !e.isLive);
+  if (upcoming.length > 0) {
+    contextStr += `\n⏳ UPCOMING (${upcoming.length} matches):\n`;
+    upcoming.slice(0, 30).forEach((e, i) => {
+      const oddsStr = e.odds?.home ? `H ${e.odds.home}${e.odds.draw ? ` | D ${e.odds.draw}` : ''} | A ${e.odds.away ?? '?'}` : 'No odds';
+      contextStr += `  ${i + 1}. ${e.homeTeam} vs ${e.awayTeam} | ${e.league} | Odds: ${oddsStr}\n`;
+    });
+    if (upcoming.length > 30) contextStr += `  ... and ${upcoming.length - 30} more upcoming matches\n`;
+  }
+
+  if (allEvents.length === 0) {
+    contextStr += '  No live events in cache right now. Data refreshes every 60 seconds.\n';
+  }
+
+  contextStr += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+
+  return { contextStr, liveCount: live.length, upcomingCount: upcoming.length, allEvents };
+}
 
 // AI Betting Suggestion endpoint with provider selection
 router.post('/api/ai/betting-suggestion', async (req: Request, res: Response) => {
@@ -357,96 +433,68 @@ router.post('/api/ai/agent', async (req: Request, res: Response) => {
   try {
     const { message, context, history } = req.body as {
       message: string;
-      context?: {
-        liveEventCount?: number;
-        upcomingEventCount?: number;
-        betSlipCount?: number;
-        topEvents?: Array<{
-          homeTeam: string;
-          awayTeam: string;
-          leagueName?: string;
-          sport?: string;
-          odds?: { home?: number; draw?: number; away?: number; homeWin?: number; awayWin?: number };
-          isLive?: boolean;
-          score?: string;
-        }>;
-      };
+      context?: { betSlipCount?: number };
       history?: Array<{ role: 'user' | 'assistant'; content: string }>;
     };
 
-    // Build events context string for the AI
-    let eventsContext = '';
-    if (context?.topEvents && context.topEvents.length > 0) {
-      eventsContext = '\n\nCURRENT LIVE & UPCOMING EVENTS (use these for specific analysis):\n';
-      context.topEvents.slice(0, 12).forEach((e, i) => {
-        const homeOdds = e.odds?.home ?? e.odds?.homeWin;
-        const drawOdds = e.odds?.draw;
-        const awayOdds = e.odds?.away ?? e.odds?.awayWin;
-        const oddsStr = homeOdds
-          ? `Odds: H ${homeOdds}${drawOdds ? ` | D ${drawOdds}` : ''} | A ${awayOdds || '?'}`
-          : 'Odds: N/A';
-        const liveStr = e.isLive ? '[LIVE' + (e.score ? ` ${e.score}` + ']' : ']') : '[Upcoming]';
-        eventsContext += `${i + 1}. ${e.homeTeam} vs ${e.awayTeam} ${liveStr} | ${e.leagueName || e.sport || 'Football'} | ${oddsStr}\n`;
-      });
-    }
+    // ── Fetch REAL-TIME data from server-side snapshots ────────────────────
+    const { contextStr: realTimeContext, liveCount, upcomingCount } = buildRealTimeEventsContext(message || '');
 
-    const systemPrompt = `You are SuiBets AI Agent — the world's most advanced sports betting intelligence system, powered by real-time market data, statistical modeling, and deep sports expertise.
+    const systemPrompt = `You are SuiBets AI Agent — an advanced sports betting intelligence system with 100% REAL-TIME data access. You have live match scores, current odds, and all upcoming fixtures fetched RIGHT NOW from our sports data feed. Never say you don't have real-time data — you DO.
 
-TODAY'S PLATFORM STATS:
-- Live events: ${context?.liveEventCount ?? 0}
-- Upcoming events: ${context?.upcomingEventCount ?? 0}
-- Active bet slip selections: ${context?.betSlipCount ?? 0}${eventsContext}
+TODAY'S LIVE DATA (as of this moment):
+- Live matches in progress: ${liveCount}
+- Upcoming fixtures loaded: ${upcomingCount}
+- Active bet slip selections: ${context?.betSlipCount ?? 0}
+${realTimeContext}
+
+CRITICAL RULES:
+1. ALWAYS reference specific teams, scores, and odds from the real-time data above
+2. If a user asks about a specific team/match, SEARCH the data above and give exact odds and score
+3. If a match is LIVE, tell the user the current score and elapsed time
+4. If a match is upcoming, tell the user the current market odds
+5. For live matches: reference current score, elapsed minutes, and live odds
+6. NEVER give generic responses — always cite real data from the list above
+7. If the team is not in the list, say so honestly and note what similar matches are available
 
 AVAILABLE ACTIONS:
-- value_bets: Scan all markets for edges where AI true-probability > market implied-probability. Identify best value using Kelly Criterion logic.
-- monte_carlo: Run Monte Carlo match simulation with 50,000+ iterations. Returns probability distribution with 95% confidence intervals.
-- arbitrage: Find risk-free opportunities where sum of (1/odds) < 1.0 across outcomes. Real guaranteed profit scenarios.
-- odds_movement: Detect sharp money, steam moves, and insider signals. Analyse opening vs current odds movement patterns.
-- live_signals: Analyse live match data — possession, xG, pressure index — for in-play betting opportunities with momentum signals.
-- predictions: Deep match prediction with win/draw/loss probabilities, key factors, and recommended selection.
-- marketplace: Rank today's top bets by composite AI score = (true_prob / implied_prob - 1) × confidence.
-- portfolio: Analyse current bet portfolio — total exposure, risk-adjusted Kelly stake, diversification score.
-- run_all: Execute complete 8-module scan simultaneously. Returns best value bets, top arb, live signals in one shot.
-- chat: Answer general betting questions, explain concepts, strategy advice.
+- value_bets: Scan for edges where AI probability > market implied probability (Kelly Criterion)
+- monte_carlo: 50,000+ iteration match simulation with confidence intervals
+- arbitrage: Risk-free profit opportunities where sum(1/odds) < 1.0
+- odds_movement: Sharp money detection, steam moves, line movement analysis
+- live_signals: In-play analysis using current score, momentum, xG estimates
+- predictions: Deep match prediction — win/draw/loss probabilities + recommendation
+- marketplace: Top bets ranked by composite AI score
+- portfolio: Portfolio risk analysis and Kelly stake recommendations
+- run_all: Full 8-module scan — value bets, arb, live signals, odds movement
+- chat: Expert answers, strategy advice, explain concepts using real data
 
-INTENT MAPPING (be strict and precise):
-"find value" / "value bets" / "edges" / "good bets" / "what should I bet" / "any tips" → value_bets
-"simulate" / "monte carlo" / "simulation" / "probability" / "run sim" / "[team] vs [team]" probability → monte_carlo
-"arbitrage" / "arb" / "risk free" / "guaranteed profit" / "no-risk" → arbitrage
-"odds movement" / "sharp money" / "line movement" / "steam move" / "who's betting on" → odds_movement
-"live" / "in-play" / "happening now" / "current match" / "live signal" / "live bet" → live_signals
-"predict" / "who wins" / "who will win" / "forecast" / "analyse [team]" / "prediction for" → predictions
-"top picks" / "best bets" / "marketplace" / "rankings" / "top bets" / "rank" → marketplace
-"portfolio" / "risk" / "exposure" / "how much at risk" / "my bets" / "balance" → portfolio
-"run all" / "everything" / "full scan" / "all modules" / "do everything" / "comprehensive" → run_all
-anything else / questions / explanations → chat
+INTENT MAPPING (strict):
+"find value" / "value bets" / "edges" / "good bets" / "tips" → value_bets
+"simulate" / "monte carlo" / "probability" / "run sim" → monte_carlo
+"arbitrage" / "arb" / "risk free" / "guaranteed" → arbitrage
+"odds movement" / "sharp money" / "steam" / "line movement" → odds_movement
+"live" / "in-play" / "happening now" / "current score" / "live bet" → live_signals
+"predict" / "who wins" / "who will win" / "forecast" / "analyse" → predictions
+"top picks" / "best bets" / "marketplace" / "rankings" → marketplace
+"portfolio" / "risk" / "exposure" / "my bets" → portfolio
+"run all" / "everything" / "full scan" / "comprehensive" → run_all
+specific team/match question + no clear action → predictions (with real odds from context)
+general question → chat (but always reference real data)
 
-RESPONSE QUALITY STANDARDS:
-1. Always reference specific real events from the context when relevant
-2. For value_bets/predictions: cite specific odds and calculated edge percentages
-3. For monte_carlo: explain what the probability means in betting terms
-4. For chat: give expert-level analysis with actionable insights
-5. Your message must be informative and specific — never generic
-6. When a team is mentioned, find it in the events list and reference real odds
+TEAM DETECTION: If the user mentions a team name, find that exact match in the data above and return "team" in params with the exact team name as it appears in the data.
 
-EDGE CASE HANDLING:
-- If user asks about a specific team not in events, still trigger the right action and note we'll scan all available markets
-- If user says "yes" / "ok" / "do it" after a suggestion, re-trigger the same action type
-- If user asks "what can you do" / "help" → chat with a detailed capability overview
-- If user mixes requests ("value bets and arbitrage"), choose the primary intent (value_bets)
-- Numbers in user message (e.g. "75% probability") → extract as prob param for monte_carlo
-
-Return ONLY valid JSON with absolutely no markdown, no code blocks:
+Return ONLY valid JSON, no markdown, no code blocks:
 {
   "action": "<action_name>",
-  "message": "<expert 2-3 sentence response — specific, data-driven, references real events or computed values>",
-  "keyInsights": ["<insight 1>", "<insight 2>", "<insight 3>"],
+  "message": "<3-5 sentence expert response referencing EXACT real-time data — teams, scores, odds, elapsed time from the list above>",
+  "keyInsights": ["<specific insight with real numbers>", "<specific insight>", "<specific insight>"],
   "params": {
-    "sport": "<detected sport: football|basketball|tennis|baseball|hockey|mma|all>",
-    "team": "<detected team name or null>",
-    "prob": <detected probability 0.0-1.0 or 0.6>,
-    "runs": <simulation runs or 50000>,
-    "league": "<detected league name or null>"
+    "sport": "<football|basketball|tennis|baseball|hockey|mma|all>",
+    "team": "<exact team name from data or null>",
+    "prob": <probability 0.0-1.0 or 0.6>,
+    "runs": <50000>,
+    "league": "<league name or null>"
   }
 }`;
 
@@ -455,7 +503,6 @@ Return ONLY valid JSON with absolutely no markdown, no code blocks:
       { role: 'system', content: systemPrompt },
     ];
 
-    // Add conversation history for context-aware responses
     if (history && history.length > 0) {
       history.slice(-6).forEach(h => {
         messages.push({ role: h.role, content: h.content });
@@ -474,8 +521,8 @@ Return ONLY valid JSON with absolutely no markdown, no code blocks:
         const completion = await openai.chat.completions.create({
           model: 'gpt-4o',
           messages,
-          temperature: 0.25,
-          max_tokens: 500,
+          temperature: 0.2,
+          max_tokens: 800,
           response_format: { type: 'json_object' },
         });
         const content = completion.choices?.[0]?.message?.content || '';
@@ -490,7 +537,7 @@ Return ONLY valid JSON with absolutely no markdown, no code blocks:
 
     // ── Smart keyword-based fallback ──────────────────────────────────────
     if (!parsed) {
-      parsed = buildSmartFallback(message, context);
+      parsed = buildSmartFallback(message, { liveEventCount: liveCount, upcomingEventCount: upcomingCount });
     }
 
     // Validate and normalise the action

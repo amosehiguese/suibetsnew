@@ -482,32 +482,12 @@ export default function AIBettingPage() {
     else setAgentThinking('Thinking…');
 
     try {
-      // Build events context for the AI — odds-first ordering, capped at 12
-      const topEvents = topEventsForAI.map(e => ({
-        homeTeam: e.homeTeam,
-        awayTeam: e.awayTeam,
-        leagueName: e.leagueName || '',
-        sport: e.sport || 'football',
-        odds: e.odds ? {
-          home: getRealOdds(e, 'home'),
-          draw: getRealOdds(e, 'draw'),
-          away: getRealOdds(e, 'away'),
-        } : undefined,
-        isLive: e.isLive || false,
-        score: e.score || null,
-      }));
-
       const res = await fetch('/api/ai/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
-          context: {
-            liveEventCount: (liveEvents as any[]).length,
-            upcomingEventCount: (upcomingEvents as any[]).length,
-            betSlipCount: selectedBets.length,
-            topEvents,
-          },
+          context: { betSlipCount: selectedBets.length },
           history: chatHistory,
         }),
       });
