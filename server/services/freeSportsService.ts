@@ -479,10 +479,16 @@ export class FreeSportsService {
     try {
       const generatedF1 = this.generateF1Schedule();
       if (generatedF1.length > 0) {
-        const existingF1Ids = new Set(allEvents.filter(e => e.sportId === 11).map(e => String(e.id)));
-        const newF1 = generatedF1.filter(e => !existingF1Ids.has(String(e.id)));
+        const existingF1 = allEvents.filter(e => e.sportId === 11);
+        const existingF1Ids = new Set(existingF1.map(e => String(e.id)));
+        // Match by race date (same day = same race, even if name differs slightly e.g. "China" vs "Chinese")
+        const existingF1Dates = new Set(existingF1.map(e => (e.startTime || '').slice(0, 10)));
+        const newF1 = generatedF1.filter(e =>
+          !existingF1Ids.has(String(e.id)) &&
+          !existingF1Dates.has((e.startTime || '').slice(0, 10))
+        );
         allEvents.push(...newF1);
-        console.log(`[FreeSports] 🏎️ F1 Generated: ${newF1.length} upcoming races added (${existingF1Ids.size} from API skipped)`);
+        console.log(`[FreeSports] 🏎️ F1 Generated: ${newF1.length} upcoming races added (${existingF1.length} from API skipped)`);
       }
     } catch (error: any) {
       console.error(`[FreeSports] F1 schedule generation error:`, error.message);
@@ -705,10 +711,13 @@ export class FreeSportsService {
         let sportId = config.sportId;
 
         if (sportSlug === 'formula-1') {
-          homeTeam = game.competition?.name || game.circuit?.name || 'Grand Prix';
-          awayTeam = '20 drivers';
-          startTime = game.date || `${dateStr}T12:00:00Z`;
-          leagueName = 'Formula 1';
+          const gpName = game.competition?.name || game.circuit?.name || 'Grand Prix';
+          const circuitName = game.circuit?.name || game.competition?.location || gpName;
+          const raceStartTime = game.date || `${dateStr}T12:00:00Z`;
+          const raceId = String(game.id || gpName.replace(/\s+/g, '-').toLowerCase());
+          const f1Event = this.generateF1RaceEvent(raceId, gpName, circuitName, raceStartTime, config.sportId);
+          events.push(f1Event);
+          continue;
         } else if (sportSlug === 'mma') {
           if (isBoxingFight(game)) {
             sportId = 8;
@@ -1314,7 +1323,7 @@ export class FreeSportsService {
     const nowUtcDay = now.getUTCDay();
     const nowUtcDate = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
 
-    for (let weekOffset = 0; weekOffset < 8; weekOffset++) {
+    for (let weekOffset = 0; weekOffset < 1; weekOffset++) {
       let daysUntilMonday = (1 - nowUtcDay + 7) % 7;
       if (daysUntilMonday === 0) daysUntilMonday = 7;
       const mondayMs = nowUtcDate + (daysUntilMonday + weekOffset * 7) * 86400000;
