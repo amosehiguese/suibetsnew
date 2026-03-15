@@ -233,6 +233,11 @@ export default function AIBettingPage() {
   const agentEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => { agentEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [agentMessages]);
 
+  // Clear portfolio result when bet slip is emptied
+  useEffect(() => {
+    if (selectedBets.length === 0) setPortfolioResult(null);
+  }, [selectedBets.length]);
+
   // ── Auto-refresh live events every 60 seconds ────────────────────────────
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -378,27 +383,46 @@ export default function AIBettingPage() {
   const valueBets = allValueBets.filter(v => v.edge >= minEdgeFilter);
 
   // ── Arbitrage ────────────────────────────────────────────────────────────
+  // Real arbitrage requires different bookmakers. Since we have one odds source,
+  // we surface events where the bookmaker's margin is lowest (closest to fair odds)
+  // — these are the best candidates for cross-bookmaker arbitrage.
   const buildArbOpps = (events: any[]) => {
-    return events.filter(e => getRealOdds(e, 'home') && getRealOdds(e, 'away')).slice(0, 5).map(e => {
-      const homeOdds = getRealOdds(e, 'home')!;
-      const awayOdds = getRealOdds(e, 'away')!;
-      const drawOdds = getRealOdds(e, 'draw');
-      const impliedProb = (1 / homeOdds) + (drawOdds ? 1 / drawOdds : 0) + (1 / awayOdds);
-      const profit = impliedProb < 1 ? +((1 - impliedProb) * 100).toFixed(2) : 0;
-      return {
-        event: `${e.homeTeam} vs ${e.awayTeam}`,
-        league: e.leagueName || '',
-        bookA: 'SuiBets',
-        oddsA: +homeOdds.toFixed(2),
-        bookB: 'Exchange',
-        oddsB: +awayOdds.toFixed(2),
-        impliedProb: +impliedProb.toFixed(4),
-        profit,
-        eventId: e.id,
-        homeTeam: e.homeTeam,
-        awayTeam: e.awayTeam,
-      };
-    });
+    return events
+      .filter(e => getRealOdds(e, 'home') && getRealOdds(e, 'away'))
+      .map(e => {
+        const homeOdds = getRealOdds(e, 'home')!;
+        const awayOdds = getRealOdds(e, 'away')!;
+        const drawOdds = getRealOdds(e, 'draw');
+        const impliedProb = (1 / homeOdds) + (drawOdds ? 1 / drawOdds : 0) + (1 / awayOdds);
+        const margin = +((impliedProb - 1) * 100).toFixed(2);
+        // True arb: implied < 1.0. With one bookmaker this won't occur,
+        // but low-margin events are best targets for cross-bookmaker arb.
+        const profit = impliedProb < 1 ? +((1 - impliedProb) * 100).toFixed(2) : 0;
+        return {
+          event: `${e.homeTeam} vs ${e.awayTeam}`,
+          league: e.leagueName || '',
+          bookA: 'Bookmaker A',
+          oddsA: +homeOdds.toFixed(2),
+          bookB: 'Bookmaker B',
+          oddsB: +awayOdds.toFixed(2),
+          impliedProb: +impliedProb.toFixed(4),
+          margin,
+          profit,
+          eventId: e.id,
+          homeTeam: e.homeTeam,
+          awayTeam: e.awayTeam,
+        };
+      })
+      // Sort by lowest margin first — these are the best arb targets
+      .sort((a, b) => a.margin - b.margin)
+      .slice(0, 6);
+  };
+
+  // ── String hash helper (stable across events) ────────────────────────────
+  const strHash = (s: string): number => {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) { h = (Math.imul(31, h) + s.charCodeAt(i)) | 0; }
+    return Math.abs(h);
   };
 
   // ── Live signals ─────────────────────────────────────────────────────────
@@ -406,10 +430,28 @@ export default function AIBettingPage() {
     const pool = (liveEvents as any[]).length > 0 ? liveEvents as any[] : events;
     return pool.slice(0, 6).map((e: any) => {
       const homeOdds = getRealOdds(e, 'home');
-      const strength = homeOdds ? Math.min(0.92, (1 / homeOdds) + 0.12) : 0.65;
-      const signal = strength > 0.72 ? 'BUY' : strength > 0.58 ? 'WATCH' : 'HOLD';
+      const awayOdds = getRealOdds(e, 'away');
+      const drawOdds = getRealOdds(e, 'draw');
+      // Compute true win probability from real odds if available
+      let strength: number;
+      if (homeOdds && awayOdds) {
+        const impliedHome = 1 / homeOdds;
+        const impliedAway = 1 / awayOdds;
+        const impliedDraw = drawOdds ? 1 / drawOdds : 0;
+        const overround = impliedHome + impliedAway + impliedDraw;
+        const trueHome = impliedHome / overround;
+        // Signal strength = normalised home probability + slight underdog uplift
+        const underdogBonus = homeOdds > 3.0 ? 0.08 : homeOdds > 2.0 ? 0.05 : 0;
+        strength = Math.min(0.92, trueHome + underdogBonus);
+      } else if (homeOdds) {
+        strength = Math.min(0.88, (1 / homeOdds) + 0.05);
+      } else {
+        strength = 0.55;
+      }
+      const signal = strength > 0.68 ? 'BUY' : strength > 0.55 ? 'WATCH' : 'HOLD';
       const markets = ['Match Winner', 'Over 2.5 Goals', '1st Half Result', 'Both Teams Score', 'Next Goal'];
-      const marketIdx = Math.abs(e.id || 0) % markets.length;
+      const key = String(e.id || e.eventName || e.homeTeam || '');
+      const marketIdx = strHash(key) % markets.length;
       return {
         match: `${e.homeTeam} vs ${e.awayTeam}`,
         league: e.leagueName || '',
@@ -428,7 +470,9 @@ export default function AIBettingPage() {
   const buildOddsMovements = (events: any[]) => {
     return events.filter(e => getRealOdds(e, 'home')).slice(0, 6).map(e => {
       const currentOdds = getRealOdds(e, 'home')!;
-      const seed = (e.id || 1) % 20;
+      // Use string hash for stable, non-NaN seed
+      const key = String(e.id || e.homeTeam || e.eventName || '');
+      const seed = strHash(key) % 20;
       const openingMultiplier = 1 + (seed - 10) * 0.012;
       const openingOdds = +Math.max(1.01, currentOdds * openingMultiplier).toFixed(2);
       const changePct = +((openingOdds - currentOdds) / openingOdds * 100).toFixed(1);
@@ -450,18 +494,25 @@ export default function AIBettingPage() {
   const oddsMovements = buildOddsMovements(allEvents);
   const liveSignals = buildLiveSignals(allEvents);
 
-  const marketplaceBets = allValueBets.slice(0, 5).map((v, i) => ({
-    rank: i + 1,
-    selection: v.selection,
-    event: v.eventName,
-    score: +(v.aiProb + v.edge + (v.marketOdds / 10)).toFixed(3),
-    edge: v.edge,
-    odds: v.marketOdds,
-    eventId: v.eventId,
-    homeTeam: v.homeTeam,
-    awayTeam: v.awayTeam,
-    leagueName: v.leagueName,
-  }));
+  // Marketplace: rank value bets by ROI = (aiProb × odds) - 1, highest first
+  const marketplaceBets = allValueBets
+    .map(v => ({
+      selection: v.selection,
+      event: v.eventName,
+      roi: +(((v.aiProb * v.marketOdds) - 1) * 100).toFixed(1),
+      edge: v.edge,
+      odds: v.marketOdds,
+      aiProb: v.aiProb,
+      sport: v.sport,
+      eventId: v.eventId,
+      homeTeam: v.homeTeam,
+      awayTeam: v.awayTeam,
+      leagueName: v.leagueName,
+    }))
+    .filter(v => v.roi > 0)
+    .sort((a, b) => b.roi - a.roi)
+    .slice(0, 8)
+    .map((v, i) => ({ ...v, rank: i + 1 }));
 
   // ── Core agent result builder ────────────────────────────────────────────
   const buildAgentResult = (action: string, events: any[], params?: any): any => {
@@ -828,17 +879,11 @@ export default function AIBettingPage() {
 
   // ── Portfolio risk ───────────────────────────────────────────────────────
   const calcPortfolioRisk = () => {
-    const source = selectedBets.length > 0
-      ? selectedBets
-      : allValueBets.slice(0, 5).map(v => ({
-          stake: strategy.maxStake,
-          odds: v.marketOdds,
-          leagueName: v.leagueName,
-          eventName: v.eventName,
-          selectionName: v.selection,
-          currency: 'SBETS',
-        }));
-
+    if (selectedBets.length === 0) {
+      setPortfolioResult(null);
+      return;
+    }
+    const source = selectedBets;
     const total = source.reduce((s: number, b: any) => s + Number(b.stake || 1000), 0);
     const maxWin = source.reduce((s: number, b: any) => s + Number(b.stake || 1000) * Number(b.odds || 2.0), 0);
     const avgOdds = source.length > 0
@@ -1635,25 +1680,42 @@ export default function AIBettingPage() {
             {/* ── 5. Arbitrage ───────────────────────────────────────── */}
             {activeTab === 'arbitrage' && (
               <div className="space-y-3">
-                <div className="text-xs text-gray-400">Formula: <span className="text-yellow-400 font-mono">(1/oddsA) + (1/oddsB) &lt; 1.0 → true arbitrage opportunity</span></div>
+                <div className="text-xs text-gray-400">
+                  Sorted by lowest bookmaker margin — these are the best cross-bookmaker arbitrage targets.
+                  <span className="text-yellow-400 font-mono ml-1">Implied &lt; 100% → true arbitrage</span>
+                </div>
+                <div className="bg-[#0b1618] rounded-lg p-2.5 border border-yellow-500/20 text-[11px] text-yellow-400/80 flex items-start gap-2">
+                  <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                  Real arbitrage requires placing opposing bets across multiple bookmakers simultaneously. Odds shown are from our live feed — compare with a second bookmaker to confirm the opportunity.
+                </div>
                 {arbiOpps.length === 0 ? (
                   <div className="text-gray-400 text-sm text-center py-4">No odds data for arbitrage calculation.</div>
-                ) : arbiOpps.map((a, i) => (
-                  <div key={i} className={`flex items-center gap-3 rounded-lg p-3 border transition-all ${a.profit > 0 ? 'bg-green-900/20 border-green-500/30' : 'bg-[#0b1618] border-[#1e3a3f]'}`}>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-white truncate">{a.event}</div>
-                      {a.league && <div className="text-[10px] text-gray-500">{a.league}</div>}
-                      <div className="text-xs text-gray-400 mt-0.5">
-                        {a.bookA} @ {a.oddsA} | {a.bookB} @ {a.oddsB} | Implied: {(a.impliedProb * 100).toFixed(1)}%
+                ) : (arbiOpps as any[]).map((a: any, i: number) => {
+                  const marginPct = a.margin ?? +((a.impliedProb - 1) * 100).toFixed(2);
+                  const isLowMargin = marginPct < 3;
+                  return (
+                    <div key={i} className={`rounded-lg p-3 border transition-all ${a.profit > 0 ? 'bg-green-900/20 border-green-500/30' : isLowMargin ? 'bg-yellow-900/10 border-yellow-500/20' : 'bg-[#0b1618] border-[#1e3a3f]'}`}>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm text-white truncate">{a.event}</div>
+                          {a.league && <div className="text-[10px] text-gray-500">{a.league}</div>}
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-400 mt-1">
+                            <span>Home @ {a.oddsA}</span>
+                            <span>Away @ {a.oddsB}</span>
+                            <span>Implied: {(a.impliedProb * 100).toFixed(1)}%</span>
+                          </div>
+                        </div>
+                        {a.profit > 0 ? (
+                          <Badge className="bg-green-500/20 text-green-400 border-green-500/40 text-xs whitespace-nowrap">True Arb +{a.profit}%</Badge>
+                        ) : (
+                          <Badge className={`text-xs whitespace-nowrap ${isLowMargin ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' : 'bg-gray-500/20 text-gray-400 border-gray-500/40'}`}>
+                            {isLowMargin ? `Low margin ${marginPct}%` : `Margin ${marginPct}%`}
+                          </Badge>
+                        )}
                       </div>
                     </div>
-                    {a.profit > 0 ? (
-                      <Badge className="bg-green-500/20 text-green-400 border-green-500/40 text-xs whitespace-nowrap">+{a.profit}% profit</Badge>
-                    ) : (
-                      <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/40 text-xs">Overround</Badge>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -1747,24 +1809,22 @@ export default function AIBettingPage() {
                   {' — '}
                   {selectedBets.length > 0
                     ? <span className="text-cyan-400">analysing your {selectedBets.length} active bet{selectedBets.length > 1 ? 's' : ''}</span>
-                    : <span className="text-gray-500">add bets to your slip for live analysis, or click below for top value picks</span>}
+                    : <span className="text-gray-500">add bets to your bet slip to analyse your portfolio risk</span>}
                 </div>
 
-                {selectedBets.length === 0 && allValueBets.length > 0 && (
-                  <div className="bg-[#0b1618] rounded-lg p-3 border border-[#1e3a3f] space-y-1.5">
-                    <div className="text-xs text-gray-400 font-medium mb-1">Top 5 value picks (preview):</div>
-                    {allValueBets.slice(0, 5).map((v, i) => (
-                      <div key={i} className="flex items-center justify-between text-xs">
-                        <span className="text-gray-300 truncate max-w-[65%]">{v.selection} — {v.eventName}</span>
-                        <span className="text-green-400 font-mono flex-shrink-0">@{v.marketOdds} +{(v.edge * 100).toFixed(1)}%</span>
-                      </div>
-                    ))}
+                {selectedBets.length === 0 && (
+                  <div className="bg-[#0b1618] rounded-lg p-6 border border-[#1e3a3f] text-center space-y-2">
+                    <BarChart3 className="h-8 w-8 text-gray-600 mx-auto" />
+                    <div className="text-sm text-gray-400 font-medium">No bets in your slip</div>
+                    <div className="text-xs text-gray-500">Add bets from the Value Bets tab or Marketplace, then return here to analyse your portfolio risk, diversification and expected returns.</div>
                   </div>
                 )}
 
-                <Button onClick={calcPortfolioRisk} className="w-full bg-red-700/70 hover:bg-red-700 text-white" data-testid="calc-portfolio-risk">
-                  <BarChart3 className="h-4 w-4 mr-2" /> Analyse Portfolio Risk
-                </Button>
+                {selectedBets.length > 0 && (
+                  <Button onClick={calcPortfolioRisk} className="w-full bg-red-700/70 hover:bg-red-700 text-white" data-testid="calc-portfolio-risk">
+                    <BarChart3 className="h-4 w-4 mr-2" /> Analyse Portfolio Risk ({selectedBets.length} bet{selectedBets.length !== 1 ? 's' : ''})
+                  </Button>
+                )}
 
                 {portfolioResult && (
                   <div className="space-y-3">
@@ -1790,9 +1850,7 @@ export default function AIBettingPage() {
                       <div className="text-[10px] text-gray-500 mb-1">League Exposure</div>
                       <div className="text-xs text-yellow-400 break-words">{portfolioResult.exposure || 'N/A'}</div>
                     </div>
-                    {!portfolioResult.isLive && (
-                      <div className="text-[10px] text-gray-500 text-center">Based on top value picks — add bets to your slip for exact figures</div>
-                    )}
+                    <div className="text-[10px] text-cyan-500/70 text-center">Analysing {portfolioResult.betCount} bet{portfolioResult.betCount !== 1 ? 's' : ''} from your current slip</div>
                   </div>
                 )}
               </div>
@@ -1825,18 +1883,22 @@ export default function AIBettingPage() {
             {/* ── 9. AI Bet Marketplace Intelligence ─────────────────── */}
             {activeTab === 'marketplace' && (
               <div className="space-y-3">
-                <div className="text-xs text-gray-400">Score = <span className="text-yellow-400 font-mono">ai_prob + edge + (odds / 10)</span> — higher = better value</div>
+                <div className="text-xs text-gray-400">
+                  Ranked by <span className="text-yellow-400 font-mono">ROI = (ai_prob × odds − 1) × 100%</span> — real expected return using live market odds
+                </div>
                 {marketplaceBets.length === 0 ? (
-                  <div className="text-gray-400 text-sm text-center py-4">Loading market intelligence…</div>
+                  <div className="text-gray-400 text-sm text-center py-4">No value bets available — market data is loading or odds are not yet available.</div>
                 ) : marketplaceBets.map((b, i) => (
                   <div key={i} className="flex items-center gap-3 bg-[#0b1618] rounded-lg p-3 border border-[#1e3a3f] hover:border-yellow-500/30 transition-all">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${i === 0 ? 'bg-yellow-500 text-black' : i === 1 ? 'bg-gray-400 text-black' : 'bg-amber-700 text-white'}`}>{b.rank}</div>
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${i === 0 ? 'bg-yellow-500 text-black' : i === 1 ? 'bg-gray-400 text-black' : i === 2 ? 'bg-amber-700 text-white' : 'bg-[#1e3a3f] text-gray-300'}`}>{b.rank}</div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm text-white font-medium truncate">{b.selection}</div>
                       <div className="text-xs text-gray-400 truncate">{b.event}</div>
+                      {b.leagueName && <div className="text-[10px] text-gray-600 truncate">{b.leagueName}</div>}
                       <div className="flex gap-2 text-xs mt-0.5">
-                        <span className="text-yellow-400">Score: {b.score}</span>
-                        <span className="text-gray-400">@ {b.odds}</span>
+                        <span className="text-yellow-400 font-bold">ROI +{b.roi}%</span>
+                        <span className="text-cyan-400">@ {b.odds}</span>
+                        <span className="text-gray-500">AI {(b.aiProb * 100).toFixed(0)}%</span>
                       </div>
                       <EdgeBar edge={b.edge} />
                     </div>
