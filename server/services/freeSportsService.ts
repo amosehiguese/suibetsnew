@@ -1658,102 +1658,13 @@ export class FreeSportsService {
   }
 
   /**
-   * Generate deterministic settlement results for past WWE events.
-   * Covers:
-   *   1. Fixed PPV events whose start time has passed
-   *   2. Past Raw/SmackDown episodes (14-day lookback) using the same ID pattern the upcoming generator uses
-   * The same event ID always produces the same winner (seeded hash), so bets settle consistently.
+   * WWE settlement: only real results, never random.
+   * Since no real-time results API is available for WWE,
+   * this returns an empty array so bets remain pending.
    */
   private generateWWEResults(): FreeSportsResult[] {
-    const now = new Date();
-    const SETTLE_DELAY_MS = 4 * 60 * 60 * 1000; // 4 hours post-start
-    const results: FreeSportsResult[] = [];
-
-    const seededWinner = (eventId: string, homeOdds: number): 'home' | 'away' => {
-      const seed = eventId.split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
-      const rand = Math.abs(Math.sin(seed) * 10000) % 1;
-      const homeProb = homeOdds ? 1 / homeOdds : 0.5;
-      return rand < homeProb ? 'home' : 'away';
-    };
-
-    // ── 1. Fixed PPV events (pull from the main list, settle past ones) ──
-    const fixedPPVMatches: { id: string; wrestler1: string; wrestler2: string; odds1: number; odds2: number; date: string }[] = [
-      { id: 'wrestlemania42-punk-reigns', wrestler1: 'CM Punk (c)', wrestler2: 'Roman Reigns', odds1: 1.65, odds2: 2.20, date: '2026-04-19T22:00:00Z' },
-      { id: 'wrestlemania42-rhodes-orton', wrestler1: 'Cody Rhodes (c)', wrestler2: 'Randy Orton', odds1: 1.50, odds2: 2.50, date: '2026-04-18T22:00:00Z' },
-      { id: 'wrestlemania42-cargill-ripley', wrestler1: 'Jade Cargill (c)', wrestler2: 'Rhea Ripley', odds1: 2.10, odds2: 1.72, date: '2026-04-18T20:00:00Z' },
-      { id: 'wrestlemania42-vaquer-morgan', wrestler1: 'Stephanie Vaquer (c)', wrestler2: 'Liv Morgan', odds1: 1.80, odds2: 2.00, date: '2026-04-19T20:00:00Z' },
-      { id: 'wrestlemania42-lee-lynch', wrestler1: 'AJ Lee (c)', wrestler2: 'Becky Lynch', odds1: 1.90, odds2: 1.90, date: '2026-04-18T19:00:00Z' },
-      { id: 'wrestlemania42-rollins-paul', wrestler1: 'Seth Rollins', wrestler2: 'Logan Paul', odds1: 1.40, odds2: 2.90, date: '2026-04-19T19:30:00Z' },
-      { id: 'wrestlemania42-lesnar-open', wrestler1: 'Brock Lesnar', wrestler2: 'Oba Femi', odds1: 2.10, odds2: 1.72, date: '2026-04-18T21:00:00Z' },
-      { id: 'wrestlemania42-giulia-flair', wrestler1: 'Giulia (c)', wrestler2: 'Charlotte Flair', odds1: 2.20, odds2: 1.65, date: '2026-04-19T18:30:00Z' },
-      { id: 'wrestlemania42-hayes-williams', wrestler1: 'Carmelo Hayes', wrestler2: 'Trick Williams', odds1: 1.85, odds2: 1.95, date: '2026-04-18T18:30:00Z' },
-      { id: 'backlash2026-main', wrestler1: 'CM Punk', wrestler2: 'Seth Rollins', odds1: 1.55, odds2: 2.40, date: '2026-05-03T23:00:00Z' },
-      { id: 'backlash2026-womens', wrestler1: 'Rhea Ripley', wrestler2: 'Bianca Belair', odds1: 1.60, odds2: 2.30, date: '2026-05-03T22:00:00Z' },
-      { id: 'backlash2026-tag', wrestler1: 'The Usos', wrestler2: 'DIY', odds1: 1.70, odds2: 2.10, date: '2026-05-03T21:00:00Z' },
-      { id: 'clash-italy-main', wrestler1: 'Cody Rhodes', wrestler2: 'Gunther', odds1: 1.75, odds2: 2.05, date: '2026-05-31T20:00:00Z' },
-      { id: 'clash-italy-womens', wrestler1: 'Liv Morgan', wrestler2: 'IYO SKY', odds1: 1.65, odds2: 2.20, date: '2026-05-31T19:00:00Z' },
-      { id: 'summerslam2026-main', wrestler1: 'Roman Reigns', wrestler2: 'John Cena', odds1: 1.45, odds2: 2.75, date: '2026-08-01T23:00:00Z' },
-      { id: 'summerslam2026-wh', wrestler1: 'CM Punk', wrestler2: 'Drew McIntyre', odds1: 1.60, odds2: 2.30, date: '2026-08-02T23:00:00Z' },
-      { id: 'summerslam2026-womens', wrestler1: 'Rhea Ripley', wrestler2: 'Charlotte Flair', odds1: 1.55, odds2: 2.40, date: '2026-08-01T21:00:00Z' },
-      { id: 'mitb2026-mens', wrestler1: 'LA Knight', wrestler2: 'Jey Uso', odds1: 2.50, odds2: 3.00, date: '2026-09-06T23:00:00Z' },
-      { id: 'mitb2026-womens', wrestler1: 'Bianca Belair', wrestler2: 'Bayley', odds1: 2.80, odds2: 3.20, date: '2026-09-06T22:00:00Z' },
-      { id: 'survivor2026-main', wrestler1: 'Team Raw', wrestler2: 'Team SmackDown', odds1: 1.75, odds2: 2.05, date: '2026-11-29T23:00:00Z' },
-      { id: 'survivor2026-womens', wrestler1: 'Team Raw Women', wrestler2: 'Team SmackDown Women', odds1: 1.85, odds2: 1.95, date: '2026-11-29T22:00:00Z' },
-    ];
-
-    for (const match of fixedPPVMatches) {
-      const startTime = new Date(match.date);
-      if (now.getTime() - startTime.getTime() < SETTLE_DELAY_MS) continue;
-      const w = seededWinner(`wwe_${match.id}`, match.odds1);
-      results.push({
-        eventId: `wwe_${match.id}`,
-        homeTeam: match.wrestler1,
-        awayTeam: match.wrestler2,
-        homeScore: w === 'home' ? 1 : 0,
-        awayScore: w === 'away' ? 1 : 0,
-        winner: w,
-        status: 'finished',
-      });
-    }
-
-    // ── 2. Weekly Raw (Monday) + SmackDown (Friday) episodes — 14-day lookback ──
-    // We use the same date-based ID pattern the upcoming generator uses so bets match.
-    const rawSlots = ['-main', '-women', '-title', '-tag'];
-    const sdSlots  = ['-main', '-women', '-title', '-tag'];
-
-    const nowUtc = now.getTime();
-    const nowUtcMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-
-    for (let dayOffset = -14; dayOffset <= -1; dayOffset++) {
-      const dayMs = nowUtcMidnight + dayOffset * 86400000;
-      const dayOfWeek = new Date(dayMs).getUTCDay(); // 0=Sun, 1=Mon, 5=Fri
-
-      if (dayOfWeek === 1) {
-        // Monday Night Raw
-        const showDateStr = new Date(dayMs).toISOString().split('T')[0];
-        const showStartMs = dayMs + 4 * 3600000; // 4am UTC (Raw airs 8pm EST)
-        if (nowUtc - showStartMs < SETTLE_DELAY_MS) continue;
-
-        for (const slot of rawSlots) {
-          const eventId = `wwe_raw-${showDateStr}${slot}`;
-          const w = seededWinner(eventId, 1.60); // default 1.60 if no odds stored
-          results.push({ eventId, homeTeam: 'Wrestler A', awayTeam: 'Wrestler B', homeScore: w === 'home' ? 1 : 0, awayScore: w === 'away' ? 1 : 0, winner: w, status: 'finished' });
-        }
-      } else if (dayOfWeek === 5) {
-        // Friday Night SmackDown
-        const showDateStr = new Date(dayMs).toISOString().split('T')[0];
-        const showStartMs = dayMs + 4 * 3600000; // 4am UTC (SmackDown airs 8pm EST)
-        if (nowUtc - showStartMs < SETTLE_DELAY_MS) continue;
-
-        for (const slot of sdSlots) {
-          const eventId = `wwe_sd-${showDateStr}${slot}`;
-          const w = seededWinner(eventId, 1.60);
-          results.push({ eventId, homeTeam: 'Wrestler A', awayTeam: 'Wrestler B', homeScore: w === 'home' ? 1 : 0, awayScore: w === 'away' ? 1 : 0, winner: w, status: 'finished' });
-        }
-      }
-    }
-
-    return results;
+    console.log('[FreeSports] 🎭 WWE: returning empty results — no random settlement (bets stay pending until real results available)');
+    return [];
   }
 
   private generateF1Schedule(): SportEvent[] {
@@ -3023,13 +2934,23 @@ export class FreeSportsService {
   }
 
   /**
-   * Generate settlement results for niche sports - auto-resolves past matches using seeded randomness
-   * This ensures 100% automatic settlement once match time has passed
+   * Fetch real settlement results for niche sports from SofaScore API.
+   * NEVER uses random or seeded results — only real match outcomes from the live API.
+   * If SofaScore is unavailable, returns an empty array so bets remain pending.
    */
   private async fetchSofaScoreResults(): Promise<FreeSportsResult[]> {
     const results: FreeSportsResult[] = [];
-    const now = new Date();
 
+    // Sports that have real SofaScore coverage
+    const sofaScoreSports: Array<{ slug: string; sportKey: string; sportId: number; hasDraws: boolean }> = [
+      { slug: 'darts', sportKey: 'darts', sportId: 21, hasDraws: false },
+      { slug: 'snooker', sportKey: 'snooker', sportId: 22, hasDraws: false },
+      { slug: 'table-tennis', sportKey: 'table-tennis', sportId: 23, hasDraws: false },
+      { slug: 'waterpolo', sportKey: 'water-polo', sportId: 24, hasDraws: true },
+      { slug: 'badminton', sportKey: 'badminton', sportId: 25, hasDraws: false },
+    ];
+
+    // Build a lookup of our generated events so we can match by name
     const allNicheEvents = [
       ...this.generateDartsEvents(),
       ...this.generateSnookerEvents(),
@@ -3039,32 +2960,95 @@ export class FreeSportsService {
       ...this.generateChessEvents(),
       ...this.generateArmwrestlingEvents(),
     ];
+    const now = new Date();
 
-    for (const event of allNicheEvents) {
-      if (!event.startTime) continue;
-      const startTime = new Date(event.startTime);
-      // Settle if match started more than 2 hours ago
-      if (now.getTime() - startTime.getTime() < 2 * 60 * 60 * 1000) continue;
+    for (const sport of sofaScoreSports) {
+      try {
+        // Fetch the most recent finished events from SofaScore (page 0 = most recent)
+        const resp = await axios.get(
+          `${SOFASCORE_BASE_URL}/sport/${sport.slug}/events/last/0`,
+          { headers: SOFASCORE_HEADERS, timeout: 12000 }
+        );
+        const events: any[] = resp.data?.events || [];
 
-      // Seeded deterministic winner based on event ID (fair, reproducible)
-      const seed = String(event.id).split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
-      const seededRand = Math.abs(Math.sin(seed) * 10000) % 1;
+        const FINISHED_STATUSES = new Set(['ended', 'finished', 'canceled', 'walkover', 'retired', 'final']);
 
-      // Use odds to derive fair probability for home win
-      const homeProb = event.homeOdds ? 1 / event.homeOdds : 0.5;
-      const winner: 'home' | 'away' | 'draw' = seededRand < homeProb ? 'home' : 'away';
+        for (const ev of events) {
+          const statusDesc = (ev?.status?.description || ev?.status?.type || '').toLowerCase();
+          if (!FINISHED_STATUSES.has(statusDesc) && statusDesc !== 'ap' && statusDesc !== 'aet') continue;
 
-      results.push({
-        eventId: String(event.id),
-        homeTeam: event.homeTeam,
-        awayTeam: event.awayTeam,
-        homeScore: winner === 'home' ? 3 : 1,
-        awayScore: winner === 'away' ? 3 : 1,
-        winner,
-        status: 'finished',
-      });
+          const homeTeamName: string = ev?.homeTeam?.name || ev?.homeTeam?.shortName || '';
+          const awayTeamName: string = ev?.awayTeam?.name || ev?.awayTeam?.shortName || '';
+          if (!homeTeamName || !awayTeamName) continue;
+
+          const homeScore: number = ev?.homeScore?.current ?? ev?.homeScore?.display ?? 0;
+          const awayScore: number = ev?.awayScore?.current ?? ev?.awayScore?.display ?? 0;
+          const winner: 'home' | 'away' | 'draw' =
+            homeScore > awayScore ? 'home' : awayScore > homeScore ? 'away' : 'draw';
+
+          // Match against our generated events by player/team name similarity
+          const matchingEvent = allNicheEvents.find(ge => {
+            if (!ge.startTime) return false;
+            // Only match events that should be finished (started > 2 hours ago)
+            const startedAt = new Date(ge.startTime);
+            if (now.getTime() - startedAt.getTime() < 2 * 60 * 60 * 1000) return false;
+
+            const geHome = ge.homeTeam.toLowerCase().trim();
+            const geAway = ge.awayTeam.toLowerCase().trim();
+            const sfHome = homeTeamName.toLowerCase().trim();
+            const sfAway = awayTeamName.toLowerCase().trim();
+
+            const homeMatch =
+              geHome === sfHome ||
+              sfHome.includes(geHome) ||
+              geHome.includes(sfHome) ||
+              geHome.split(' ')[0] === sfHome.split(' ')[0]; // match on first name (common for darts/snooker)
+            const awayMatch =
+              geAway === sfAway ||
+              sfAway.includes(geAway) ||
+              geAway.includes(sfAway) ||
+              geAway.split(' ')[0] === sfAway.split(' ')[0];
+
+            return homeMatch && awayMatch;
+          });
+
+          if (matchingEvent) {
+            const eventId = String(matchingEvent.id);
+            // Avoid duplicates
+            if (!results.some(r => r.eventId === eventId)) {
+              console.log(`[FreeSports] ✅ SofaScore ${sport.slug} result: ${homeTeamName} ${homeScore}-${awayScore} ${awayTeamName} → ${winner}`);
+              results.push({
+                eventId,
+                homeTeam: matchingEvent.homeTeam,
+                awayTeam: matchingEvent.awayTeam,
+                homeScore,
+                awayScore,
+                winner,
+                status: 'finished',
+              });
+            }
+          }
+        }
+
+        console.log(`[FreeSports] SofaScore ${sport.slug}: ${events.length} API events checked, ${results.filter(r => String(r.eventId).startsWith(sport.sportKey)).length} matched`);
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (err: any) {
+        console.warn(`[FreeSports] SofaScore ${sport.slug} results unavailable: ${err.message} — bets remain pending (no random settlement)`);
+      }
     }
 
+    // Chess and Armwrestling: no real-time API available — bets remain pending
+    // Do NOT settle with random/seeded results
+    const chessPending = allNicheEvents.filter(e => String(e.id).startsWith('chess_') && e.startTime && now.getTime() - new Date(e.startTime).getTime() > 2 * 60 * 60 * 1000);
+    const armPending = allNicheEvents.filter(e => String(e.id).startsWith('armwrestling_') && e.startTime && now.getTime() - new Date(e.startTime).getTime() > 2 * 60 * 60 * 1000);
+    if (chessPending.length > 0) {
+      console.log(`[FreeSports] ♟️ Chess: ${chessPending.length} past events — awaiting real results (no API available)`);
+    }
+    if (armPending.length > 0) {
+      console.log(`[FreeSports] 💪 Armwrestling: ${armPending.length} past events — awaiting real results (no API available)`);
+    }
+
+    console.log(`[FreeSports] 🎯 SofaScore niche sports settlement: ${results.length} real results found`);
     return results;
   }
 
