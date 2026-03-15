@@ -462,6 +462,23 @@ export default function AIBettingPage() {
     });
   };
 
+  // ── Extract team name from user message against live event data ─────────────
+  const extractTeamFromMessage = (msg: string): string | null => {
+    const lower = msg.toLowerCase();
+    for (const e of allEvents) {
+      const home = (e.homeTeam || '').toLowerCase();
+      const away = (e.awayTeam || '').toLowerCase();
+      if (home.length >= 3 && lower.includes(home)) return e.homeTeam;
+      if (away.length >= 3 && lower.includes(away)) return e.awayTeam;
+      // Also match any word (3+ chars) from a team name
+      const homeWords = home.split(/\s+/).filter((w: string) => w.length >= 4);
+      const awayWords = away.split(/\s+/).filter((w: string) => w.length >= 4);
+      if (homeWords.some((w: string) => lower.includes(w))) return e.homeTeam;
+      if (awayWords.some((w: string) => lower.includes(w))) return e.awayTeam;
+    }
+    return null;
+  };
+
   const sendAgentMessage = async (overrideText?: string) => {
     const text = (overrideText || agentInput).trim();
     if (!text || agentLoading) return;
@@ -474,39 +491,72 @@ export default function AIBettingPage() {
     // Set thinking hint based on common commands
     const lower = text.toLowerCase();
     if (lower.includes('value') || lower.includes('edge')) setAgentThinking('Scanning all markets for edges…');
-    else if (lower.includes('monte') || lower.includes('simul')) setAgentThinking('Running Monte Carlo simulations…');
+    else if (lower.includes('monte') || lower.includes('simul') || lower.includes('carlo')) setAgentThinking('Running Monte Carlo simulations…');
     else if (lower.includes('arb')) setAgentThinking('Checking arbitrage opportunities…');
     else if (lower.includes('live')) setAgentThinking('Analysing live match data…');
     else if (lower.includes('all') || lower.includes('everything')) setAgentThinking('Running all 9 modules…');
     else if (lower.includes('predict') || lower.includes('who')) setAgentThinking('Building match prediction…');
     else setAgentThinking('Thinking…');
 
+    // Minimum visible delay so the response is always clearly seen
+    const minDelay = new Promise(r => setTimeout(r, 500));
+
     try {
-      const res = await fetch('/api/ai/agent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          context: { betSlipCount: selectedBets.length },
-          history: chatHistory,
+      const [res] = await Promise.all([
+        fetch('/api/ai/agent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: text,
+            context: { betSlipCount: selectedBets.length },
+            history: chatHistory,
+          }),
         }),
-      });
+        minDelay,
+      ]);
+
       const data = await res.json();
       const action: string = data.action || 'chat';
       const params = data.params || {};
+
+      // ── Client-side team extraction ───────────────────────────────────────
+      // If the server didn't identify a team (fallback path), extract it here
+      // by matching the user's message against every loaded event's team names
+      if (!params.team) {
+        const found = extractTeamFromMessage(text);
+        if (found) params.team = found;
+      }
+
       const result = buildAgentResult(action, allEvents, params);
+
+      // If fallback gave a generic message but we found a team, personalise it
+      let messageText = data.message || `Completed ${action.replace(/_/g, ' ')} analysis.`;
+      if (params.team && messageText.includes("I'm SuiBets AI")) {
+        const teamEvents = allEvents.filter((e: any) =>
+          (e.homeTeam || '').toLowerCase().includes(params.team.toLowerCase()) ||
+          (e.awayTeam || '').toLowerCase().includes(params.team.toLowerCase())
+        );
+        const match = teamEvents[0];
+        if (match) {
+          const homeOdds = getRealOdds(match, 'home');
+          const drawOdds = getRealOdds(match, 'draw');
+          const awayOdds = getRealOdds(match, 'away');
+          const oddsStr = homeOdds ? `Home ${homeOdds}${drawOdds ? ` | Draw ${drawOdds}` : ''} | Away ${awayOdds ?? '?'}` : 'No odds available';
+          messageText = `Found ${params.team} — ${match.isLive ? '🔴 LIVE' : '⏳ Upcoming'}: ${match.homeTeam} vs ${match.awayTeam} in ${match.leagueName || 'league'}. Real-time odds: ${oddsStr}. ${action === 'monte_carlo' ? 'Running simulation with these market prices.' : 'Analysing this match now.'}`;
+        }
+      }
 
       // Update conversation history
       setChatHistory(prev => [
         ...prev,
         { role: 'user', content: text },
-        { role: 'assistant', content: data.message || '' },
-      ].slice(-12)); // keep last 6 exchanges
+        { role: 'assistant', content: messageText },
+      ].slice(-12));
 
       const botMsg: AgentMessage = {
         id: (Date.now() + 1).toString(),
         role: 'agent',
-        text: data.message || `Completed ${action.replace(/_/g, ' ')} analysis.`,
+        text: messageText,
         keyInsights: data.keyInsights || [],
         action,
         result,

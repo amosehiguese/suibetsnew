@@ -446,7 +446,7 @@ router.post('/api/ai/agent', async (req: Request, res: Response) => {
     };
 
     // ── Fetch REAL-TIME data from server-side snapshots ────────────────────
-    const { contextStr: realTimeContext, liveCount, upcomingCount } = buildRealTimeEventsContext(message || '');
+    const { contextStr: realTimeContext, liveCount, upcomingCount, allEvents: rtEvents } = buildRealTimeEventsContext(message || '');
 
     const systemPrompt = `You are SuiBets AI Agent — an advanced sports betting intelligence system with 100% REAL-TIME data access. You have live match scores, current odds, and all upcoming fixtures fetched RIGHT NOW from our sports data feed. Never say you don't have real-time data — you DO.
 
@@ -545,7 +545,30 @@ Return ONLY valid JSON, no markdown, no code blocks:
 
     // ── Smart keyword-based fallback ──────────────────────────────────────
     if (!parsed) {
-      parsed = buildSmartFallback(message, { liveEventCount: liveCount, upcomingEventCount: upcomingCount });
+      // Extract team name from message against real event data
+      const msgL = (message || '').toLowerCase();
+      let detectedTeam: string | null = null;
+      for (const e of rtEvents) {
+        const home = e.homeTeam.toLowerCase();
+        const away = e.awayTeam.toLowerCase();
+        if (home.length >= 3 && msgL.includes(home)) { detectedTeam = e.homeTeam; break; }
+        if (away.length >= 3 && msgL.includes(away)) { detectedTeam = e.awayTeam; break; }
+        const hw = home.split(/\s+/).filter(w => w.length >= 4);
+        const aw = away.split(/\s+/).filter(w => w.length >= 4);
+        if (hw.some(w => msgL.includes(w))) { detectedTeam = e.homeTeam; break; }
+        if (aw.some(w => msgL.includes(w))) { detectedTeam = e.awayTeam; break; }
+      }
+
+      parsed = buildSmartFallback(message, {
+        liveEventCount: liveCount,
+        upcomingEventCount: upcomingCount,
+        topEvents: rtEvents.slice(0, 20) as any,
+      });
+
+      // Inject detected team into params
+      if (detectedTeam && parsed.params) {
+        parsed.params.team = detectedTeam;
+      }
     }
 
     // Validate and normalise the action
