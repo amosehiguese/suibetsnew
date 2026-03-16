@@ -184,13 +184,15 @@ export default function StreamingPage() {
                 </p>
                 <a
                   href={getWatchUrl(watchingMatch, activeSourceIdx)}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center gap-2.5 bg-gradient-to-r from-[#0055cc] to-[#0088ff] hover:from-[#0066dd] hover:to-[#0099ff] text-white font-bold px-10 py-3.5 rounded-xl text-base transition-all shadow-lg shadow-blue-900/40 no-underline"
                   data-testid="button-play-stream"
                 >
                   <Play className="h-5 w-5 fill-white" />
                   Play Stream
                 </a>
-                <p className="text-gray-600 text-xs mt-3">Opens with a back button to return here</p>
+                <p className="text-gray-600 text-xs mt-3">Opens in a new tab — close it to return here</p>
               </div>
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-600 gap-3">
@@ -198,6 +200,8 @@ export default function StreamingPage() {
                 <p className="text-sm">No stream available for this match right now</p>
                 <a
                   href={getWatchUrl(watchingMatch, 0)}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-[#00d0ff] hover:text-white text-sm transition-colors no-underline"
                 >
                   Try direct stream →
@@ -222,6 +226,8 @@ export default function StreamingPage() {
                     <a
                       key={`${stream.source}-${stream.streamNo}`}
                       href={watchUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm no-underline border border-white/10 text-gray-400 hover:border-[#00d0ff]/30 hover:text-[#00d0ff] transition-all"
                       data-testid={`button-stream-${stream.streamNo}`}
                     >
