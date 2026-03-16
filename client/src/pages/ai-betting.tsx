@@ -189,8 +189,21 @@ export default function AIBettingPage() {
 
   // ── Portfolio ────────────────────────────────────────────────────────────
   const [portfolioResult, setPortfolioResult] = useState<{
-    totalStake: number; riskScore: number; exposure: string;
-    maxWin: number; avgOdds: number; betCount: number; isLive: boolean;
+    totalStake: number;
+    riskScore: number;
+    riskRating: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    exposure: string;
+    maxWin: number;
+    netProfit: number;
+    avgOdds: number;
+    betCount: number;
+    isLive: boolean;
+    uniqueSports: number;
+    uniqueEvents: number;
+    diversificationGrade: 'Excellent' | 'Good' | 'Fair' | 'Poor';
+    breakevenWinRate: number;
+    worstCase: number;
+    betBreakdown: { name: string; stake: number; odds: number; impliedProb: number; potentialWin: number }[];
   } | null>(null);
 
   // ── Value bet min-edge filter ────────────────────────────────────────────
@@ -965,23 +978,94 @@ export default function AIBettingPage() {
       return;
     }
     const source = selectedBets;
-    const total = source.reduce((s: number, b: any) => s + Number(b.stake || 1000), 0);
-    const maxWin = source.reduce((s: number, b: any) => s + Number(b.stake || 1000) * Number(b.odds || 2.0), 0);
-    const avgOdds = source.length > 0
-      ? +(source.reduce((s: number, b: any) => s + Number(b.odds || 2.0), 0) / source.length).toFixed(2)
-      : 0;
-    const riskScore = +(total * 0.15).toFixed(0);
-    const leagues = [...new Set(source.map((b: any) => b.leagueName || b.market || b.eventName?.split(' vs ')[0] || 'Unknown'))].filter(Boolean);
-    const exposure = leagues.slice(0, 3).join(', ') + (leagues.length > 3 ? ` +${leagues.length - 3}` : '');
+    const n = source.length;
+
+    // ── Core numbers ──────────────────────────────────────────────────────
+    const totalStake = source.reduce((s: number, b: any) => s + Number(b.stake || 1000), 0);
+    const avgOdds = +(source.reduce((s: number, b: any) => s + Number(b.odds || 2.0), 0) / n).toFixed(2);
+
+    // Max win = sum of individual singles wins (gross return)
+    const maxWin = +(source.reduce((s: number, b: any) =>
+      s + Number(b.stake || 1000) * Number(b.odds || 2.0), 0)).toFixed(0);
+    const netProfit = +(maxWin - totalStake).toFixed(0);
+
+    // Worst case = lose everything
+    const worstCase = -totalStake;
+
+    // Breakeven win rate = how many bets need to win to cover all stakes
+    // Each winning bet returns stake×odds; we need sum(stake×odds×p) = totalStake
+    // Simplified: breakevenWinRate = 1 / avgOdds (implied probability)
+    const breakevenWinRate = +(100 / avgOdds).toFixed(1);
+
+    // ── Diversification ───────────────────────────────────────────────────
+    const uniqueSports = new Set(
+      source.map((b: any) => (b.sport || b.market || 'unknown').toLowerCase())
+    ).size;
+    const uniqueEvents = new Set(
+      source.map((b: any) => b.eventId || b.eventName || Math.random())
+    ).size;
+    const diversificationGrade: 'Excellent' | 'Good' | 'Fair' | 'Poor' =
+      uniqueSports >= 4 ? 'Excellent'
+      : uniqueSports >= 3 ? 'Good'
+      : uniqueSports >= 2 ? 'Fair'
+      : 'Poor';
+
+    // ── Risk score 0–100 ──────────────────────────────────────────────────
+    // Concentration risk: all same sport/event = high risk
+    const concentrationRisk = Math.max(0, 40 - uniqueSports * 8 - (uniqueEvents - 1) * 3);
+
+    // Odds variance risk: very high or very low odds = more risk
+    const oddsRisk = Math.min(30, Math.max(0, (avgOdds - 1.5) * 7));
+
+    // Count risk: single bet = no diversification benefit
+    const countRisk = Math.max(0, 20 - n * 3);
+
+    // Stake imbalance: one bet taking >50% of total stake adds risk
+    const maxSingleStake = Math.max(...source.map((b: any) => Number(b.stake || 1000)));
+    const imbalanceRisk = totalStake > 0 ? Math.min(10, (maxSingleStake / totalStake) * 10) : 0;
+
+    const riskScore = Math.min(100, Math.round(concentrationRisk + oddsRisk + countRisk + imbalanceRisk));
+    const riskRating: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' =
+      riskScore < 25 ? 'LOW'
+      : riskScore < 50 ? 'MEDIUM'
+      : riskScore < 75 ? 'HIGH'
+      : 'CRITICAL';
+
+    // ── Exposure label ────────────────────────────────────────────────────
+    const leagues = [...new Set(
+      source.map((b: any) => b.leagueName || b.sport || b.market || 'Mixed')
+    )].filter(Boolean);
+    const exposure = leagues.slice(0, 3).join(' · ') + (leagues.length > 3 ? ` +${leagues.length - 3} more` : '');
+
+    // ── Per-bet breakdown ─────────────────────────────────────────────────
+    const betBreakdown = source.map((b: any) => {
+      const stake = Number(b.stake || 1000);
+      const odds = Number(b.odds || 2.0);
+      return {
+        name: b.selectionName || b.eventName || 'Unknown',
+        stake,
+        odds,
+        impliedProb: +(100 / odds).toFixed(1),
+        potentialWin: +(stake * odds).toFixed(0),
+      };
+    });
 
     setPortfolioResult({
-      totalStake: total,
+      totalStake: +totalStake.toFixed(0),
       riskScore,
+      riskRating,
       exposure,
-      maxWin: +maxWin.toFixed(0),
+      maxWin,
+      netProfit,
       avgOdds,
-      betCount: source.length,
-      isLive: selectedBets.length > 0,
+      betCount: n,
+      isLive: true,
+      uniqueSports,
+      uniqueEvents,
+      diversificationGrade,
+      breakevenWinRate,
+      worstCase,
+      betBreakdown,
     });
   };
 
@@ -1897,54 +1981,122 @@ export default function AIBettingPage() {
             {activeTab === 'portfolio' && (
               <div className="space-y-4">
                 <div className="text-xs text-gray-400">
-                  Formula: <span className="text-red-400 font-mono">risk_score = total_stake × 0.15</span>
-                  {' — '}
                   {selectedBets.length > 0
-                    ? <span className="text-cyan-400">analysing your {selectedBets.length} active bet{selectedBets.length > 1 ? 's' : ''}</span>
-                    : <span className="text-gray-500">add bets to your bet slip to analyse your portfolio risk</span>}
+                    ? <span className="text-cyan-400">{selectedBets.length} bet{selectedBets.length > 1 ? 's' : ''} in your slip — click Analyse to run full risk report</span>
+                    : <span className="text-gray-500">Add bets to your slip to analyse portfolio risk, diversification and expected returns</span>}
                 </div>
 
                 {selectedBets.length === 0 && (
                   <div className="bg-[#0b1618] rounded-lg p-6 border border-[#1e3a3f] text-center space-y-2">
                     <BarChart3 className="h-8 w-8 text-gray-600 mx-auto" />
                     <div className="text-sm text-gray-400 font-medium">No bets in your slip</div>
-                    <div className="text-xs text-gray-500">Add bets from the Value Bets tab or Marketplace, then return here to analyse your portfolio risk, diversification and expected returns.</div>
+                    <div className="text-xs text-gray-500">Add bets from the Value Bets tab, Auto-Bet, or Marketplace, then return here.</div>
                   </div>
                 )}
 
                 {selectedBets.length > 0 && (
-                  <Button onClick={calcPortfolioRisk} className="w-full bg-red-700/70 hover:bg-red-700 text-white" data-testid="calc-portfolio-risk">
+                  <Button onClick={calcPortfolioRisk} className="w-full bg-red-700/70 hover:bg-red-700 text-white font-bold" data-testid="calc-portfolio-risk">
                     <BarChart3 className="h-4 w-4 mr-2" /> Analyse Portfolio Risk ({selectedBets.length} bet{selectedBets.length !== 1 ? 's' : ''})
                   </Button>
                 )}
 
-                {portfolioResult && (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-[#0b1618] rounded-lg p-3 text-center border border-[#1e3a3f]">
-                        <div className="text-base font-bold text-white font-mono">{portfolioResult.totalStake.toLocaleString()}</div>
-                        <div className="text-[10px] text-gray-400 mt-0.5">Total Stake (SBETS)</div>
+                {portfolioResult && (() => {
+                  const ratingColor =
+                    portfolioResult.riskRating === 'LOW' ? 'text-green-400 border-green-500/30 bg-green-500/10' :
+                    portfolioResult.riskRating === 'MEDIUM' ? 'text-yellow-400 border-yellow-500/30 bg-yellow-500/10' :
+                    portfolioResult.riskRating === 'HIGH' ? 'text-orange-400 border-orange-500/30 bg-orange-500/10' :
+                    'text-red-400 border-red-500/30 bg-red-500/10';
+                  const barColor =
+                    portfolioResult.riskRating === 'LOW' ? 'bg-green-500' :
+                    portfolioResult.riskRating === 'MEDIUM' ? 'bg-yellow-500' :
+                    portfolioResult.riskRating === 'HIGH' ? 'bg-orange-500' : 'bg-red-500';
+                  const divColor =
+                    portfolioResult.diversificationGrade === 'Excellent' ? 'text-green-400' :
+                    portfolioResult.diversificationGrade === 'Good' ? 'text-cyan-400' :
+                    portfolioResult.diversificationGrade === 'Fair' ? 'text-yellow-400' : 'text-red-400';
+                  return (
+                    <div className="space-y-3">
+
+                      {/* Risk Score Meter */}
+                      <div className={`rounded-lg p-4 border ${ratingColor}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-xs font-semibold text-gray-300 uppercase tracking-wide">Risk Rating</div>
+                          <div className={`text-lg font-black font-mono ${ratingColor.split(' ')[0]}`}>{portfolioResult.riskRating}</div>
+                        </div>
+                        <div className="w-full bg-[#0b1618] rounded-full h-2 mb-1">
+                          <div className={`h-2 rounded-full transition-all ${barColor}`} style={{ width: `${portfolioResult.riskScore}%` }} />
+                        </div>
+                        <div className="flex justify-between text-[10px] text-gray-500">
+                          <span>0 — Safe</span>
+                          <span className="font-mono font-bold text-white">{portfolioResult.riskScore}/100</span>
+                          <span>100 — Critical</span>
+                        </div>
                       </div>
-                      <div className="bg-[#0b1618] rounded-lg p-3 text-center border border-red-500/20">
-                        <div className="text-base font-bold text-red-400 font-mono">{portfolioResult.riskScore.toLocaleString()}</div>
-                        <div className="text-[10px] text-gray-400 mt-0.5">Risk Score (SBETS)</div>
+
+                      {/* Core Financials */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-[#0b1618] rounded-lg p-3 text-center border border-[#1e3a3f]">
+                          <div className="text-base font-bold text-white font-mono">{portfolioResult.totalStake.toLocaleString()}</div>
+                          <div className="text-[10px] text-gray-400 mt-0.5">Total Stake (SBETS)</div>
+                        </div>
+                        <div className="bg-[#0b1618] rounded-lg p-3 text-center border border-green-500/20">
+                          <div className="text-base font-bold text-green-400 font-mono">+{portfolioResult.netProfit.toLocaleString()}</div>
+                          <div className="text-[10px] text-gray-400 mt-0.5">Net Profit if All Win</div>
+                        </div>
+                        <div className="bg-[#0b1618] rounded-lg p-3 text-center border border-cyan-500/20">
+                          <div className="text-base font-bold text-cyan-400 font-mono">{portfolioResult.maxWin.toLocaleString()}</div>
+                          <div className="text-[10px] text-gray-400 mt-0.5">Gross Return (SBETS)</div>
+                        </div>
+                        <div className="bg-[#0b1618] rounded-lg p-3 text-center border border-red-500/20">
+                          <div className="text-base font-bold text-red-400 font-mono">{portfolioResult.worstCase.toLocaleString()}</div>
+                          <div className="text-[10px] text-gray-400 mt-0.5">Worst Case (all lose)</div>
+                        </div>
+                        <div className="bg-[#0b1618] rounded-lg p-3 text-center border border-[#1e3a3f]">
+                          <div className="text-base font-bold text-yellow-400 font-mono">{portfolioResult.avgOdds}x</div>
+                          <div className="text-[10px] text-gray-400 mt-0.5">Avg Odds</div>
+                        </div>
+                        <div className="bg-[#0b1618] rounded-lg p-3 text-center border border-[#1e3a3f]">
+                          <div className="text-base font-bold text-purple-400 font-mono">{portfolioResult.breakevenWinRate}%</div>
+                          <div className="text-[10px] text-gray-400 mt-0.5">Breakeven Win Rate</div>
+                        </div>
                       </div>
-                      <div className="bg-[#0b1618] rounded-lg p-3 text-center border border-green-500/20">
-                        <div className="text-base font-bold text-green-400 font-mono">{portfolioResult.maxWin.toLocaleString()}</div>
-                        <div className="text-[10px] text-gray-400 mt-0.5">Max Win (SBETS)</div>
+
+                      {/* Diversification */}
+                      <div className="bg-[#0b1618] rounded-lg p-3 border border-[#1e3a3f] space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="text-[10px] text-gray-500 uppercase tracking-wide">Diversification</div>
+                          <div className={`text-xs font-bold ${divColor}`}>{portfolioResult.diversificationGrade}</div>
+                        </div>
+                        <div className="flex gap-4 text-xs">
+                          <span className="text-gray-400">{portfolioResult.uniqueSports} sport{portfolioResult.uniqueSports !== 1 ? 's' : ''}</span>
+                          <span className="text-gray-400">{portfolioResult.uniqueEvents} event{portfolioResult.uniqueEvents !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div className="text-[10px] text-yellow-400/80 break-words">{portfolioResult.exposure}</div>
                       </div>
-                      <div className="bg-[#0b1618] rounded-lg p-3 text-center border border-[#1e3a3f]">
-                        <div className="text-base font-bold text-yellow-400 font-mono">{portfolioResult.avgOdds}x</div>
-                        <div className="text-[10px] text-gray-400 mt-0.5">Avg Odds ({portfolioResult.betCount} bets)</div>
+
+                      {/* Per-bet breakdown */}
+                      <div className="bg-[#0b1618] rounded-lg p-3 border border-[#1e3a3f]">
+                        <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-2">Bet Breakdown</div>
+                        <div className="space-y-1.5">
+                          {portfolioResult.betBreakdown.map((b, i) => (
+                            <div key={i} className="flex items-center justify-between text-xs">
+                              <span className="text-gray-300 truncate max-w-[55%]">{b.name}</span>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-gray-500 font-mono">{b.odds}x</span>
+                                <span className="text-purple-400 font-mono text-[10px]">{b.impliedProb}% imp.</span>
+                                <span className="text-green-400 font-mono">{b.potentialWin.toLocaleString()}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="text-[10px] text-cyan-500/70 text-center">
+                        Analysing {portfolioResult.betCount} bet{portfolioResult.betCount !== 1 ? 's' : ''} · Risk score based on concentration, odds variance & diversification
                       </div>
                     </div>
-                    <div className="bg-[#0b1618] rounded-lg p-3 border border-[#1e3a3f]">
-                      <div className="text-[10px] text-gray-500 mb-1">League Exposure</div>
-                      <div className="text-xs text-yellow-400 break-words">{portfolioResult.exposure || 'N/A'}</div>
-                    </div>
-                    <div className="text-[10px] text-cyan-500/70 text-center">Analysing {portfolioResult.betCount} bet{portfolioResult.betCount !== 1 ? 's' : ''} from your current slip</div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             )}
 
