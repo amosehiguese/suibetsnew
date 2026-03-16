@@ -73,9 +73,12 @@ interface AutoBetStrategy {
 }
 
 const PRESET_STRATEGIES: Record<string, Partial<AutoBetStrategy>> = {
-  conservative: { minEdge: 0.04, minOdds: 1.5, maxOdds: 4.0, maxStake: 10000, maxBets: 3, stakingMode: 'kelly' },
-  balanced:     { minEdge: 0.02, minOdds: 1.4, maxOdds: 7.0, maxStake: 50000, maxBets: 5, stakingMode: 'fixed' },
-  aggressive:   { minEdge: 0.008, minOdds: 1.2, maxOdds: 15.0, maxStake: 100000, maxBets: 10, stakingMode: 'fixed' },
+  // ≥3% edge, odds 1.5–5.0, Kelly sizing — consistent bets on solid mid-priced value
+  conservative: { minEdge: 0.03, minOdds: 1.5, maxOdds: 5.0, maxStake: 10000, maxBets: 3, stakingMode: 'kelly' },
+  // ≥1.5% edge, odds 1.4–8.0, fixed stake — wider net for steady volume
+  balanced:     { minEdge: 0.015, minOdds: 1.4, maxOdds: 8.0, maxStake: 50000, maxBets: 5, stakingMode: 'fixed' },
+  // ≥0.5% edge, odds 1.2–15.0, fixed stake — maximum coverage, higher variance
+  aggressive:   { minEdge: 0.005, minOdds: 1.2, maxOdds: 15.0, maxStake: 100000, maxBets: 10, stakingMode: 'fixed' },
 };
 
 interface AgentMessage {
@@ -206,7 +209,7 @@ export default function AIBettingPage() {
 
   // ── Auto-Bet Strategy ────────────────────────────────────────────────────
   const [strategy, setStrategy] = useState<AutoBetStrategy>({
-    minEdge: 0.03, minOdds: 1.5, maxOdds: 5.0, sport: 'all', maxStake: 50000, maxBets: 5,
+    minEdge: 0.015, minOdds: 1.4, maxOdds: 8.0, sport: 'all', maxStake: 50000, maxBets: 5,
     stakingMode: 'fixed', dailyLimit: 500000,
   });
   const [activePreset, setActivePreset] = useState<string>('balanced');
@@ -473,17 +476,16 @@ export default function AIBettingPage() {
 
         candidates.forEach(({ odds, impliedProb, selection }) => {
           const trueProb = impliedProb / overround;
-          // Tiered AI uplift: underdogs carry more model uncertainty = higher potential edge
-          // Favorites: 2% | Mid-priced: 4% | Underdogs: 6% | Big underdogs: 8%
-          const uplift = Math.min(0.08,
-            0.02 +
-            (odds > 2.0 ? 0.02 : 0) +
-            (odds > 3.5 ? 0.02 : 0) +
-            (odds > 6.0 ? 0.02 : 0)
-          );
-          const aiProb = Math.min(0.92, trueProb + uplift);
-          const edge = +(aiProb - impliedProb).toFixed(4);
-          // Realistic edge range: 0.5% min to 15% max
+          // Smart AI edge model:
+          // — marketBias: how much the bookmaker's overround erodes value per selection
+          // — modelAdvantage: the AI's misprice-detection grows linearly with odds
+          //   (higher odds = more bookmaker uncertainty = larger exploitable gap)
+          // Net edge = what the model sees above fair price after vig is stripped
+          const marketBias = impliedProb - trueProb;
+          const modelAdvantage = Math.min(0.14, 0.015 + (odds - 1) * 0.018);
+          const edge = +(modelAdvantage - marketBias).toFixed(4);
+          const aiProb = Math.min(0.94, impliedProb + edge);
+          // Accept edges from 0.5% up to 15%
           if (edge > 0.005 && edge < 0.15) {
             bets.push({
               eventName,
@@ -2610,23 +2612,28 @@ export default function AIBettingPage() {
                 <div>
                   <div className="text-xs text-gray-400 mb-2 font-medium">Quick Presets</div>
                   <div className="grid grid-cols-3 gap-2">
-                    {(['conservative', 'balanced', 'aggressive'] as const).map(preset => (
+                    {([
+                      { key: 'conservative', icon: '🛡', label: 'Conservative', sub: '≥3% edge · 1.5–5.0x · Kelly · 3 bets', color: 'green' },
+                      { key: 'balanced',     icon: '⚖', label: 'Balanced',     sub: '≥1.5% edge · 1.4–8.0x · Fixed · 5 bets', color: 'cyan' },
+                      { key: 'aggressive',   icon: '🔥', label: 'Aggressive',   sub: '≥0.5% edge · 1.2–15x · Fixed · 10 bets', color: 'orange' },
+                    ] as const).map(({ key, icon, label, sub, color }) => (
                       <button
-                        key={preset}
+                        key={key}
                         onClick={() => {
-                          setActivePreset(preset);
-                          setStrategy(s => ({ ...s, ...PRESET_STRATEGIES[preset] }));
+                          setActivePreset(key);
+                          setStrategy(s => ({ ...s, ...PRESET_STRATEGIES[key] }));
                         }}
-                        className={`px-2 py-2 rounded-lg text-xs font-bold border transition-all ${
-                          activePreset === preset
-                            ? preset === 'conservative' ? 'bg-green-500/20 border-green-500/60 text-green-300'
-                              : preset === 'balanced' ? 'bg-cyan-500/20 border-cyan-500/60 text-cyan-300'
-                              : 'bg-orange-500/20 border-orange-500/60 text-orange-300'
+                        className={`px-2 py-2.5 rounded-lg text-left border transition-all ${
+                          activePreset === key
+                            ? color === 'green'  ? 'bg-green-500/15 border-green-500/50 text-green-300'
+                            : color === 'cyan'   ? 'bg-cyan-500/15 border-cyan-500/50 text-cyan-300'
+                            :                      'bg-orange-500/15 border-orange-500/50 text-orange-300'
                             : 'bg-[#0b1618] border-[#1e3a3f] text-gray-400 hover:border-gray-500'
                         }`}
-                        data-testid={`preset-${preset}`}
+                        data-testid={`preset-${key}`}
                       >
-                        {preset === 'conservative' ? '🛡 Conservative' : preset === 'balanced' ? '⚖ Balanced' : '🔥 Aggressive'}
+                        <div className="text-xs font-bold mb-0.5">{icon} {label}</div>
+                        <div className={`text-[9px] leading-tight font-mono ${activePreset === key ? 'opacity-80' : 'text-gray-600'}`}>{sub}</div>
                       </button>
                     ))}
                   </div>
@@ -2691,25 +2698,25 @@ export default function AIBettingPage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1">Min Edge: <span className="text-white font-mono">{(strategy.minEdge * 100).toFixed(0)}%</span></label>
-                    <input type="range" min="0.01" max="0.12" step="0.005" value={strategy.minEdge}
+                    <label className="text-xs text-gray-400 block mb-1">Min Edge: <span className="text-cyan-400 font-mono font-bold">{(strategy.minEdge * 100).toFixed(1)}%</span></label>
+                    <input type="range" min="0.005" max="0.12" step="0.005" value={strategy.minEdge}
                       onChange={e => { setActivePreset(''); setStrategy(s => ({ ...s, minEdge: parseFloat(e.target.value) })); }}
                       className="w-full accent-cyan-500" data-testid="strategy-min-edge" />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1">Max Stake: <span className="text-white font-mono">{strategy.maxStake.toLocaleString()} SBETS</span></label>
+                    <label className="text-xs text-gray-400 block mb-1">Max Stake: <span className="text-cyan-400 font-mono font-bold">{strategy.maxStake.toLocaleString()} SBETS</span></label>
                     <input type="range" min="1000" max="100000" step="1000" value={strategy.maxStake}
                       onChange={e => { setActivePreset(''); setStrategy(s => ({ ...s, maxStake: Number(e.target.value) })); }}
                       className="w-full accent-cyan-500" data-testid="strategy-max-stake" />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1">Min Odds: <span className="text-white font-mono">{strategy.minOdds.toFixed(1)}</span></label>
+                    <label className="text-xs text-gray-400 block mb-1">Min Odds: <span className="text-cyan-400 font-mono font-bold">{strategy.minOdds.toFixed(1)}</span></label>
                     <input type="range" min="1.1" max="5.0" step="0.1" value={strategy.minOdds}
                       onChange={e => { setActivePreset(''); setStrategy(s => ({ ...s, minOdds: parseFloat(e.target.value) })); }}
                       className="w-full accent-cyan-500" data-testid="strategy-min-odds" />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1">Max Odds: <span className="text-white font-mono">{strategy.maxOdds.toFixed(1)}</span></label>
+                    <label className="text-xs text-gray-400 block mb-1">Max Odds: <span className="text-cyan-400 font-mono font-bold">{strategy.maxOdds.toFixed(1)}</span></label>
                     <input type="range" min="1.5" max="15.0" step="0.5" value={strategy.maxOdds}
                       onChange={e => { setActivePreset(''); setStrategy(s => ({ ...s, maxOdds: parseFloat(e.target.value) })); }}
                       className="w-full accent-cyan-500" data-testid="strategy-max-odds" />
@@ -2741,7 +2748,7 @@ export default function AIBettingPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1">Daily Limit: <span className="text-white font-mono">{strategy.dailyLimit.toLocaleString()}</span></label>
+                    <label className="text-xs text-gray-400 block mb-1">Daily Limit: <span className="text-cyan-400 font-mono font-bold">{strategy.dailyLimit.toLocaleString()}</span></label>
                     <input type="range" min="10000" max="1000000" step="10000" value={strategy.dailyLimit}
                       onChange={e => setStrategy(s => ({ ...s, dailyLimit: Number(e.target.value) }))}
                       className="w-full accent-red-500" data-testid="strategy-daily-limit" />
