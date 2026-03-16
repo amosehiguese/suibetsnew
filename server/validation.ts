@@ -4,10 +4,10 @@
 
 import { z } from 'zod';
 
-// Bet amount validation - min 0.02 SUI, max 10,000 SUI
+// Bet amount validation - min 0.02 SUI/SBETS, high cap to allow SBETS bets (enforced per-currency at runtime)
 export const BetAmountSchema = z.number()
-  .min(0.02, 'Minimum bet is 0.02 SUI')
-  .max(10000, 'Maximum bet is 10,000 SUI')
+  .min(0.02, 'Minimum bet is 0.02 SUI / 100 SBETS')
+  .max(10_000_000, 'Maximum bet exceeded')
   .positive('Bet amount must be positive');
 
 // Odds validation - between 1.01 and 1000

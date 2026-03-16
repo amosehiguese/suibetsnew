@@ -3161,7 +3161,7 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         }
       }
 
-      // MAX STAKE VALIDATION - Backend enforcement (100 SUI / 10,000 SBETS)
+      // MAX STAKE VALIDATION - Backend enforcement (100 SUI / 100,000 SBETS, runtime-adjustable via admin)
       // Use feeCurrency as primary indicator (client sends this), fallback to currency
       const betCurrency = feeCurrency || currency || 'SUI';
       

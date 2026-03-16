@@ -43,11 +43,22 @@ interface ArbitrageOpp {
 }
 
 interface MonteCarloResult {
+  mode: 'single' | 'portfolio';
   simulated: number;
   confidence: number;
   lower: number;
   upper: number;
   runs: number;
+  expectedPnl: number;
+  pProfit: number;
+  pLoss: number;
+  medianPnl: number;
+  bestCase: number;
+  worstCase: number;
+  expectedRoi: number;
+  stake: number;
+  distribution: { label: string; count: number; pct: number }[];
+  betCount: number;
 }
 
 interface AutoBetStrategy {
@@ -179,6 +190,11 @@ export default function AIBettingPage() {
   const [mcRuns, setMcRuns] = useState(50000);
   const [mcResult, setMcResult] = useState<MonteCarloResult | null>(null);
   const [mcRunning, setMcRunning] = useState(false);
+  const [mcMode, setMcMode] = useState<'single' | 'portfolio'>('single');
+  const [mcStake, setMcStake] = useState(1000);
+  const [mcOdds, setMcOdds] = useState(2.0);
+  const [mcEdgeBump, setMcEdgeBump] = useState(0.05);
+  const [mcSelectedEvent, setMcSelectedEvent] = useState<string>('');
 
   // ── Auto-Bet Strategy ────────────────────────────────────────────────────
   const [strategy, setStrategy] = useState<AutoBetStrategy>({
@@ -871,19 +887,127 @@ export default function AIBettingPage() {
   const runMonteCarlo = () => {
     setMcRunning(true);
     setTimeout(() => {
-      let wins = 0;
-      for (let i = 0; i < mcRuns; i++) { if (Math.random() < mcProb) wins++; }
-      const simulated = wins / mcRuns;
-      const se = Math.sqrt((simulated * (1 - simulated)) / mcRuns);
-      setMcResult({
-        simulated: +((simulated * 100).toFixed(2)),
-        confidence: +((simulated * 100).toFixed(2)),
-        lower: +(((simulated - 1.96 * se) * 100).toFixed(2)),
-        upper: +(((simulated + 1.96 * se) * 100).toFixed(2)),
-        runs: mcRuns,
-      });
+      const buildDistribution = (outcomes: number[], numBuckets = 8) => {
+        const sorted = [...outcomes].sort((a, b) => a - b);
+        const min = sorted[0];
+        const max = sorted[sorted.length - 1];
+        if (min === max) {
+          return [{ label: min >= 0 ? `+${min.toFixed(0)}` : `${min.toFixed(0)}`, count: outcomes.length, pct: 100 }];
+        }
+        const bucketSize = (max - min) / numBuckets;
+        return Array.from({ length: numBuckets }, (_, i) => {
+          const low = min + i * bucketSize;
+          const high = i === numBuckets - 1 ? max + 0.01 : low + bucketSize;
+          const count = sorted.filter(v => v >= low && v < high).length;
+          const midpoint = (low + high) / 2;
+          return {
+            label: midpoint >= 0 ? `+${Math.round(midpoint)}` : `${Math.round(midpoint)}`,
+            count,
+            pct: +((count / outcomes.length) * 100).toFixed(1),
+          };
+        });
+      };
+
+      if (mcMode === 'single') {
+        // ── Single Bet Simulation ──
+        const prob = Math.min(0.99, Math.max(0.01, mcProb));
+        const profitPerWin = mcStake * (mcOdds - 1);
+        const lossPerBet = -mcStake;
+        let wins = 0;
+        const outcomes: number[] = [];
+        for (let i = 0; i < mcRuns; i++) {
+          const won = Math.random() < prob;
+          outcomes.push(won ? profitPerWin : lossPerBet);
+          if (won) wins++;
+        }
+        outcomes.sort((a, b) => a - b);
+        const simulated = wins / mcRuns;
+        const se = Math.sqrt((simulated * (1 - simulated)) / mcRuns);
+        const expectedPnl = outcomes.reduce((s, v) => s + v, 0) / mcRuns;
+        const pProfit = (wins / mcRuns) * 100;
+        // single bet only has 2 outcome values — show win/loss bar
+        const dist = [
+          { label: `Win +${profitPerWin.toFixed(0)}`, count: wins, pct: +pProfit.toFixed(1) },
+          { label: `Lose -${mcStake}`, count: mcRuns - wins, pct: +(100 - pProfit).toFixed(1) },
+        ];
+        setMcResult({
+          mode: 'single',
+          simulated: +((simulated * 100).toFixed(2)),
+          confidence: +((simulated * 100).toFixed(2)),
+          lower: +(((simulated - 1.96 * se) * 100).toFixed(2)),
+          upper: +(((simulated + 1.96 * se) * 100).toFixed(2)),
+          runs: mcRuns,
+          expectedPnl: +expectedPnl.toFixed(0),
+          pProfit: +pProfit.toFixed(1),
+          pLoss: +(100 - pProfit).toFixed(1),
+          medianPnl: outcomes[Math.floor(mcRuns / 2)],
+          bestCase: outcomes[Math.floor(mcRuns * 0.95)],
+          worstCase: outcomes[Math.floor(mcRuns * 0.05)],
+          expectedRoi: +((expectedPnl / mcStake) * 100).toFixed(1),
+          stake: mcStake,
+          distribution: dist,
+          betCount: 1,
+        });
+
+      } else {
+        // ── Portfolio Simulation ──
+        const slip = selectedBets.length > 0
+          ? selectedBets.map((b: any) => ({
+              label: `${b.homeTeam ?? ''} vs ${b.awayTeam ?? ''}`.trim() || b.description || 'Bet',
+              stake: Number(b.stake) || mcStake,
+              odds: Number(b.odds) || 2.0,
+              prob: Math.min(0.97, (1 / (Number(b.odds) || 2.0)) * (1 + mcEdgeBump)),
+            }))
+          : allValueBets.slice(0, 8).map((vb: any) => ({
+              label: `${vb.homeTeam ?? ''} vs ${vb.awayTeam ?? ''}`.trim() || 'Value Bet',
+              stake: mcStake,
+              odds: Number(vb.homeOdds) || 2.0,
+              prob: Math.min(0.97, (1 / (Number(vb.homeOdds) || 2.0)) * (1 + mcEdgeBump)),
+            }));
+
+        if (slip.length === 0) {
+          setMcResult(null);
+          setMcRunning(false);
+          return;
+        }
+
+        const totalStake = slip.reduce((s: number, b: any) => s + b.stake, 0);
+        const outcomes: number[] = [];
+        for (let i = 0; i < mcRuns; i++) {
+          let pnl = 0;
+          for (const bet of slip) {
+            pnl += Math.random() < bet.prob ? bet.stake * (bet.odds - 1) : -bet.stake;
+          }
+          outcomes.push(pnl);
+        }
+        outcomes.sort((a, b) => a - b);
+        const wins = outcomes.filter(v => v > 0).length;
+        const simulated = wins / mcRuns;
+        const se = Math.sqrt((simulated * (1 - simulated)) / mcRuns);
+        const expectedPnl = outcomes.reduce((s, v) => s + v, 0) / mcRuns;
+        const pProfit = simulated * 100;
+
+        setMcResult({
+          mode: 'portfolio',
+          simulated: +pProfit.toFixed(2),
+          confidence: +pProfit.toFixed(2),
+          lower: +(((simulated - 1.96 * se) * 100).toFixed(2)),
+          upper: +(((simulated + 1.96 * se) * 100).toFixed(2)),
+          runs: mcRuns,
+          expectedPnl: +expectedPnl.toFixed(0),
+          pProfit: +pProfit.toFixed(1),
+          pLoss: +(100 - pProfit).toFixed(1),
+          medianPnl: +outcomes[Math.floor(mcRuns / 2)].toFixed(0),
+          bestCase: +outcomes[Math.floor(mcRuns * 0.95)].toFixed(0),
+          worstCase: +outcomes[Math.floor(mcRuns * 0.05)].toFixed(0),
+          expectedRoi: +((expectedPnl / (totalStake || 1)) * 100).toFixed(1),
+          stake: totalStake,
+          distribution: buildDistribution(outcomes),
+          betCount: slip.length,
+        });
+      }
       setMcRunning(false);
-    }, 600);
+    }, 200);
   };
 
   // ── Auto-Bet ─────────────────────────────────────────────────────────────
@@ -1776,42 +1900,211 @@ export default function AIBettingPage() {
             {/* ── 3. Monte Carlo ─────────────────────────────────────── */}
             {activeTab === 'montecarlo' && (
               <div className="space-y-4">
-                <div className="text-xs text-gray-400">
-                  Formula: <span className="text-purple-400 font-mono">CI = simulated ± 1.96√(p(1−p)/n)</span> — 95% confidence interval
+
+                {/* Mode toggle */}
+                <div className="flex rounded-lg overflow-hidden border border-[#1e3a3f]">
+                  {(['single', 'portfolio'] as const).map(m => (
+                    <button key={m}
+                      data-testid={`mc-mode-${m}`}
+                      onClick={() => { setMcMode(m); setMcResult(null); }}
+                      className={`flex-1 py-1.5 text-xs font-semibold transition-colors ${mcMode === m ? 'bg-purple-600 text-white' : 'bg-[#0b1618] text-gray-400 hover:text-white'}`}>
+                      {m === 'single' ? '🎯 Single Bet' : '📦 Portfolio'}
+                    </button>
+                  ))}
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs text-gray-400 block mb-1">Win Probability: <span className="text-white font-mono">{(mcProb * 100).toFixed(0)}%</span></label>
-                    <input type="range" min="0.05" max="0.95" step="0.01" value={mcProb}
-                      onChange={e => setMcProb(parseFloat(e.target.value))}
-                      className="w-full accent-purple-500" data-testid="mc-prob-slider" />
+
+                {/* Single Bet inputs */}
+                {mcMode === 'single' && (
+                  <div className="space-y-3">
+                    {/* Event selector */}
+                    {allEvents.length > 0 && (
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Auto-fill from event (optional)</label>
+                        <select
+                          data-testid="mc-event-select"
+                          value={mcSelectedEvent}
+                          onChange={e => {
+                            const id = e.target.value;
+                            setMcSelectedEvent(id);
+                            if (id) {
+                              const ev = allEvents.find((x: any) => String(x.id ?? x.fixtureId) === id);
+                              if (ev) {
+                                const homeOdds = Number(ev.homeOdds || ev.odds?.home) || 0;
+                                if (homeOdds > 1) {
+                                  setMcOdds(+homeOdds.toFixed(2));
+                                  setMcProb(+(1 / homeOdds).toFixed(3));
+                                }
+                              }
+                            }
+                          }}
+                          className="w-full bg-[#0b1618] border border-[#1e3a3f] text-white text-xs rounded-lg px-3 py-2">
+                          <option value="">— Manual input —</option>
+                          {allEvents.slice(0, 30).map((ev: any) => {
+                            const evId = String(ev.id ?? ev.fixtureId);
+                            return (
+                              <option key={evId} value={evId}>
+                                {ev.homeTeam} vs {ev.awayTeam}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Stake (SBETS)</label>
+                        <input
+                          type="number" min="1" step="100" value={mcStake}
+                          onChange={e => setMcStake(Math.max(1, Number(e.target.value)))}
+                          className="w-full bg-[#0b1618] border border-[#1e3a3f] text-white text-sm rounded-lg px-3 py-1.5"
+                          data-testid="mc-stake-input" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Odds</label>
+                        <input
+                          type="number" min="1.01" step="0.05" value={mcOdds}
+                          onChange={e => {
+                            const o = Math.max(1.01, Number(e.target.value));
+                            setMcOdds(o);
+                            setMcProb(+(1 / o).toFixed(3));
+                          }}
+                          className="w-full bg-[#0b1618] border border-[#1e3a3f] text-white text-sm rounded-lg px-3 py-1.5"
+                          data-testid="mc-odds-input" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Win Prob %</label>
+                        <input
+                          type="number" min="1" max="99" step="1" value={(mcProb * 100).toFixed(0)}
+                          onChange={e => setMcProb(Math.min(0.99, Math.max(0.01, Number(e.target.value) / 100)))}
+                          className="w-full bg-[#0b1618] border border-[#1e3a3f] text-white text-sm rounded-lg px-3 py-1.5"
+                          data-testid="mc-prob-input" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Win Probability: <span className="text-purple-300 font-mono">{(mcProb * 100).toFixed(1)}%</span>
+                        <span className="text-gray-500 ml-2">(implied by odds: {(1/mcOdds*100).toFixed(1)}%)</span>
+                      </label>
+                      <input type="range" min="0.01" max="0.99" step="0.01" value={mcProb}
+                        onChange={e => setMcProb(parseFloat(e.target.value))}
+                        className="w-full accent-purple-500" data-testid="mc-prob-slider" />
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-xs text-gray-400 block mb-1">Simulation Runs</label>
-                    <select value={mcRuns} onChange={e => setMcRuns(Number(e.target.value))}
-                      className="w-full bg-[#0b1618] border border-[#1e3a3f] text-white text-sm rounded-lg px-3 py-2"
-                      data-testid="mc-runs-select">
-                      {[10000, 50000, 100000].map(n => <option key={n} value={n}>{n.toLocaleString()}</option>)}
-                    </select>
+                )}
+
+                {/* Portfolio inputs */}
+                {mcMode === 'portfolio' && (
+                  <div className="space-y-3">
+                    <div className={`text-xs rounded-lg px-3 py-2 border ${selectedBets.length > 0 ? 'border-green-500/30 bg-green-500/5 text-green-400' : 'border-yellow-500/30 bg-yellow-500/5 text-yellow-400'}`}>
+                      {selectedBets.length > 0
+                        ? `✅ Using ${selectedBets.length} bet${selectedBets.length > 1 ? 's' : ''} from your slip`
+                        : `⚠️ No bets in slip — will use top ${Math.min(8, allValueBets.length)} value bets`}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Default Stake per Bet (SBETS)</label>
+                        <input type="number" min="1" step="100" value={mcStake}
+                          onChange={e => setMcStake(Math.max(1, Number(e.target.value)))}
+                          className="w-full bg-[#0b1618] border border-[#1e3a3f] text-white text-sm rounded-lg px-3 py-1.5"
+                          data-testid="mc-stake-portfolio-input" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Edge Assumption: <span className="text-purple-300 font-mono">+{(mcEdgeBump * 100).toFixed(0)}%</span></label>
+                        <input type="range" min="0" max="0.2" step="0.01" value={mcEdgeBump}
+                          onChange={e => setMcEdgeBump(parseFloat(e.target.value))}
+                          className="w-full accent-purple-500 mt-2" data-testid="mc-edge-slider" />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-gray-500">Edge assumption adds to the market-implied probability. 0% = pure market odds; +5% = you win 5% more often than implied.</p>
                   </div>
+                )}
+
+                {/* Runs selector */}
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Simulation Runs</label>
+                  <select value={mcRuns} onChange={e => setMcRuns(Number(e.target.value))}
+                    className="w-full bg-[#0b1618] border border-[#1e3a3f] text-white text-sm rounded-lg px-3 py-2"
+                    data-testid="mc-runs-select">
+                    {[10000, 50000, 100000, 500000].map(n => <option key={n} value={n}>{n.toLocaleString()} runs</option>)}
+                  </select>
                 </div>
+
                 <Button onClick={runMonteCarlo} disabled={mcRunning}
                   className="bg-purple-600 hover:bg-purple-700 text-white w-full"
                   data-testid="run-monte-carlo">
-                  {mcRunning ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Running {mcRuns.toLocaleString()} simulations…</> : <><PlayCircle className="h-4 w-4 mr-2" />Run Monte Carlo Simulation</>}
+                  {mcRunning
+                    ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Running {mcRuns.toLocaleString()} simulations…</>
+                    : <><PlayCircle className="h-4 w-4 mr-2" />Run Monte Carlo</>}
                 </Button>
+
+                {/* Results */}
                 {mcResult && (
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { label: 'Simulated Win %', value: `${mcResult.simulated}%`, color: 'text-purple-400' },
-                      { label: '95% CI Lower', value: `${mcResult.lower}%`, color: 'text-blue-400' },
-                      { label: '95% CI Upper', value: `${mcResult.upper}%`, color: 'text-green-400' },
-                    ].map((r, i) => (
-                      <div key={i} className="bg-[#0b1618] rounded-lg p-3 text-center border border-[#1e3a3f]">
-                        <div className={`text-lg font-bold ${r.color}`}>{r.value}</div>
-                        <div className="text-xs text-gray-400">{r.label}</div>
+                  <div className="space-y-3">
+                    {/* Header */}
+                    <div className="text-xs text-gray-500 flex items-center gap-2">
+                      <span className="text-purple-400 font-mono">n={mcResult.runs.toLocaleString()}</span>
+                      <span>·</span>
+                      <span>{mcResult.mode === 'portfolio' ? `${mcResult.betCount} bets` : '1 bet'}</span>
+                      <span>·</span>
+                      <span>95% CI: [{mcResult.lower}%, {mcResult.upper}%]</span>
+                    </div>
+
+                    {/* Key metrics */}
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { label: 'P(Profit)', value: `${mcResult.pProfit}%`, color: mcResult.pProfit >= 50 ? 'text-green-400' : 'text-red-400', bg: mcResult.pProfit >= 50 ? 'border-green-500/20' : 'border-red-500/20' },
+                        { label: 'Expected P&L', value: `${mcResult.expectedPnl >= 0 ? '+' : ''}${mcResult.expectedPnl.toLocaleString()} S`, color: mcResult.expectedPnl >= 0 ? 'text-green-400' : 'text-red-400', bg: mcResult.expectedPnl >= 0 ? 'border-green-500/20' : 'border-red-500/20' },
+                        { label: 'Expected ROI', value: `${mcResult.expectedRoi >= 0 ? '+' : ''}${mcResult.expectedRoi}%`, color: mcResult.expectedRoi >= 0 ? 'text-emerald-400' : 'text-orange-400', bg: 'border-[#1e3a3f]' },
+                        { label: 'Median P&L', value: `${mcResult.medianPnl >= 0 ? '+' : ''}${mcResult.medianPnl.toLocaleString()} S`, color: 'text-blue-400', bg: 'border-[#1e3a3f]' },
+                      ].map((r, i) => (
+                        <div key={i} className={`bg-[#0b1618] rounded-lg p-3 border ${r.bg}`}>
+                          <div className={`text-base font-bold ${r.color}`}>{r.value}</div>
+                          <div className="text-[10px] text-gray-400 mt-0.5">{r.label}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Percentile band */}
+                    <div className="bg-[#0b1618] rounded-lg p-3 border border-[#1e3a3f]">
+                      <div className="text-[10px] text-gray-400 mb-2 uppercase tracking-wide">Outcome Range (5th – 95th percentile)</div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-red-400 font-mono">{mcResult.worstCase >= 0 ? '+' : ''}{mcResult.worstCase.toLocaleString()} S</span>
+                        <div className="flex-1 mx-3 h-1.5 bg-gradient-to-r from-red-500 via-yellow-400 to-green-500 rounded-full" />
+                        <span className="text-green-400 font-mono">{mcResult.bestCase >= 0 ? '+' : ''}{mcResult.bestCase.toLocaleString()} S</span>
                       </div>
-                    ))}
+                      <div className="flex justify-between text-[9px] text-gray-600 mt-1">
+                        <span>Worst 5%</span><span>Best 5%</span>
+                      </div>
+                    </div>
+
+                    {/* Distribution histogram */}
+                    {mcResult.distribution.length > 0 && (
+                      <div className="bg-[#0b1618] rounded-lg p-3 border border-[#1e3a3f]">
+                        <div className="text-[10px] text-gray-400 mb-2 uppercase tracking-wide">Outcome Distribution</div>
+                        <div className="space-y-1.5">
+                          {mcResult.distribution.map((bucket, i) => {
+                            const isWin = !bucket.label.startsWith('-') || bucket.label.startsWith('+');
+                            const barColor = bucket.label.startsWith('-') ? 'bg-red-500/60' : 'bg-green-500/60';
+                            const maxPct = Math.max(...mcResult.distribution.map(b => b.pct));
+                            const barWidth = maxPct > 0 ? (bucket.pct / maxPct) * 100 : 0;
+                            return (
+                              <div key={i} className="flex items-center gap-2 text-xs">
+                                <span className="w-16 text-right font-mono text-gray-400 shrink-0">{bucket.label}</span>
+                                <div className="flex-1 bg-[#0a1215] rounded-sm h-4 overflow-hidden">
+                                  <div className={`h-full ${barColor} transition-all`} style={{ width: `${barWidth}%` }} />
+                                </div>
+                                <span className={`w-10 text-right font-mono shrink-0 ${bucket.label.startsWith('-') ? 'text-red-400' : 'text-green-400'}`}>{bucket.pct}%</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="text-[9px] text-gray-600 text-center">
+                      Formula: CI = p̂ ± 1.96√(p̂(1−p̂)/n) · S = SBETS tokens · Results are probabilistic estimates, not guarantees.
+                    </div>
                   </div>
                 )}
               </div>
