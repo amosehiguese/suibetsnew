@@ -266,6 +266,8 @@ export default function AIBettingPage() {
   const [agentInput, setAgentInput] = useState('');
   const [agentLoading, setAgentLoading] = useState(false);
   const [agentThinking, setAgentThinking] = useState('');
+  const [savedToast, setSavedToast] = useState(false);
+  const savedToastRef = useRef<ReturnType<typeof setTimeout>>();
   const [chatHistory, setChatHistory] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>(() => {
     try {
       const stored = localStorage.getItem('suibets-chat-history');
@@ -274,11 +276,16 @@ export default function AIBettingPage() {
     return [];
   });
 
-  // Persist chat to localStorage whenever it changes
+  // Persist chat to localStorage whenever it changes + flash "saved" toast
   useEffect(() => {
     try {
       localStorage.setItem('suibets-chat-messages', JSON.stringify(agentMessages.slice(-60)));
     } catch {}
+    if (agentMessages.length > 1) {
+      setSavedToast(true);
+      clearTimeout(savedToastRef.current);
+      savedToastRef.current = setTimeout(() => setSavedToast(false), 2200);
+    }
   }, [agentMessages]);
   useEffect(() => {
     try {
@@ -1566,6 +1573,48 @@ export default function AIBettingPage() {
     odds_movement:{ label: 'SHARP',  color: 'text-orange-400', bg: 'bg-orange-500/15' },
   };
 
+  // Parse "run_all" style text into per-module coloured sections
+  const MODULE_KEYWORDS: { key: string; label: string; icon: string; positiveKey: string; color: string; bg: string }[] = [
+    { key: 'Value bets:', label: 'Value Bets', icon: '🎯', positiveKey: 'edge', color: 'text-green-400', bg: 'bg-green-500/10 border-green-500/20' },
+    { key: 'Arbitrage:', label: 'Arbitrage', icon: '♻️', positiveKey: '%', color: 'text-yellow-400', bg: 'bg-yellow-500/10 border-yellow-500/20' },
+    { key: 'Odds movement:', label: 'Odds Movement', icon: '📊', positiveKey: 'sharp', color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' },
+    { key: 'Live signals:', label: 'Live Signals', icon: '⚡', positiveKey: 'recommend', color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20' },
+    { key: 'Predictions:', label: 'Predictions', icon: '🔮', positiveKey: 'chance', color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/20' },
+    { key: 'Marketplace:', label: 'Marketplace', icon: '🏆', positiveKey: 'pick', color: 'text-cyan-400', bg: 'bg-cyan-500/10 border-cyan-500/20' },
+    { key: 'Portfolio:', label: 'Portfolio', icon: '💼', positiveKey: 'recommend', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
+  ];
+
+  const parseModuleSections = (text: string): { prefix: string; sections: { label: string; icon: string; content: string; color: string; bg: string; positive: boolean }[] } => {
+    let firstKeyIdx = text.length;
+    for (const m of MODULE_KEYWORDS) {
+      const idx = text.indexOf(m.key);
+      if (idx !== -1 && idx < firstKeyIdx) firstKeyIdx = idx;
+    }
+    const prefix = text.slice(0, firstKeyIdx).trim();
+    const body = text.slice(firstKeyIdx);
+    const sections: { label: string; icon: string; content: string; color: string; bg: string; positive: boolean }[] = [];
+
+    let remaining = body;
+    for (let i = 0; i < MODULE_KEYWORDS.length; i++) {
+      const m = MODULE_KEYWORDS[i];
+      const idx = remaining.indexOf(m.key);
+      if (idx === -1) continue;
+      const afterKey = remaining.slice(idx + m.key.length);
+      // Find where next keyword starts
+      let nextIdx = afterKey.length;
+      for (let j = i + 1; j < MODULE_KEYWORDS.length; j++) {
+        const ni = afterKey.indexOf(MODULE_KEYWORDS[j].key);
+        if (ni !== -1 && ni < nextIdx) nextIdx = ni;
+      }
+      const content = afterKey.slice(0, nextIdx).trim().replace(/^:\s*/, '');
+      const lower = content.toLowerCase();
+      const positive = !lower.includes('no edges') && !lower.includes('no risk') && !lower.includes('no opportunit') && lower.length > 10;
+      sections.push({ label: m.label, icon: m.icon, content, color: m.color, bg: m.bg, positive });
+      remaining = afterKey.slice(nextIdx);
+    }
+    return { prefix, sections };
+  };
+
   return (
     <Layout title="AI Betting Engine">
       <div className="max-w-4xl mx-auto space-y-4 pb-10">
@@ -1629,7 +1678,9 @@ export default function AIBettingPage() {
               )}
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-gray-500 hidden sm:inline">Conversation saved</span>
+              <span className={`text-[11px] transition-all duration-500 hidden sm:inline ${savedToast ? 'text-green-400 opacity-100' : 'text-transparent opacity-0'}`}>
+                ✓ Saved
+              </span>
               <button
                 onClick={clearChat}
                 className="text-[11px] text-gray-500 hover:text-red-400 transition-colors px-2 py-0.5 rounded border border-transparent hover:border-red-900/40"
@@ -1641,14 +1692,14 @@ export default function AIBettingPage() {
           </div>
 
           {/* Quick Commands */}
-          <div className="flex gap-2 flex-wrap px-4 py-2.5 border-b border-cyan-900/20 bg-[#0b1618]/40">
+          <div className="flex items-center gap-2 flex-wrap px-4 py-2 border-b border-cyan-900/20 bg-[#0b1618]/40">
+            <span className="text-[10px] text-gray-600 uppercase tracking-wider font-semibold shrink-0 hidden sm:inline">Quick:</span>
             {[
               { label: 'Find value bets', icon: '🎯' },
               { label: 'Check arbitrage', icon: '♻️' },
               { label: 'Run Monte Carlo', icon: '🎲' },
               { label: 'Live signals', icon: '⚡' },
               { label: 'Top predictions', icon: '🔮' },
-              { label: 'Run all modules', icon: '🚀' },
             ].map(cmd => (
               <button
                 key={cmd.label}
@@ -1656,9 +1707,17 @@ export default function AIBettingPage() {
                 data-testid={`agent-quick-${cmd.label.toLowerCase().replace(/\s+/g, '-')}`}
                 className="text-[11px] px-2.5 py-1 rounded-full border border-cyan-900/40 text-cyan-400 hover:bg-cyan-500/10 hover:border-cyan-500/50 transition-colors flex items-center gap-1"
               >
-                <span>{cmd.icon}</span> {cmd.label}
+                <span>{cmd.icon}</span> <span className="hidden sm:inline">{cmd.label}</span><span className="sm:hidden">{cmd.label.split(' ')[0]}</span>
               </button>
             ))}
+            <button
+              onClick={() => sendAgentMessage('Run all modules')}
+              data-testid="agent-quick-run-all-modules"
+              disabled={agentLoading}
+              className="ml-auto text-[11px] px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/20 hover:border-cyan-400/50 font-semibold transition-all flex items-center gap-1.5 disabled:opacity-40"
+            >
+              🚀 Run all
+            </button>
           </div>
 
           {/* Messages */}
@@ -1675,17 +1734,57 @@ export default function AIBettingPage() {
                     ? 'bg-cyan-600/20 border border-cyan-600/30 text-white'
                     : 'bg-[#0b1618] border border-[#1e3a3f] text-gray-200'
                   } rounded-xl px-4 py-2.5 text-sm`}>
-                    <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                    {/* Text — if run_all parse into module sections, otherwise plain */}
+                    {msg.action === 'run_all' && msg.role === 'agent' ? (() => {
+                      const { prefix, sections } = parseModuleSections(msg.text);
+                      return (
+                        <div className="space-y-1.5">
+                          {prefix && <p className="leading-relaxed text-gray-300 text-[13px] mb-2">{prefix}</p>}
+                          {sections.map((s, si) => (
+                            <div key={si} className={`rounded-lg border px-2.5 py-1.5 flex items-start gap-2 ${s.bg}`}>
+                              <span className="text-sm leading-none mt-0.5">{s.icon}</span>
+                              <div className="flex-1 min-w-0">
+                                <span className={`text-[10px] font-bold uppercase tracking-wide ${s.color}`}>{s.label}</span>
+                                <p className="text-[11px] text-gray-300 mt-0.5 leading-snug">{s.content}</p>
+                              </div>
+                              {!s.positive && (
+                                <span className="text-[9px] shrink-0 mt-0.5 px-1.5 py-0.5 rounded-full bg-gray-700/60 text-gray-500 border border-gray-700/80">—</span>
+                              )}
+                            </div>
+                          ))}
+                          {sections.length === 0 && <p className="leading-relaxed whitespace-pre-wrap text-[13px]">{msg.text}</p>}
+                        </div>
+                      );
+                    })() : <p className="leading-relaxed whitespace-pre-wrap text-[13px]">{msg.text}</p>}
 
-                    {/* Key Insights */}
+                    {/* Key Insights — render probability bars for items containing "%" */}
                     {msg.keyInsights && msg.keyInsights.length > 0 && (
-                      <div className="mt-2.5 space-y-1">
-                        {msg.keyInsights.map((insight: string, i: number) => (
-                          <div key={i} className="flex items-start gap-1.5 text-[11px] text-cyan-300/80">
-                            <Sparkles className="h-3 w-3 text-cyan-400 mt-0.5 flex-shrink-0" />
-                            <span>{insight}</span>
-                          </div>
-                        ))}
+                      <div className="mt-2.5 space-y-1.5">
+                        {msg.keyInsights.map((insight: string, i: number) => {
+                          const pctMatch = insight.match(/(\d+(?:\.\d+)?)\s*%/);
+                          const pct = pctMatch ? parseFloat(pctMatch[1]) : null;
+                          if (pct !== null && pct <= 100) {
+                            const barColor = pct >= 60 ? 'bg-green-500' : pct >= 40 ? 'bg-yellow-500' : 'bg-red-400';
+                            const textColor = pct >= 60 ? 'text-green-400' : pct >= 40 ? 'text-yellow-400' : 'text-red-400';
+                            return (
+                              <div key={i} className="bg-[#0a1315]/60 rounded-lg p-2 border border-[#1e3a3f]">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-[11px] text-gray-300 leading-snug pr-2">{insight.replace(pctMatch![0], '').trim().replace(/[.:,]$/, '')}</span>
+                                  <span className={`text-[11px] font-bold font-mono shrink-0 ${textColor}`}>{pct.toFixed(0)}%</span>
+                                </div>
+                                <div className="w-full h-1 bg-[#0b1618] rounded-full overflow-hidden">
+                                  <div className={`h-1 rounded-full transition-all duration-700 ${barColor}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                                </div>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div key={i} className="flex items-start gap-1.5 text-[11px] text-cyan-300/80">
+                              <Sparkles className="h-3 w-3 text-cyan-400 mt-0.5 flex-shrink-0" />
+                              <span>{insight}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
 
@@ -1775,7 +1874,11 @@ export default function AIBettingPage() {
                     {msg.result?.type === 'arbitrage' && (
                       <div className="mt-3 space-y-2">
                         {msg.result.opportunities?.length === 0 ? (
-                          <div className="text-[11px] text-gray-500 text-center py-2">No true arbitrage found — market is efficient right now.</div>
+                          <div className="flex justify-center py-2">
+                            <span className="inline-flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-full bg-gray-700/40 border border-gray-700/60 text-gray-400">
+                              <span>✕</span> No arb opportunities — market is efficient
+                            </span>
+                          </div>
                         ) : msg.result.opportunities?.map((opp: any, i: number) => (
                           <div key={i} className={`bg-[#0d1f24] border rounded-lg p-2.5 ${opp.profit > 0 ? 'border-green-900/40' : 'border-[#1e3a3f]'}`}>
                             <div className="text-xs font-medium text-white truncate">{opp.event}</div>
@@ -1901,8 +2004,18 @@ export default function AIBettingPage() {
                         <div className="text-[10px] text-gray-500 font-medium uppercase tracking-wide mb-2 flex items-center gap-1">
                           <Star className="h-3 w-3 text-yellow-400" />
                           Unified Opportunity Table — all modules ranked by AI score
+                          {(msg.result.ranked || []).length > 0 && (
+                            <span className="ml-auto text-[9px] text-gray-600">{(msg.result.ranked || []).length} opps</span>
+                          )}
                         </div>
-                        <div className="space-y-1.5">
+                        {(msg.result.ranked || []).length === 0 ? (
+                          <div className="flex justify-center py-2.5">
+                            <span className="inline-flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-full bg-gray-700/40 border border-gray-700/60 text-gray-400">
+                              <span>✕</span> No edges found across all modules
+                            </span>
+                          </div>
+                        ) : null}
+                        <div className="max-h-60 overflow-y-auto space-y-1.5 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-cyan-900/40 pr-0.5">
                           {(msg.result.ranked || []).map((item: any, i: number) => {
                             const mod = moduleTypeLabel[item.moduleType] || { label: 'SIGNAL', color: 'text-gray-400', bg: 'bg-gray-500/15' };
                             return (
