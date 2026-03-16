@@ -68,7 +68,15 @@ interface AutoBetStrategy {
   sport: string;
   maxStake: number;
   maxBets: number;
+  stakingMode: 'fixed' | 'kelly';
+  dailyLimit: number;
 }
+
+const PRESET_STRATEGIES: Record<string, Partial<AutoBetStrategy>> = {
+  conservative: { minEdge: 0.06, minOdds: 1.5, maxOdds: 3.0, maxStake: 10000, maxBets: 3, stakingMode: 'kelly' },
+  balanced:     { minEdge: 0.03, minOdds: 1.5, maxOdds: 5.0, maxStake: 50000, maxBets: 5, stakingMode: 'fixed' },
+  aggressive:   { minEdge: 0.01, minOdds: 1.3, maxOdds: 10.0, maxStake: 100000, maxBets: 10, stakingMode: 'fixed' },
+};
 
 interface AgentMessage {
   id: string;
@@ -198,8 +206,11 @@ export default function AIBettingPage() {
 
   // ── Auto-Bet Strategy ────────────────────────────────────────────────────
   const [strategy, setStrategy] = useState<AutoBetStrategy>({
-    minEdge: 0.03, minOdds: 1.5, maxOdds: 5.0, sport: 'all', maxStake: 100000, maxBets: 5
+    minEdge: 0.03, minOdds: 1.5, maxOdds: 5.0, sport: 'all', maxStake: 50000, maxBets: 5,
+    stakingMode: 'fixed', dailyLimit: 500000,
   });
+  const [activePreset, setActivePreset] = useState<string>('balanced');
+  const [dailyStaked, setDailyStaked] = useState(0);
   const [autoLog, setAutoLog] = useState<string[]>([]);
   const [usedAutoBetKeys, setUsedAutoBetKeys] = useState<Set<string>>(new Set());
 
@@ -515,42 +526,62 @@ export default function AIBettingPage() {
   // ── Live signals ─────────────────────────────────────────────────────────
   const buildLiveSignals = (events: any[]) => {
     const pool = (liveEvents as any[]).length > 0 ? liveEvents as any[] : events;
-    return pool.slice(0, 6).map((e: any) => {
-      const homeOdds = getRealOdds(e, 'home');
-      const awayOdds = getRealOdds(e, 'away');
-      const drawOdds = getRealOdds(e, 'draw');
-      // Compute true win probability from real odds if available
-      let strength: number;
-      if (homeOdds && awayOdds) {
-        const impliedHome = 1 / homeOdds;
-        const impliedAway = 1 / awayOdds;
-        const impliedDraw = drawOdds ? 1 / drawOdds : 0;
-        const overround = impliedHome + impliedAway + impliedDraw;
-        const trueHome = impliedHome / overround;
-        // Signal strength = normalised home probability + slight underdog uplift
-        const underdogBonus = homeOdds > 3.0 ? 0.08 : homeOdds > 2.0 ? 0.05 : 0;
-        strength = Math.min(0.92, trueHome + underdogBonus);
-      } else if (homeOdds) {
-        strength = Math.min(0.88, (1 / homeOdds) + 0.05);
-      } else {
-        strength = 0.55;
-      }
-      const signal = strength > 0.68 ? 'BUY' : strength > 0.55 ? 'WATCH' : 'HOLD';
-      const markets = ['Match Winner', 'Over 2.5 Goals', '1st Half Result', 'Both Teams Score', 'Next Goal'];
-      const key = String(e.id || e.eventName || e.homeTeam || '');
-      const marketIdx = strHash(key) % markets.length;
-      return {
-        match: `${e.homeTeam} vs ${e.awayTeam}`,
-        league: e.leagueName || '',
-        signal,
-        strength: +strength.toFixed(2),
-        market: markets[marketIdx],
-        odds: homeOdds ? +homeOdds.toFixed(2) : null,
-        eventId: e.id,
-        isLive: e.isLive || false,
-        score: e.score || null,
-      };
-    });
+    return pool
+      .filter((e: any) => getRealOdds(e, 'home') || getRealOdds(e, 'away'))
+      .slice(0, 8)
+      .map((e: any) => {
+        const homeOdds = getRealOdds(e, 'home');
+        const awayOdds = getRealOdds(e, 'away');
+        const drawOdds = getRealOdds(e, 'draw');
+
+        // Build candidates for all available outcomes
+        const candidates: { label: string; odds: number; impliedProb: number }[] = [];
+        const impliedH = homeOdds ? 1 / homeOdds : 0;
+        const impliedA = awayOdds ? 1 / awayOdds : 0;
+        const impliedD = drawOdds ? 1 / drawOdds : 0;
+        const overround = impliedH + impliedA + impliedD || 1;
+
+        if (homeOdds) candidates.push({ label: `${e.homeTeam || 'Home'} Win`, odds: homeOdds, impliedProb: impliedH });
+        if (awayOdds) candidates.push({ label: `${e.awayTeam || 'Away'} Win`, odds: awayOdds, impliedProb: impliedA });
+        if (drawOdds) candidates.push({ label: 'Draw', odds: drawOdds, impliedProb: impliedD });
+
+        // Compute edge for each: aiProb (fair + uplift) vs implied
+        const withEdge = candidates.map(c => {
+          const fairProb = c.impliedProb / overround;
+          const uplift = Math.min(0.07, 0.025 + (c.odds > 2.5 ? 0.02 : 0) + (c.odds > 4.0 ? 0.015 : 0));
+          const aiProb = Math.min(0.95, fairProb + uplift);
+          const edge = aiProb - c.impliedProb;
+          return { ...c, aiProb, edge };
+        });
+
+        // Pick best edge candidate
+        withEdge.sort((a, b) => b.edge - a.edge);
+        const best = withEdge[0] || { label: 'Home Win', odds: homeOdds || 2.0, edge: 0.02, aiProb: 0.55 };
+
+        // Signal based on edge quality
+        const signal = best.edge > 0.04 ? 'BUY' : best.edge > 0.02 ? 'WATCH' : 'HOLD';
+        // Strength as a readable confidence % (scaled from edge)
+        const strength = Math.min(0.98, 0.50 + best.edge * 8);
+
+        return {
+          match: `${e.homeTeam || '?'} vs ${e.awayTeam || '?'}`,
+          league: e.leagueName || '',
+          signal,
+          strength: +strength.toFixed(2),
+          recommendation: best.label,
+          odds: best.odds ? +best.odds.toFixed(2) : null,
+          edge: +best.edge.toFixed(3),
+          aiProb: +best.aiProb.toFixed(3),
+          market: 'Match Winner',
+          eventId: e.id,
+          homeTeam: e.homeTeam,
+          awayTeam: e.awayTeam,
+          isLive: e.isLive || false,
+          score: e.score || null,
+          allCandidates: withEdge,
+        };
+      })
+      .sort((a, b) => b.edge - a.edge);
   };
 
   // ── Odds movement ────────────────────────────────────────────────────────
@@ -1011,11 +1042,20 @@ export default function AIBettingPage() {
   };
 
   // ── Auto-Bet ─────────────────────────────────────────────────────────────
+  const kellyStake = (edge: number, odds: number, maxStake: number): number => {
+    // Kelly fraction = edge / (odds - 1), capped at 25% of max stake
+    const b = odds - 1;
+    if (b <= 0) return maxStake * 0.05;
+    const fraction = Math.max(0.01, Math.min(0.25, edge / b));
+    return Math.round(maxStake * fraction / 1000) * 1000;
+  };
+
   const runAutoBet = () => {
     const MAX_AUTO_BETS = strategy.maxBets;
     const logs: string[] = [];
     let placed = 0;
     let skipped = 0;
+    let sessionStake = 0;
 
     if (allValueBets.length === 0) {
       logs.push('⚠️ No events with real odds loaded yet. Wait for data to load or refresh.');
@@ -1023,21 +1063,25 @@ export default function AIBettingPage() {
       return;
     }
 
-    logs.push(`📊 Scanning ${allValueBets.length} value opportunities across ${allEvents.length} events…`);
-
-    // Fisher-Yates shuffle to always get a different ordering each run
-    const shuffled = [...allValueBets];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    // Check daily limit
+    if (dailyStaked >= strategy.dailyLimit) {
+      logs.push(`🛑 Daily limit of ${strategy.dailyLimit.toLocaleString()} SBETS reached. Reset tomorrow or increase limit.`);
+      setAutoLog(logs);
+      return;
     }
+
+    logs.push(`📊 Scanning ${allValueBets.length} value opportunities across ${allEvents.length} events…`);
+    logs.push(`🎯 Strategy: ${strategy.stakingMode === 'kelly' ? 'Kelly Criterion' : 'Fixed'} staking | Daily used: ${dailyStaked.toLocaleString()} / ${strategy.dailyLimit.toLocaleString()} SBETS`);
+
+    // Sort by edge DESC — best value bets first (no shuffle)
+    const sorted = [...allValueBets].sort((a, b) => b.edge - a.edge);
 
     const newlyUsedKeys: string[] = [];
 
-    shuffled.forEach((vb) => {
+    sorted.forEach((vb) => {
       if (placed >= MAX_AUTO_BETS) return;
 
-      // Skip bets that were already placed by a previous auto-bet run
+      // Skip bets already placed in a previous run
       const betKey = `${vb.eventId}::${vb.selection}`;
       if (usedAutoBetKeys.has(betKey)) return;
 
@@ -1048,23 +1092,35 @@ export default function AIBettingPage() {
       const meetsSport = normStrategySport === 'all' || normVbSport === normStrategySport || normVbSport.includes(normStrategySport) || normStrategySport.includes(normVbSport);
 
       if (meetsEdge && meetsOdds && meetsSport) {
+        const stake = strategy.stakingMode === 'kelly'
+          ? kellyStake(vb.edge, vb.marketOdds, strategy.maxStake)
+          : strategy.maxStake;
+
+        // Check remaining daily limit
+        if (dailyStaked + sessionStake + stake > strategy.dailyLimit) {
+          logs.push(`⚠️ Skipping #${placed + 1} — would exceed daily limit`);
+          return;
+        }
+
         addBet({
           id: `ai-${vb.eventId}-${Date.now()}-${placed}`,
           eventId: vb.eventId,
           eventName: vb.eventName,
           selectionName: vb.selection,
           odds: vb.marketOdds,
-          stake: strategy.maxStake,
+          stake,
           market: 'Match Winner',
           homeTeam: vb.homeTeam,
           awayTeam: vb.awayTeam,
           currency: 'SBETS',
         });
-        logs.push(`✅ #${placed + 1} ${vb.selection} @ ${vb.marketOdds} | edge +${(vb.edge * 100).toFixed(1)}% | ${vb.leagueName || vb.sport}`);
+        const kellyNote = strategy.stakingMode === 'kelly' ? ` [Kelly: ${stake.toLocaleString()}]` : '';
+        logs.push(`✅ #${placed + 1} ${vb.selection} @ ${vb.marketOdds} | edge +${(vb.edge * 100).toFixed(1)}% | ${vb.leagueName || vb.sport}${kellyNote}`);
         newlyUsedKeys.push(betKey);
+        sessionStake += stake;
         placed++;
       } else {
-        if (skipped < 3) {
+        if (skipped < 2) {
           const reason = !meetsEdge
             ? `edge ${(vb.edge * 100).toFixed(1)}% < min ${(strategy.minEdge * 100).toFixed(0)}%`
             : !meetsOdds
@@ -1077,19 +1133,18 @@ export default function AIBettingPage() {
     });
 
     if (placed === 0) {
-      // All qualifying bets already used — reset used keys so the pool refreshes
       setUsedAutoBetKeys(new Set());
       logs.push(`\n❌ No bets placed. ${allValueBets.length} opportunities found but none met all filters.`);
-      logs.push(`💡 Try: lower Min Edge to ${(strategy.minEdge * 50).toFixed(0)}%, widen odds range, or set sport to "All".`);
+      logs.push(`💡 Try a preset: Conservative / Balanced / Aggressive, or widen your filters.`);
     } else {
-      // Mark these as used so next run picks different ones
       setUsedAutoBetKeys(prev => {
         const next = new Set(prev);
         newlyUsedKeys.forEach(k => next.add(k));
         return next;
       });
-      logs.push(`\n✓ ${placed} bet${placed > 1 ? 's' : ''} added to slip. Review below and confirm.`);
-      if (skipped > 3) logs.push(`  (${skipped} other opportunities skipped by filters)`);
+      setDailyStaked(d => d + sessionStake);
+      logs.push(`\n✓ ${placed} bet${placed > 1 ? 's' : ''} added — ${sessionStake.toLocaleString()} SBETS total stake.`);
+      if (skipped > 2) logs.push(`  (${skipped} other opportunities filtered out)`);
     }
 
     setAutoLog(logs);
@@ -2183,79 +2238,158 @@ export default function AIBettingPage() {
                   <AlertCircle className="h-3.5 w-3.5" /> Bets are added to your slip — you confirm and sign the transaction manually.
                 </div>
 
-                {/* Qualifying count preview */}
+                {/* Preset Strategy Buttons */}
+                <div>
+                  <div className="text-xs text-gray-400 mb-2 font-medium">Quick Presets</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['conservative', 'balanced', 'aggressive'] as const).map(preset => (
+                      <button
+                        key={preset}
+                        onClick={() => {
+                          setActivePreset(preset);
+                          setStrategy(s => ({ ...s, ...PRESET_STRATEGIES[preset] }));
+                        }}
+                        className={`px-2 py-2 rounded-lg text-xs font-bold border transition-all ${
+                          activePreset === preset
+                            ? preset === 'conservative' ? 'bg-green-500/20 border-green-500/60 text-green-300'
+                              : preset === 'balanced' ? 'bg-cyan-500/20 border-cyan-500/60 text-cyan-300'
+                              : 'bg-orange-500/20 border-orange-500/60 text-orange-300'
+                            : 'bg-[#0b1618] border-[#1e3a3f] text-gray-400 hover:border-gray-500'
+                        }`}
+                        data-testid={`preset-${preset}`}
+                      >
+                        {preset === 'conservative' ? '🛡 Conservative' : preset === 'balanced' ? '⚖ Balanced' : '🔥 Aggressive'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Qualifying count + top 3 preview */}
                 {(() => {
-                  const qualifying = allValueBets.filter(vb => {
-                    const nVb = normalizeSport(vb.sport);
-                    const nSt = normalizeSport(strategy.sport);
-                    return vb.edge >= strategy.minEdge &&
-                      vb.marketOdds >= strategy.minOdds &&
-                      vb.marketOdds <= strategy.maxOdds &&
-                      (nSt === 'all' || nVb === nSt || nVb.includes(nSt) || nSt.includes(nVb));
-                  });
+                  const qualifying = allValueBets
+                    .filter(vb => {
+                      const nVb = normalizeSport(vb.sport);
+                      const nSt = normalizeSport(strategy.sport);
+                      return vb.edge >= strategy.minEdge &&
+                        vb.marketOdds >= strategy.minOdds &&
+                        vb.marketOdds <= strategy.maxOdds &&
+                        (nSt === 'all' || nVb === nSt || nVb.includes(nSt) || nSt.includes(nVb));
+                    })
+                    .sort((a, b) => b.edge - a.edge);
+
                   return (
-                    <div className={`rounded-lg px-3 py-2 text-xs flex items-center justify-between ${qualifying.length > 0 ? 'bg-green-500/10 border border-green-500/30' : 'bg-yellow-500/10 border border-yellow-500/30'}`}>
-                      <span className={qualifying.length > 0 ? 'text-green-300' : 'text-yellow-300'}>
-                        {qualifying.length > 0
-                          ? `${qualifying.length} bet${qualifying.length > 1 ? 's' : ''} qualify with current filters`
-                          : 'No bets qualify — try loosening filters below'}
-                      </span>
-                      <span className="text-gray-400">{allValueBets.length} total opportunities</span>
+                    <div className={`rounded-lg p-3 text-xs border space-y-2 ${qualifying.length > 0 ? 'bg-green-500/10 border-green-500/30' : 'bg-yellow-500/10 border-yellow-500/30'}`}>
+                      <div className="flex items-center justify-between">
+                        <span className={qualifying.length > 0 ? 'text-green-300 font-medium' : 'text-yellow-300'}>
+                          {qualifying.length > 0
+                            ? `${qualifying.length} bet${qualifying.length > 1 ? 's' : ''} qualify with current filters`
+                            : 'No bets qualify — try loosening filters below'}
+                        </span>
+                        <span className="text-gray-500">{allValueBets.length} total opps</span>
+                      </div>
+                      {qualifying.slice(0, 3).map((vb, i) => (
+                        <div key={i} className="flex items-center justify-between bg-black/20 rounded px-2 py-1">
+                          <span className="text-gray-300 truncate max-w-[55%]">{vb.selection}</span>
+                          <div className="flex gap-2 shrink-0">
+                            <span className="text-cyan-400 font-mono">@{vb.marketOdds}</span>
+                            <span className="text-green-400 font-mono font-bold">+{(vb.edge * 100).toFixed(1)}%</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   );
                 })()}
+
+                {/* Staking Mode Toggle */}
+                <div className="flex items-center gap-3 bg-[#0b1618] rounded-lg px-3 py-2 border border-[#1e3a3f]">
+                  <div className="flex-1">
+                    <div className="text-xs text-white font-medium">Staking Mode</div>
+                    <div className="text-[10px] text-gray-500 mt-0.5">
+                      {strategy.stakingMode === 'kelly' ? 'Kelly: stake sized by edge strength (safer, adaptive)' : 'Fixed: same stake for every bet'}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setStrategy(s => ({ ...s, stakingMode: s.stakingMode === 'fixed' ? 'kelly' : 'fixed' }))}
+                    className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${
+                      strategy.stakingMode === 'kelly'
+                        ? 'bg-purple-500/20 border-purple-500/50 text-purple-300'
+                        : 'bg-[#1e3a3f] border-[#1e3a3f] text-gray-400'
+                    }`}
+                    data-testid="toggle-staking-mode"
+                  >
+                    {strategy.stakingMode === 'kelly' ? '🧮 Kelly' : '🔒 Fixed'}
+                  </button>
+                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-gray-400 block mb-1">Min Edge: <span className="text-white font-mono">{(strategy.minEdge * 100).toFixed(0)}%</span></label>
                     <input type="range" min="0.01" max="0.12" step="0.005" value={strategy.minEdge}
-                      onChange={e => setStrategy(s => ({ ...s, minEdge: parseFloat(e.target.value) }))}
+                      onChange={e => { setActivePreset(''); setStrategy(s => ({ ...s, minEdge: parseFloat(e.target.value) })); }}
                       className="w-full accent-cyan-500" data-testid="strategy-min-edge" />
                   </div>
                   <div>
                     <label className="text-xs text-gray-400 block mb-1">Max Stake: <span className="text-white font-mono">{strategy.maxStake.toLocaleString()} SBETS</span></label>
                     <input type="range" min="1000" max="100000" step="1000" value={strategy.maxStake}
-                      onChange={e => setStrategy(s => ({ ...s, maxStake: Number(e.target.value) }))}
+                      onChange={e => { setActivePreset(''); setStrategy(s => ({ ...s, maxStake: Number(e.target.value) })); }}
                       className="w-full accent-cyan-500" data-testid="strategy-max-stake" />
                   </div>
                   <div>
                     <label className="text-xs text-gray-400 block mb-1">Min Odds: <span className="text-white font-mono">{strategy.minOdds.toFixed(1)}</span></label>
                     <input type="range" min="1.1" max="5.0" step="0.1" value={strategy.minOdds}
-                      onChange={e => setStrategy(s => ({ ...s, minOdds: parseFloat(e.target.value) }))}
+                      onChange={e => { setActivePreset(''); setStrategy(s => ({ ...s, minOdds: parseFloat(e.target.value) })); }}
                       className="w-full accent-cyan-500" data-testid="strategy-min-odds" />
                   </div>
                   <div>
                     <label className="text-xs text-gray-400 block mb-1">Max Odds: <span className="text-white font-mono">{strategy.maxOdds.toFixed(1)}</span></label>
                     <input type="range" min="1.5" max="15.0" step="0.5" value={strategy.maxOdds}
-                      onChange={e => setStrategy(s => ({ ...s, maxOdds: parseFloat(e.target.value) }))}
+                      onChange={e => { setActivePreset(''); setStrategy(s => ({ ...s, maxOdds: parseFloat(e.target.value) })); }}
                       className="w-full accent-cyan-500" data-testid="strategy-max-odds" />
                   </div>
                   <div className="col-span-2">
                     <label className="text-xs text-gray-400 block mb-1">
                       Number of Bets: <span className="text-cyan-400 font-mono font-bold">{strategy.maxBets}</span>
-                      <span className="text-gray-500 ml-2">(how many bets to add per run)</span>
+                      <span className="text-gray-500 ml-2">(per run, picked by highest edge first)</span>
                     </label>
                     <input type="range" min="1" max="20" step="1" value={strategy.maxBets}
-                      onChange={e => setStrategy(s => ({ ...s, maxBets: Number(e.target.value) }))}
+                      onChange={e => { setActivePreset(''); setStrategy(s => ({ ...s, maxBets: Number(e.target.value) })); }}
                       className="w-full accent-cyan-500" data-testid="strategy-max-bets" />
                     <div className="flex justify-between text-[10px] text-gray-600 mt-0.5">
                       <span>1</span><span>5</span><span>10</span><span>15</span><span>20</span>
                     </div>
                   </div>
                 </div>
-                <div>
-                  <label className="text-xs text-gray-400 block mb-1">Sport Filter</label>
-                  <select value={strategy.sport} onChange={e => setStrategy(s => ({ ...s, sport: e.target.value }))}
-                    className="w-full bg-[#0b1618] border border-[#1e3a3f] text-white text-sm rounded-lg px-3 py-2"
-                    data-testid="strategy-sport">
-                    {['all', 'football', 'basketball', 'tennis', 'baseball', 'hockey', 'mma', 'motorsport', 'rugby', 'cricket'].map(sp => (
-                      <option key={sp} value={sp}>{sp.charAt(0).toUpperCase() + sp.slice(1)}</option>
-                    ))}
-                  </select>
+
+                {/* Sport Filter + Daily Limit */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Sport Filter</label>
+                    <select value={strategy.sport} onChange={e => setStrategy(s => ({ ...s, sport: e.target.value }))}
+                      className="w-full bg-[#0b1618] border border-[#1e3a3f] text-white text-sm rounded-lg px-3 py-2"
+                      data-testid="strategy-sport">
+                      {['all', 'football', 'basketball', 'tennis', 'baseball', 'hockey', 'mma', 'motorsport', 'rugby', 'cricket'].map(sp => (
+                        <option key={sp} value={sp}>{sp.charAt(0).toUpperCase() + sp.slice(1)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Daily Limit: <span className="text-white font-mono">{strategy.dailyLimit.toLocaleString()}</span></label>
+                    <input type="range" min="10000" max="1000000" step="10000" value={strategy.dailyLimit}
+                      onChange={e => setStrategy(s => ({ ...s, dailyLimit: Number(e.target.value) }))}
+                      className="w-full accent-red-500" data-testid="strategy-daily-limit" />
+                    <div className="flex items-center justify-between text-[10px] mt-0.5">
+                      <span className="text-gray-600">Protection limit</span>
+                      {dailyStaked > 0 && (
+                        <button onClick={() => setDailyStaked(0)} className="text-gray-500 hover:text-cyan-400 transition-colors">Reset ({dailyStaked.toLocaleString()} used)</button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <Button onClick={runAutoBet} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold" data-testid="run-auto-bet">
-                  <Bot className="h-4 w-4 mr-2" /> Run Auto-Bet Strategy ({strategy.maxBets} bet{strategy.maxBets !== 1 ? 's' : ''})
+
+                <Button onClick={runAutoBet} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3" data-testid="run-auto-bet">
+                  <Bot className="h-4 w-4 mr-2" /> Run Auto-Bet — {strategy.maxBets} Best Edge Bet{strategy.maxBets !== 1 ? 's' : ''}
                 </Button>
+
                 {autoLog.length > 0 && (
                   <div className="bg-[#0b1618] rounded-lg p-3 border border-[#1e3a3f] space-y-1">
                     <div className="flex items-center justify-between mb-2">
@@ -2263,7 +2397,16 @@ export default function AIBettingPage() {
                       <button onClick={() => { setAutoLog([]); setUsedAutoBetKeys(new Set()); }} className="text-[10px] text-gray-500 hover:text-red-400 transition-colors">Clear</button>
                     </div>
                     {autoLog.map((line, i) => (
-                      <div key={i} className={`text-xs font-mono ${line.startsWith('✅') ? 'text-green-400' : line.startsWith('❌') ? 'text-red-400' : line.startsWith('💡') ? 'text-yellow-400' : line.startsWith('📊') ? 'text-cyan-400' : line.startsWith('✓') ? 'text-cyan-300' : 'text-gray-400'}`}>{line}</div>
+                      <div key={i} className={`text-xs font-mono ${
+                        line.startsWith('✅') ? 'text-green-400' :
+                        line.startsWith('❌') ? 'text-red-400' :
+                        line.startsWith('💡') ? 'text-yellow-400' :
+                        line.startsWith('📊') ? 'text-cyan-400' :
+                        line.startsWith('🎯') ? 'text-purple-400' :
+                        line.startsWith('🛑') ? 'text-red-400' :
+                        line.startsWith('⚠️') ? 'text-yellow-400' :
+                        line.startsWith('✓') ? 'text-cyan-300' : 'text-gray-400'
+                      }`}>{line}</div>
                     ))}
                   </div>
                 )}
@@ -2396,22 +2539,90 @@ export default function AIBettingPage() {
             {/* ── 8. Live Match AI Engine ────────────────────────────── */}
             {activeTab === 'live-ai' && (
               <div className="space-y-3">
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>Sorted by AI edge — best value shown first</span>
+                  <span>{liveSignals.filter(s => s.signal === 'BUY').length} BUY · {liveSignals.filter(s => s.signal === 'WATCH').length} WATCH</span>
+                </div>
                 {liveSignals.length === 0 ? (
                   <div className="text-gray-400 text-sm text-center py-4">No live or upcoming matches to analyse. Check back during match windows.</div>
                 ) : liveSignals.map((s, i) => (
-                  <div key={i} className="bg-[#0b1618] rounded-lg p-3 border border-red-500/20 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-white font-medium truncate">{s.match}</div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${s.signal === 'BUY' ? 'bg-green-500/20 text-green-400' : s.signal === 'WATCH' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-500/20 text-gray-400'}`}>{s.signal}</span>
+                  <div key={i} className={`bg-[#0b1618] rounded-lg p-3 border space-y-2 ${
+                    s.signal === 'BUY' ? 'border-green-500/30' : s.signal === 'WATCH' ? 'border-yellow-500/20' : 'border-[#1e3a3f]'
+                  }`}>
+                    {/* Header row */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-white font-medium truncate">{s.match}</div>
+                        {s.league && <div className="text-[10px] text-gray-500 mt-0.5">{s.league}</div>}
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
                         {s.isLive && <Badge className="text-[9px] bg-red-500/20 text-red-400 border-red-500/30 animate-pulse">LIVE</Badge>}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          s.signal === 'BUY' ? 'bg-green-500/20 text-green-400 border border-green-500/40' :
+                          s.signal === 'WATCH' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40' :
+                          'bg-gray-500/15 text-gray-400 border border-gray-500/30'
+                        }`}>{s.signal}</span>
                       </div>
                     </div>
-                    {s.league && <div className="text-[10px] text-gray-500">{s.league}</div>}
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-400">{s.market}{s.odds ? ` · @${s.odds}` : ''}</span>
-                      <span className="text-green-400 font-bold">{(s.strength * 100).toFixed(0)}% strength</span>
+
+                    {/* Recommendation row */}
+                    <div className={`rounded px-2 py-1.5 flex items-center justify-between text-xs ${
+                      s.signal === 'BUY' ? 'bg-green-500/10' : 'bg-[#0d1c1f]'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        <Target className="h-3 w-3 text-cyan-400 shrink-0" />
+                        <span className="text-white font-medium">{s.recommendation}</span>
+                        {s.odds && <span className="text-cyan-400 font-mono">@ {s.odds}</span>}
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px]">
+                        <span className="text-gray-500">AI</span>
+                        <span className="text-purple-400 font-mono">{(s.aiProb * 100).toFixed(0)}%</span>
+                        <span className="text-gray-600 mx-0.5">·</span>
+                        <span className="text-green-400 font-bold">+{(s.edge * 100).toFixed(1)}% edge</span>
+                      </div>
                     </div>
+
+                    {/* Strength bar */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1 text-[10px]">
+                        <span className="text-gray-500">Signal confidence</span>
+                        <span className={`font-bold ${s.signal === 'BUY' ? 'text-green-400' : s.signal === 'WATCH' ? 'text-yellow-400' : 'text-gray-400'}`}>
+                          {(s.strength * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-[#0a1315] rounded-full">
+                        <div className={`h-1.5 rounded-full transition-all duration-500 ${
+                          s.signal === 'BUY' ? 'bg-green-500' : s.signal === 'WATCH' ? 'bg-yellow-500' : 'bg-gray-600'
+                        }`} style={{ width: `${(s.strength * 100).toFixed(0)}%` }} />
+                      </div>
+                    </div>
+
+                    {/* Add to slip button for BUY/WATCH signals */}
+                    {s.signal !== 'HOLD' && s.odds && (
+                      <Button
+                        size="sm"
+                        className={`w-full h-7 text-xs font-bold ${
+                          s.signal === 'BUY'
+                            ? 'bg-green-600/80 hover:bg-green-600 text-white border border-green-500/50'
+                            : 'bg-yellow-600/50 hover:bg-yellow-600/70 text-yellow-200 border border-yellow-500/30'
+                        }`}
+                        onClick={() => addBet({
+                          id: `live-${s.eventId}-${Date.now()}`,
+                          eventId: String(s.eventId),
+                          eventName: s.match,
+                          selectionName: s.recommendation,
+                          odds: s.odds!,
+                          stake: strategy.maxStake,
+                          market: 'Match Winner',
+                          homeTeam: s.homeTeam,
+                          awayTeam: s.awayTeam,
+                          currency: 'SBETS',
+                        })}
+                        data-testid={`add-live-bet-${i}`}
+                      >
+                        {s.signal === 'BUY' ? '+ Add to Slip' : '+ Watch Bet'}
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
