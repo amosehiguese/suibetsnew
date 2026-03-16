@@ -417,20 +417,55 @@ export default function AIBettingPage() {
     return lower;
   };
 
+  // sportId → canonical sport name (matches DB: 1=Football,2=Basketball,3=Tennis,4/5=Baseball,
+  // 6=Ice Hockey,7=MMA,8=Boxing,9=Esports,10=AFL,11=Formula1,12=Handball,13=NBA,14=NFL,15=Rugby,16=Volleyball,17=Horse Racing)
+  const SPORT_ID_MAP: Record<number, string> = {
+    1: 'football', 2: 'basketball', 3: 'tennis', 4: 'baseball', 5: 'baseball',
+    6: 'hockey', 7: 'mma', 8: 'mma', 9: 'esports', 10: 'afl',
+    11: 'motorsport', 12: 'handball', 13: 'basketball', 14: 'american-football',
+    15: 'rugby', 16: 'volleyball', 17: 'unknown', 21: 'basketball', 22: 'basketball',
+    23: 'basketball', 24: 'basketball', 25: 'basketball', 26: 'football', 27: 'football',
+  };
+
   const detectEventSport = (e: any): string => {
-    if (e.sport) return normalizeSport(e.sport);
+    // 1. Explicit sportId mapping (most reliable)
+    if (e.sportId && SPORT_ID_MAP[e.sportId]) return SPORT_ID_MAP[e.sportId];
+    // 2. Named sport field (sport / sportName / _sportName)
+    const sportField = e.sport || e.sportName || e._sportName;
+    if (sportField) return normalizeSport(String(sportField));
+    // 3. Keyword detection on league + event name
     const league = (e.leagueName || '').toLowerCase();
     const name = (e.eventName || `${e.homeTeam || ''} vs ${e.awayTeam || ''}`).toLowerCase();
     const combined = league + ' ' + name;
-    if (combined.includes('formula') || combined.includes('grand prix') || combined.includes('f1') || combined.includes('nascar') || combined.includes('motorsport')) return 'motorsport';
-    if (combined.includes('basketball') || combined.includes('nba') || combined.includes('euroleague')) return 'basketball';
-    if (combined.includes('tennis') || combined.includes('atp') || combined.includes('wta') || combined.includes('wimbledon') || combined.includes('open')) return 'tennis';
+    if (combined.includes('formula') || combined.includes('grand prix') || combined.includes('f1') || combined.includes('nascar') || combined.includes('motorsport') || combined.includes('motogp')) return 'motorsport';
+    if (combined.includes('nba') || combined.includes('euroleague') || combined.includes('ncaa') || combined.includes('basketball')) return 'basketball';
+    if (combined.includes('tennis') || combined.includes('atp') || combined.includes('wta') || combined.includes('wimbledon')) return 'tennis';
     if (combined.includes('baseball') || combined.includes('mlb')) return 'baseball';
-    if (combined.includes('hockey') || combined.includes('nhl')) return 'hockey';
-    if (combined.includes('mma') || combined.includes('ufc') || combined.includes('boxing')) return 'mma';
+    if (combined.includes('ice hockey') || combined.includes('nhl') || combined.includes('hockey')) return 'hockey';
+    if (combined.includes('mma') || combined.includes('ufc') || combined.includes('boxing') || combined.includes('knockout')) return 'mma';
     if (combined.includes('rugby')) return 'rugby';
-    if (combined.includes('cricket')) return 'cricket';
-    if (combined.includes('premier') || combined.includes('bundesliga') || combined.includes('serie a') || combined.includes('la liga') || combined.includes('ligue 1') || combined.includes('champions league') || combined.includes('europa') || combined.includes('copa') || combined.includes('fa cup') || combined.includes('mls') || combined.includes('eredivisie') || combined.includes('soccer') || combined.includes('football')) return 'football';
+    if (combined.includes('cricket') || combined.includes('ipl') || combined.includes('test match')) return 'cricket';
+    if (combined.includes('volleyball')) return 'volleyball';
+    if (combined.includes('handball')) return 'handball';
+    if (combined.includes('american football') || combined.includes('nfl') || combined.includes('afl')) return 'american-football';
+    if (combined.includes('esport') || combined.includes('league of legends') || combined.includes('dota') || combined.includes('counter-strike') || combined.includes('valorant')) return 'esports';
+    // Football — expanded league list to cover international leagues
+    if (
+      combined.includes('premier') || combined.includes('bundesliga') || combined.includes('serie a') ||
+      combined.includes('la liga') || combined.includes('ligue 1') || combined.includes('champions league') ||
+      combined.includes('europa') || combined.includes('copa') || combined.includes('fa cup') ||
+      combined.includes('mls') || combined.includes('eredivisie') || combined.includes('soccer') ||
+      combined.includes('football') || combined.includes('super lig') || combined.includes('süper lig') ||
+      combined.includes('liga ') || combined.includes('primera') || combined.includes('segunda') ||
+      combined.includes('bundesliga') || combined.includes('ekstraklasa') || combined.includes('allsvenskan') ||
+      combined.includes('eliteserien') || combined.includes('eredivisie') || combined.includes('jupiler') ||
+      combined.includes('premiership') || combined.includes('a-league') || combined.includes('j league') ||
+      combined.includes('k league') || combined.includes('süd') || combined.includes('superliga') ||
+      combined.includes('championship') || combined.includes('league one') || combined.includes('league two') ||
+      combined.includes('division ') || combined.includes('national league') || combined.includes('brasileirao') ||
+      combined.includes('serie b') || combined.includes('serie c') || combined.includes('frauen') ||
+      combined.includes('women') || combined.includes('u21') || combined.includes('u23')
+    ) return 'football';
     return 'unknown';
   };
 
@@ -2043,11 +2078,13 @@ export default function AIBettingPage() {
                   const potentialPayout = Math.round(10000 * v.marketOdds);
                   // Sport emoji
                   const sportEmoji: Record<string, string> = {
-                    football: '⚽', basketball: '🏀', tennis: '🎾', baseball: '⚾',
-                    hockey: '🏒', mma: '🥊', rugby: '🏉', cricket: '🏏',
-                    motorsport: '🏎️', volleyball: '🏐', unknown: '🎯',
+                    football: '⚽', soccer: '⚽', basketball: '🏀', tennis: '🎾',
+                    baseball: '⚾', hockey: '🏒', 'ice hockey': '🏒', mma: '🥊',
+                    boxing: '🥊', rugby: '🏉', cricket: '🏏', motorsport: '🏎️',
+                    volleyball: '🏐', handball: '🤾', 'american-football': '🏈',
+                    afl: '🏈', esports: '🎮', unknown: '🎯',
                   };
-                  const emoji = sportEmoji[v.sport] || '🎯';
+                  const emoji = sportEmoji[v.sport] || sportEmoji[normalizeSport(v.sport)] || '🎯';
 
                   return (
                     <div key={i} className={`rounded-lg border transition-all hover:border-opacity-60 ${edgeBg}`}>
@@ -2406,8 +2443,14 @@ export default function AIBettingPage() {
                     const signalBg    = isSharp ? 'bg-red-500/15 border-red-500/30' : isSteam ? 'bg-orange-500/15 border-orange-500/30' : 'bg-blue-500/15 border-blue-500/30';
                     const barColor    = isSharp ? 'bg-red-500' : isSteam ? 'bg-orange-500' : 'bg-blue-500';
                     const barWidth    = Math.min(100, (m.absChange / 15) * 100);
-                    const sportEmoji: Record<string, string> = { football: '⚽', basketball: '🏀', tennis: '🎾', baseball: '⚾', hockey: '🏒', mma: '🥊', rugby: '🏉', cricket: '🏏', unknown: '🎯' };
-                    const emoji = sportEmoji[m.sport] || '🎯';
+                    const sportEmoji: Record<string, string> = {
+                      football: '⚽', soccer: '⚽', basketball: '🏀', tennis: '🎾',
+                      baseball: '⚾', hockey: '🏒', 'ice hockey': '🏒', mma: '🥊',
+                      boxing: '🥊', rugby: '🏉', cricket: '🏏', motorsport: '🏎️',
+                      volleyball: '🏐', handball: '🤾', 'american-football': '🏈',
+                      afl: '🏈', esports: '🎮', unknown: '🎯',
+                    };
+                    const emoji = sportEmoji[m.sport] || sportEmoji[normalizeSport(m.sport)] || '🎯';
 
                     return (
                       <div key={i} className={`rounded-lg border transition-all ${cardBg}`}>
