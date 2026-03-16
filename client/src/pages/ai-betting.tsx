@@ -196,6 +196,10 @@ export default function AIBettingPage() {
 
   const [activeTab, setActiveTab] = useState('value');
 
+  // ── Marketplace State ─────────────────────────────────────────────────────
+  const [marketplaceStake, setMarketplaceStake] = useState(1000);
+  const [marketplaceShowAll, setMarketplaceShowAll] = useState(false);
+
   // ── Monte Carlo State ────────────────────────────────────────────────────
   const [mcProb, setMcProb] = useState(0.6);
   const [mcRuns, setMcRuns] = useState(50000);
@@ -401,6 +405,16 @@ export default function AIBettingPage() {
   };
 
   // ── Value bets (panel) — home + away + draw ─────────────────────────────
+  const titleCase = (s: string) =>
+    (s || '').replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+
+  const SPORT_EMOJI: Record<string, string> = {
+    football: '⚽', basketball: '🏀', tennis: '🎾', baseball: '⚾',
+    hockey: '🏒', mma: '🥊', rugby: '🏉', cricket: '🏏',
+    volleyball: '🏐', handball: '🤾', motorsport: '🏎️',
+    'american-football': '🏈', esports: '🎮', afl: '🏉', unknown: '🎯',
+  };
+
   const normalizeSport = (s: string) => {
     const lower = (s || '').toLowerCase();
     if (lower === 'soccer' || lower.includes('football') || lower.includes('soccer')) return 'football';
@@ -732,17 +746,30 @@ export default function AIBettingPage() {
   const liveSignals = buildLiveSignals(allEvents);
 
   // Marketplace: rank value bets by ROI = (aiProb × odds) - 1, highest first
-  // Deduplicate by eventId — keep the best ROI selection per event
+  // Deduplicate by BOTH eventId AND normalised matchKey (teams sorted) to prevent
+  // the same fixture appearing twice when home/away have different selections.
   const marketplaceBets = (() => {
-    const seen = new Map<string, any>();
+    const byId = new Map<string, any>();
+    const byMatch = new Map<string, string>(); // matchKey → eventId winner
+
     for (const v of allValueBets) {
       const roi = +(((v.aiProb * v.marketOdds) - 1) * 100).toFixed(1);
       if (roi <= 0) continue;
-      const key = String(v.eventId);
-      const prev = seen.get(key);
+
+      const idKey = v.eventId ? String(v.eventId) : null;
+      // Normalised match key: sorted team names lowercased (handles reversed fixtures)
+      const teams = [v.homeTeam || '', v.awayTeam || ''].map(t => t.toLowerCase().trim()).sort();
+      const matchKey = teams.join('|');
+
+      // If we already have this match via a different eventId, unify to the best ROI one
+      const existingIdForMatch = byMatch.get(matchKey);
+      const canonical = idKey ?? matchKey;
+      const resolvedKey = existingIdForMatch ?? canonical;
+
+      const prev = byId.get(resolvedKey);
       if (!prev || roi > prev.roi) {
-        seen.set(key, {
-          selection: v.selection,
+        const entry = {
+          selection: titleCase(v.selection),
           event: v.eventName,
           roi,
           edge: v.edge,
@@ -750,15 +777,17 @@ export default function AIBettingPage() {
           aiProb: v.aiProb,
           sport: v.sport,
           eventId: v.eventId,
-          homeTeam: v.homeTeam,
-          awayTeam: v.awayTeam,
+          homeTeam: titleCase(v.homeTeam || ''),
+          awayTeam: titleCase(v.awayTeam || ''),
           leagueName: v.leagueName,
-        });
+          matchKey,
+        };
+        byId.set(resolvedKey, entry);
+        if (matchKey) byMatch.set(matchKey, resolvedKey);
       }
     }
-    return Array.from(seen.values())
+    return Array.from(byId.values())
       .sort((a, b) => b.roi - a.roi)
-      .slice(0, 12)
       .map((v, i) => ({ ...v, rank: i + 1 }));
   })();
 
@@ -3157,35 +3186,114 @@ export default function AIBettingPage() {
             {/* ── 9. AI Bet Marketplace Intelligence ─────────────────── */}
             {activeTab === 'marketplace' && (
               <div className="space-y-3">
-                <div className="text-xs text-gray-400">
-                  Ranked by <span className="text-yellow-400 font-mono">ROI = (ai_prob × odds − 1) × 100%</span> — real expected return using live market odds
-                </div>
-                {marketplaceBets.length === 0 ? (
-                  <div className="text-gray-400 text-sm text-center py-4">No value bets available — market data is loading or odds are not yet available.</div>
-                ) : marketplaceBets.map((b, i) => (
-                  <div key={i} className="flex items-center gap-3 bg-[#0b1618] rounded-lg p-3 border border-[#1e3a3f] hover:border-yellow-500/30 transition-all">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${i === 0 ? 'bg-yellow-500 text-black' : i === 1 ? 'bg-gray-400 text-black' : i === 2 ? 'bg-amber-700 text-white' : 'bg-[#1e3a3f] text-gray-300'}`}>{b.rank}</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-white font-medium truncate">{b.selection}</div>
-                      <div className="text-xs text-gray-400 truncate">{b.event}</div>
-                      {b.leagueName && <div className="text-[10px] text-gray-600 truncate">{b.leagueName}</div>}
-                      <div className="flex gap-2 text-xs mt-0.5">
-                        <span className="text-yellow-400 font-bold">ROI +{b.roi}%</span>
-                        <span className="text-cyan-400">@ {b.odds}</span>
-                        <span className="text-gray-500">AI {(b.aiProb * 100).toFixed(0)}%</span>
-                      </div>
-                      <EdgeBar edge={b.edge} />
-                    </div>
-                    <Button
-                      size="sm"
-                      className="h-7 text-xs bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/40 flex-shrink-0"
-                      onClick={() => addBet({ id: `mkt-${b.eventId}-${i}`, eventId: b.eventId, eventName: b.event, selectionName: b.selection, odds: b.odds, stake: 1000, market: 'Match Winner', homeTeam: b.homeTeam, awayTeam: b.awayTeam, currency: 'SBETS' })}
-                      data-testid={`add-market-bet-${i}`}
-                    >
-                      + 1K SBETS
-                    </Button>
+                {/* Header row: formula explanation + stake selector */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs text-gray-400">
+                    Ranked by <span className="text-yellow-400 font-mono">ROI = (ai_prob × odds − 1) × 100%</span> · one unique fixture per entry
                   </div>
-                ))}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">Stake</span>
+                    {[100, 500, 1000, 5000, 10000].map(s => (
+                      <button
+                        key={s}
+                        onClick={() => setMarketplaceStake(s)}
+                        data-testid={`stake-option-${s}`}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-all ${marketplaceStake === s ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-[#0b1618] text-gray-400 border-[#1e3a3f] hover:border-yellow-500/40 hover:text-yellow-300'}`}
+                      >
+                        {s >= 1000 ? `${s / 1000}K` : s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {marketplaceBets.length === 0 ? (
+                  <div className="text-gray-400 text-sm text-center py-8">No value bets available — market data is loading or odds are not yet available.</div>
+                ) : (
+                  <>
+                    {(marketplaceShowAll ? marketplaceBets : marketplaceBets.slice(0, 12)).map((b, i) => {
+                      const expectedProfit = +((b.aiProb * b.odds - 1) * marketplaceStake).toFixed(0);
+                      const valueScore = Math.min(100, Math.round(b.edge * 800 + b.roi * 2));
+                      const scoreColor = valueScore >= 70 ? 'text-green-400' : valueScore >= 45 ? 'text-yellow-400' : 'text-blue-400';
+                      const scoreBg = valueScore >= 70 ? 'bg-green-500' : valueScore >= 45 ? 'bg-yellow-500' : 'bg-blue-500';
+                      const sportEmoji = SPORT_EMOJI[b.sport] ?? '🎯';
+                      return (
+                        <div key={b.matchKey || i} className="bg-[#0b1618] rounded-xl p-3 border border-[#1e3a3f] hover:border-yellow-500/30 transition-all">
+                          <div className="flex items-start gap-3">
+                            {/* Rank badge */}
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5 ${i === 0 ? 'bg-yellow-500 text-black' : i === 1 ? 'bg-gray-400 text-black' : i === 2 ? 'bg-amber-700 text-white' : 'bg-[#1e3a3f] text-gray-300'}`}>
+                              {b.rank}
+                            </div>
+
+                            {/* Main content */}
+                            <div className="flex-1 min-w-0">
+                              {/* Sport emoji + league */}
+                              <div className="flex items-center gap-1.5 mb-0.5">
+                                <span className="text-sm leading-none">{sportEmoji}</span>
+                                {b.leagueName && <span className="text-[10px] text-gray-500 truncate">{b.leagueName}</span>}
+                              </div>
+
+                              {/* Selection (title-cased) */}
+                              <div className="text-sm text-white font-semibold truncate">{b.selection}</div>
+
+                              {/* Home vs Away (title-cased) */}
+                              {(b.homeTeam || b.awayTeam) && (
+                                <div className="text-[11px] text-gray-400 truncate">
+                                  {b.homeTeam} <span className="text-gray-600">vs</span> {b.awayTeam}
+                                </div>
+                              )}
+
+                              {/* Stats row */}
+                              <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs mt-1">
+                                <span className="text-yellow-400 font-bold">ROI +{b.roi}%</span>
+                                <span className="text-cyan-400">@ {b.odds}</span>
+                                <span className="text-gray-500">AI {(b.aiProb * 100).toFixed(0)}%</span>
+                                <span className={`font-semibold ${expectedProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                  {expectedProfit >= 0 ? '+' : ''}{expectedProfit.toLocaleString()} SBETS profit
+                                </span>
+                              </div>
+
+                              {/* Edge bar */}
+                              <EdgeBar edge={b.edge} />
+
+                              {/* Value score visual */}
+                              <div className="mt-1.5 flex items-center gap-2">
+                                <span className="text-[9px] text-gray-500 font-medium uppercase tracking-wide w-16 flex-shrink-0">Value Score</span>
+                                <div className="flex-1 h-1.5 bg-[#0a1315] rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-1.5 rounded-full transition-all duration-700 ${scoreBg}`}
+                                    style={{ width: `${valueScore}%` }}
+                                  />
+                                </div>
+                                <span className={`text-[10px] font-bold w-7 text-right ${scoreColor}`}>{valueScore}</span>
+                              </div>
+                            </div>
+
+                            {/* Add bet button */}
+                            <Button
+                              size="sm"
+                              className="h-8 text-xs bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/40 flex-shrink-0 self-start px-2.5 whitespace-nowrap"
+                              onClick={() => addBet({ id: `mkt-${b.eventId || b.matchKey}-${i}`, eventId: b.eventId, eventName: b.event, selectionName: b.selection, odds: b.odds, stake: marketplaceStake, market: 'Match Winner', homeTeam: b.homeTeam, awayTeam: b.awayTeam, currency: 'SBETS' })}
+                              data-testid={`add-market-bet-${i}`}
+                            >
+                              + {marketplaceStake >= 1000 ? `${marketplaceStake / 1000}K` : marketplaceStake} SBETS
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Show more / less toggle */}
+                    {marketplaceBets.length > 12 && (
+                      <button
+                        onClick={() => setMarketplaceShowAll(v => !v)}
+                        data-testid="marketplace-show-more"
+                        className="w-full py-2 text-xs text-gray-400 hover:text-yellow-300 border border-[#1e3a3f] hover:border-yellow-500/30 rounded-lg transition-all"
+                      >
+                        {marketplaceShowAll ? '▲ Show less' : `▼ Show ${marketplaceBets.length - 12} more bets`}
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             )}
 
