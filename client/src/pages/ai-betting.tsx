@@ -56,6 +56,7 @@ interface AutoBetStrategy {
   maxOdds: number;
   sport: string;
   maxStake: number;
+  maxBets: number;
 }
 
 interface AgentMessage {
@@ -181,7 +182,7 @@ export default function AIBettingPage() {
 
   // ── Auto-Bet Strategy ────────────────────────────────────────────────────
   const [strategy, setStrategy] = useState<AutoBetStrategy>({
-    minEdge: 0.03, minOdds: 1.5, maxOdds: 5.0, sport: 'all', maxStake: 100000
+    minEdge: 0.03, minOdds: 1.5, maxOdds: 5.0, sport: 'all', maxStake: 100000, maxBets: 5
   });
   const [autoLog, setAutoLog] = useState<string[]>([]);
   const [usedAutoBetKeys, setUsedAutoBetKeys] = useState<Set<string>>(new Set());
@@ -873,8 +874,8 @@ export default function AIBettingPage() {
   };
 
   // ── Auto-Bet ─────────────────────────────────────────────────────────────
-  const MAX_AUTO_BETS = 5;
   const runAutoBet = () => {
+    const MAX_AUTO_BETS = strategy.maxBets;
     const logs: string[] = [];
     let placed = 0;
     let skipped = 0;
@@ -1852,6 +1853,18 @@ export default function AIBettingPage() {
                       onChange={e => setStrategy(s => ({ ...s, maxOdds: parseFloat(e.target.value) }))}
                       className="w-full accent-cyan-500" data-testid="strategy-max-odds" />
                   </div>
+                  <div className="col-span-2">
+                    <label className="text-xs text-gray-400 block mb-1">
+                      Number of Bets: <span className="text-cyan-400 font-mono font-bold">{strategy.maxBets}</span>
+                      <span className="text-gray-500 ml-2">(how many bets to add per run)</span>
+                    </label>
+                    <input type="range" min="1" max="20" step="1" value={strategy.maxBets}
+                      onChange={e => setStrategy(s => ({ ...s, maxBets: Number(e.target.value) }))}
+                      className="w-full accent-cyan-500" data-testid="strategy-max-bets" />
+                    <div className="flex justify-between text-[10px] text-gray-600 mt-0.5">
+                      <span>1</span><span>5</span><span>10</span><span>15</span><span>20</span>
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs text-gray-400 block mb-1">Sport Filter</label>
@@ -1864,7 +1877,7 @@ export default function AIBettingPage() {
                   </select>
                 </div>
                 <Button onClick={runAutoBet} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold" data-testid="run-auto-bet">
-                  <Bot className="h-4 w-4 mr-2" /> Run Auto-Bet Strategy (max {MAX_AUTO_BETS} bets)
+                  <Bot className="h-4 w-4 mr-2" /> Run Auto-Bet Strategy ({strategy.maxBets} bet{strategy.maxBets !== 1 ? 's' : ''})
                 </Button>
                 {autoLog.length > 0 && (
                   <div className="bg-[#0b1618] rounded-lg p-3 border border-[#1e3a3f] space-y-1">
