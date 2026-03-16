@@ -184,6 +184,7 @@ export default function AIBettingPage() {
     minEdge: 0.03, minOdds: 1.5, maxOdds: 5.0, sport: 'all', maxStake: 100000
   });
   const [autoLog, setAutoLog] = useState<string[]>([]);
+  const [usedAutoBetKeys, setUsedAutoBetKeys] = useState<Set<string>>(new Set());
 
   // ── Portfolio ────────────────────────────────────────────────────────────
   const [portfolioResult, setPortfolioResult] = useState<{
@@ -886,8 +887,22 @@ export default function AIBettingPage() {
 
     logs.push(`📊 Scanning ${allValueBets.length} value opportunities across ${allEvents.length} events…`);
 
-    allValueBets.forEach((vb) => {
+    // Fisher-Yates shuffle to always get a different ordering each run
+    const shuffled = [...allValueBets];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    const newlyUsedKeys: string[] = [];
+
+    shuffled.forEach((vb) => {
       if (placed >= MAX_AUTO_BETS) return;
+
+      // Skip bets that were already placed by a previous auto-bet run
+      const betKey = `${vb.eventId}::${vb.selection}`;
+      if (usedAutoBetKeys.has(betKey)) return;
+
       const meetsEdge = vb.edge >= strategy.minEdge;
       const meetsOdds = vb.marketOdds >= strategy.minOdds && vb.marketOdds <= strategy.maxOdds;
       const normVbSport = normalizeSport(vb.sport);
@@ -908,6 +923,7 @@ export default function AIBettingPage() {
           currency: 'SBETS',
         });
         logs.push(`✅ #${placed + 1} ${vb.selection} @ ${vb.marketOdds} | edge +${(vb.edge * 100).toFixed(1)}% | ${vb.leagueName || vb.sport}`);
+        newlyUsedKeys.push(betKey);
         placed++;
       } else {
         if (skipped < 3) {
@@ -923,9 +939,17 @@ export default function AIBettingPage() {
     });
 
     if (placed === 0) {
+      // All qualifying bets already used — reset used keys so the pool refreshes
+      setUsedAutoBetKeys(new Set());
       logs.push(`\n❌ No bets placed. ${allValueBets.length} opportunities found but none met all filters.`);
       logs.push(`💡 Try: lower Min Edge to ${(strategy.minEdge * 50).toFixed(0)}%, widen odds range, or set sport to "All".`);
     } else {
+      // Mark these as used so next run picks different ones
+      setUsedAutoBetKeys(prev => {
+        const next = new Set(prev);
+        newlyUsedKeys.forEach(k => next.add(k));
+        return next;
+      });
       logs.push(`\n✓ ${placed} bet${placed > 1 ? 's' : ''} added to slip. Review below and confirm.`);
       if (skipped > 3) logs.push(`  (${skipped} other opportunities skipped by filters)`);
     }
@@ -1846,7 +1870,7 @@ export default function AIBettingPage() {
                   <div className="bg-[#0b1618] rounded-lg p-3 border border-[#1e3a3f] space-y-1">
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-xs text-gray-400 font-medium">Auto-Bet Log</div>
-                      <button onClick={() => setAutoLog([])} className="text-[10px] text-gray-500 hover:text-red-400 transition-colors">Clear</button>
+                      <button onClick={() => { setAutoLog([]); setUsedAutoBetKeys(new Set()); }} className="text-[10px] text-gray-500 hover:text-red-400 transition-colors">Clear</button>
                     </div>
                     {autoLog.map((line, i) => (
                       <div key={i} className={`text-xs font-mono ${line.startsWith('✅') ? 'text-green-400' : line.startsWith('❌') ? 'text-red-400' : line.startsWith('💡') ? 'text-yellow-400' : line.startsWith('📊') ? 'text-cyan-400' : line.startsWith('✓') ? 'text-cyan-300' : 'text-gray-400'}`}>{line}</div>
