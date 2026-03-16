@@ -7718,45 +7718,141 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
   // Horse racing — uses streamed.pk (may have matches on race days) + always includes known live channels
   app.get("/api/streaming/horse-racing", async (_req: Request, res: Response) => {
     try {
-      const response = await fetch("https://streamed.pk/api/matches/horse-racing", {
-        headers: { "User-Agent": "Mozilla/5.0" }
+      // Scrape DaddyLiveHD schedule for today's horse racing events
+      const dlhdRes = await fetch("https://dlstreams.top/index.php?cat=Horse+Racing", {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Referer": "https://dlstreams.top/"
+        }
       });
-      const streamed: any[] = response.ok ? await response.json() : [];
-      // Always include known free horse racing channels as fallback entries
-      const channels = [
+      const html = dlhdRes.ok ? await dlhdRes.text() : "";
+
+      // Parse events from schedule HTML — extract time, title, channel id
+      const scheduleMatches: any[] = [];
+      const eventRegex = /(\d{2}:\d{2})\s*<\/td>[\s\S]*?<a href="https:\/\/dlstreams\.top\/watch\.php\?id=(\d+)[^"]*"[^>]*>([^<]+)<\/a>/g;
+      let m;
+      while ((m = eventRegex.exec(html)) !== null) {
+        const [, time, channelId, channelName] = m;
+        const [h, min] = time.split(":").map(Number);
+        const today = new Date();
+        today.setUTCHours(h, min, 0, 0); // DaddyLive uses UK GMT
+        const eventTime = today.getTime();
+        const title = channelName.trim();
+        scheduleMatches.push({
+          id: `daddylive-${channelId}-${eventTime}`,
+          title,
+          category: "horse-racing",
+          date: eventTime,
+          popular: true,
+          isChannel: false,
+          teams: { home: { name: title, badge: "" }, away: { name: "Live Racing", badge: "" } },
+          sources: [{ source: "daddylive", id: channelId }],
+        });
+      }
+
+      // Fallback: try a simpler link-based regex if the above finds nothing
+      if (scheduleMatches.length === 0) {
+        const linkRegex = /watch\.php\?id=(\d+)"[^>]*>([^<]+)<\/a>/g;
+        const seen = new Set<string>();
+        while ((m = linkRegex.exec(html)) !== null) {
+          const [, channelId, channelName] = m;
+          if (seen.has(channelId)) continue;
+          // Only include racing-related channels
+          const name = channelName.trim();
+          if (!name.toLowerCase().includes("racing") && !name.toLowerCase().includes("horse")) continue;
+          seen.add(channelId);
+          scheduleMatches.push({
+            id: `daddylive-${channelId}`,
+            title: name,
+            category: "horse-racing",
+            date: Date.now(),
+            popular: true,
+            isChannel: false,
+            teams: { home: { name: name, badge: "" }, away: { name: "Live Racing", badge: "" } },
+            sources: [{ source: "daddylive", id: channelId }],
+          });
+        }
+      }
+
+      // Permanent always-on racing channels from DaddyLive
+      const permanentChannels = [
         {
-          id: "attheraces-live",
-          title: "At The Races — Live Channel",
+          id: "daddylive-554",
+          title: "Sky Sports Racing UK",
           category: "horse-racing",
           date: Date.now(),
           popular: true,
-          isChannel: true,
-          teams: { home: { name: "At The Races", badge: "" }, away: { name: "Live Now", badge: "" } },
-          sources: [{ source: "attheraces", id: "live" }],
-          externalUrl: "https://www.attheraces.com/live"
+          isChannel: false,
+          teams: { home: { name: "Sky Sports Racing UK", badge: "" }, away: { name: "Live Now", badge: "" } },
+          sources: [{ source: "daddylive", id: "554" }],
         },
         {
-          id: "racingtv-live",
-          title: "Racing TV — Live Channel",
+          id: "daddylive-390",
+          title: "Racing TV UK",
           category: "horse-racing",
           date: Date.now(),
           popular: true,
-          isChannel: true,
-          teams: { home: { name: "Racing TV", badge: "" }, away: { name: "Live Now", badge: "" } },
-          sources: [{ source: "racingtv", id: "live" }],
-          externalUrl: "https://www.racingtv.com/live"
+          isChannel: false,
+          teams: { home: { name: "Racing TV UK", badge: "" }, away: { name: "Live Now", badge: "" } },
+          sources: [{ source: "daddylive", id: "390" }],
+        },
+        {
+          id: "daddylive-606",
+          title: "Dubai Racing 2",
+          category: "horse-racing",
+          date: Date.now(),
+          popular: false,
+          isChannel: false,
+          teams: { home: { name: "Dubai Racing 2", badge: "" }, away: { name: "Live Now", badge: "" } },
+          sources: [{ source: "daddylive", id: "606" }],
         },
       ];
-      res.json([...channels, ...streamed]);
+
+      // Merge: prefer scraped schedule, add permanent channels that aren't already in schedule
+      const scheduledIds = new Set(scheduleMatches.map((e: any) => e.sources[0]?.id));
+      const extras = permanentChannels.filter((c: any) => !scheduledIds.has(c.sources[0]?.id));
+      const result = [...scheduleMatches, ...extras];
+      res.json(result);
     } catch (error: any) {
       console.error("[Streaming] Horse racing error:", error.message);
-      res.json([]);
+      // Return static fallback if scraping fails completely
+      res.json([
+        {
+          id: "daddylive-554",
+          title: "Sky Sports Racing UK",
+          category: "horse-racing",
+          date: Date.now(),
+          popular: true,
+          isChannel: false,
+          teams: { home: { name: "Sky Sports Racing UK", badge: "" }, away: { name: "Live Now", badge: "" } },
+          sources: [{ source: "daddylive", id: "554" }],
+        },
+        {
+          id: "daddylive-390",
+          title: "Racing TV UK",
+          category: "horse-racing",
+          date: Date.now(),
+          popular: true,
+          isChannel: false,
+          teams: { home: { name: "Racing TV UK", badge: "" }, away: { name: "Live Now", badge: "" } },
+          sources: [{ source: "daddylive", id: "390" }],
+        },
+      ]);
     }
   });
 
   app.get("/api/streaming/stream/:source/:id", async (req: Request, res: Response) => {
     try {
       const { source, id } = req.params;
+
+      // DaddyLiveHD channels — return embed info directly without hitting streamed.pk
+      if (source === "daddylive") {
+        const embedUrl = `https://dlstreams.top/stream/stream-${id}.php`;
+        return res.json([
+          { id: `dl-${id}-1`, streamNo: 1, language: "English", hd: true, embedUrl, source: "daddylive", viewers: 0 },
+        ]);
+      }
+
       const response = await fetch(`https://streamed.pk/api/stream/${source}/${id}`);
       if (!response.ok) throw new Error(`Stream source error: ${response.status}`);
       const data = await response.json();
@@ -7767,13 +7863,18 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
     }
   });
 
-  // Full-page stream viewer with iframe to embedsports.top
+  // Full-page stream viewer with iframe to embedsports.top or dlstreams.top
   app.get("/watch/:source/:id/:streamNo?", async (req: Request, res: Response) => {
     try {
       const { source, id, streamNo } = req.params;
       const num = streamNo || '1';
-      const embedUrl = `https://embedsports.top/embed/${source}/${id}/${num}`;
-      const matchTitle = id.replace(/-/g, ' ').replace(/vs/gi, ' vs ').replace(/\s+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()).trim();
+      // DaddyLiveHD horse racing channels use dlstreams.top embed
+      const embedUrl = source === "daddylive"
+        ? `https://dlstreams.top/stream/stream-${id}.php`
+        : `https://embedsports.top/embed/${source}/${id}/${num}`;
+      const matchTitle = source === "daddylive"
+        ? id.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()).trim()
+        : id.replace(/-/g, ' ').replace(/vs/gi, ' vs ').replace(/\s+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()).trim();
 
       const html = `<!DOCTYPE html>
 <html lang="en">
