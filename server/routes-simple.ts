@@ -2231,10 +2231,10 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       // FAST PATH: Esports events (sportId=9) - return directly from cache, no football enrichment needed
       if (reqSportId === 9) {
         const esportsEvents = esportsService.getUpcomingEvents();
-        const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
         const filtered = esportsEvents.filter(e => {
-          if (!e.startTime) return true;
-          return new Date(e.startTime).getTime() > sevenDaysAgo;
+          if (!e.startTime) return false;
+          return new Date(e.startTime).getTime() > now;
         });
         console.log(`⚡ FAST PATH: Returning ${filtered.length} esports events directly from cache`);
         return res.json(filtered);
@@ -2251,7 +2251,7 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         const filtered = freeSportsEvents
           .filter(e => e.sportId === reqSportId)
           .filter(e => {
-            if (!e.startTime) return true;
+            if (!e.startTime) return false;
             return new Date(e.startTime).getTime() > now;
           });
         console.log(`⚡ FAST PATH: Returning ${filtered.length} free sport events (sportId=${reqSportId}) from daily cache`);
@@ -2393,7 +2393,7 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
           // Filter out started events - football moves to live tab, free sports have no live mode so remove them
           const now = Date.now();
           allUpcomingEvents = allUpcomingEvents.filter(e => {
-            if (!e.startTime) return true;
+            if (!e.startTime) return false;
             return new Date(e.startTime).getTime() > now;
           });
           
@@ -2490,7 +2490,7 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         const now = Date.now();
         const beforeFilter = allUpcomingEvents.length;
         allUpcomingEvents = allUpcomingEvents.filter(e => {
-          if (!e.startTime) return true;
+          if (!e.startTime) return false;
           return new Date(e.startTime).getTime() > now;
         });
         if (beforeFilter !== allUpcomingEvents.length) {
