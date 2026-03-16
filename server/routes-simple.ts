@@ -7673,6 +7673,87 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
     }
   });
 
+  app.get("/api/streaming/basketball", async (_req: Request, res: Response) => {
+    try {
+      const response = await fetch("https://streamed.pk/api/matches/basketball", {
+        headers: { "User-Agent": "Mozilla/5.0" }
+      });
+      if (!response.ok) throw new Error(`Streaming API error: ${response.status}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("[Streaming] Basketball matches error:", error.message);
+      res.json([]);
+    }
+  });
+
+  app.get("/api/streaming/baseball", async (_req: Request, res: Response) => {
+    try {
+      const response = await fetch("https://streamed.pk/api/matches/baseball", {
+        headers: { "User-Agent": "Mozilla/5.0" }
+      });
+      if (!response.ok) throw new Error(`Streaming API error: ${response.status}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("[Streaming] Baseball matches error:", error.message);
+      res.json([]);
+    }
+  });
+
+  app.get("/api/streaming/cricket", async (_req: Request, res: Response) => {
+    try {
+      const response = await fetch("https://streamed.pk/api/matches/cricket", {
+        headers: { "User-Agent": "Mozilla/5.0" }
+      });
+      if (!response.ok) throw new Error(`Streaming API error: ${response.status}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("[Streaming] Cricket matches error:", error.message);
+      res.json([]);
+    }
+  });
+
+  // Horse racing — uses streamed.pk (may have matches on race days) + always includes known live channels
+  app.get("/api/streaming/horse-racing", async (_req: Request, res: Response) => {
+    try {
+      const response = await fetch("https://streamed.pk/api/matches/horse-racing", {
+        headers: { "User-Agent": "Mozilla/5.0" }
+      });
+      const streamed: any[] = response.ok ? await response.json() : [];
+      // Always include known free horse racing channels as fallback entries
+      const channels = [
+        {
+          id: "attheraces-live",
+          title: "At The Races — Live Channel",
+          category: "horse-racing",
+          date: Date.now(),
+          popular: true,
+          isChannel: true,
+          teams: { home: { name: "At The Races", badge: "" }, away: { name: "Live Now", badge: "" } },
+          sources: [{ source: "attheraces", id: "live" }],
+          externalUrl: "https://www.attheraces.com/live"
+        },
+        {
+          id: "racingtv-live",
+          title: "Racing TV — Live Channel",
+          category: "horse-racing",
+          date: Date.now(),
+          popular: true,
+          isChannel: true,
+          teams: { home: { name: "Racing TV", badge: "" }, away: { name: "Live Now", badge: "" } },
+          sources: [{ source: "racingtv", id: "live" }],
+          externalUrl: "https://www.racingtv.com/live"
+        },
+      ];
+      res.json([...channels, ...streamed]);
+    } catch (error: any) {
+      console.error("[Streaming] Horse racing error:", error.message);
+      res.json([]);
+    }
+  });
+
   app.get("/api/streaming/stream/:source/:id", async (req: Request, res: Response) => {
     try {
       const { source, id } = req.params;
