@@ -8,7 +8,11 @@ import { nodePolyfills } from "vite-plugin-node-polyfills";
 export default defineConfig({
   plugins: [
     nodePolyfills({
-      include: ["buffer", "events", "process", "stream", "util", "path", "crypto"],
+      include: [
+        "buffer", "events", "process", "stream", "util", "path", "crypto",
+        "vm", "url", "http", "https", "os", "querystring", "string_decoder",
+        "assert", "constants", "punycode", "net", "tls", "zlib",
+      ],
       globals: {
         Buffer: true,
         global: true,

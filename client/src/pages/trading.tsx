@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from "react";
+import { useState, lazy, Suspense, Component, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import Layout from "@/components/layout/Layout";
@@ -49,6 +49,20 @@ function SwapWidgetUnavailable() {
       </a>
     </div>
   );
+}
+
+class SwapErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) return <SwapWidgetUnavailable />;
+    return this.props.children;
+  }
 }
 
 const SwapWidget = lazy(() =>
@@ -919,9 +933,11 @@ export default function TradingPage() {
 
           {/* ── Swap cards ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Suspense fallback={<SwapWidgetUnavailable />}>
-              <SwapWidget />
-            </Suspense>
+            <SwapErrorBoundary>
+              <Suspense fallback={<SwapWidgetUnavailable />}>
+                <SwapWidget />
+              </Suspense>
+            </SwapErrorBoundary>
             <div className="bg-[#0e1e24] border border-white/5 rounded-xl p-6 flex flex-col" data-testid="card-trade-perps">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-9 h-9 rounded-lg bg-[#00d0ff]/10 flex items-center justify-center">
