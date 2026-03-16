@@ -732,24 +732,35 @@ export default function AIBettingPage() {
   const liveSignals = buildLiveSignals(allEvents);
 
   // Marketplace: rank value bets by ROI = (aiProb × odds) - 1, highest first
-  const marketplaceBets = allValueBets
-    .map(v => ({
-      selection: v.selection,
-      event: v.eventName,
-      roi: +(((v.aiProb * v.marketOdds) - 1) * 100).toFixed(1),
-      edge: v.edge,
-      odds: v.marketOdds,
-      aiProb: v.aiProb,
-      sport: v.sport,
-      eventId: v.eventId,
-      homeTeam: v.homeTeam,
-      awayTeam: v.awayTeam,
-      leagueName: v.leagueName,
-    }))
-    .filter(v => v.roi > 0)
-    .sort((a, b) => b.roi - a.roi)
-    .slice(0, 8)
-    .map((v, i) => ({ ...v, rank: i + 1 }));
+  // Deduplicate by eventId — keep the best ROI selection per event
+  const marketplaceBets = (() => {
+    const seen = new Map<string, any>();
+    for (const v of allValueBets) {
+      const roi = +(((v.aiProb * v.marketOdds) - 1) * 100).toFixed(1);
+      if (roi <= 0) continue;
+      const key = String(v.eventId);
+      const prev = seen.get(key);
+      if (!prev || roi > prev.roi) {
+        seen.set(key, {
+          selection: v.selection,
+          event: v.eventName,
+          roi,
+          edge: v.edge,
+          odds: v.marketOdds,
+          aiProb: v.aiProb,
+          sport: v.sport,
+          eventId: v.eventId,
+          homeTeam: v.homeTeam,
+          awayTeam: v.awayTeam,
+          leagueName: v.leagueName,
+        });
+      }
+    }
+    return Array.from(seen.values())
+      .sort((a, b) => b.roi - a.roi)
+      .slice(0, 12)
+      .map((v, i) => ({ ...v, rank: i + 1 }));
+  })();
 
   // ── Core agent result builder ────────────────────────────────────────────
   const buildAgentResult = (action: string, events: any[], params?: any): any => {
@@ -2638,6 +2649,60 @@ export default function AIBettingPage() {
                           Low margin target — compare odds at a 2nd bookmaker to find a true arb
                         </div>
                       )}
+
+                      {/* Add to Betslip */}
+                      <div className="pt-1 border-t border-white/5">
+                        {a.isArb ? (
+                          <div className="space-y-1.5">
+                            <div className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">Add arb legs to slip</div>
+                            <div className="flex flex-wrap gap-1.5">
+                              <Button size="sm"
+                                className="h-7 text-xs bg-green-500/15 hover:bg-green-500/25 text-green-300 border border-green-500/35 flex-shrink-0"
+                                onClick={() => addBet({ id: `arb-h-${a.eventId}-${i}`, eventId: a.eventId, eventName: a.event, selectionName: `${a.homeTeam} Win`, odds: a.homeOdds, stake: a.stakeH, market: 'Match Winner', homeTeam: a.homeTeam, awayTeam: a.awayTeam, currency: 'SBETS' })}
+                                data-testid={`arb-add-home-${i}`}>
+                                🏠 {a.homeTeam} @ {a.homeOdds}
+                              </Button>
+                              {a.drawOdds && (
+                                <Button size="sm"
+                                  className="h-7 text-xs bg-green-500/15 hover:bg-green-500/25 text-green-300 border border-green-500/35 flex-shrink-0"
+                                  onClick={() => addBet({ id: `arb-d-${a.eventId}-${i}`, eventId: a.eventId, eventName: a.event, selectionName: 'Draw', odds: a.drawOdds!, stake: a.stakeD, market: 'Match Winner', homeTeam: a.homeTeam, awayTeam: a.awayTeam, currency: 'SBETS' })}
+                                  data-testid={`arb-add-draw-${i}`}>
+                                  🤝 Draw @ {a.drawOdds}
+                                </Button>
+                              )}
+                              <Button size="sm"
+                                className="h-7 text-xs bg-green-500/15 hover:bg-green-500/25 text-green-300 border border-green-500/35 flex-shrink-0"
+                                onClick={() => addBet({ id: `arb-a-${a.eventId}-${i}`, eventId: a.eventId, eventName: a.event, selectionName: `${a.awayTeam} Win`, odds: a.awayOdds, stake: a.stakeA, market: 'Match Winner', homeTeam: a.homeTeam, awayTeam: a.awayTeam, currency: 'SBETS' })}
+                                data-testid={`arb-add-away-${i}`}>
+                                ✈️ {a.awayTeam} @ {a.awayOdds}
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex gap-1.5">
+                            <Button size="sm"
+                              className="h-7 text-xs bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex-shrink-0"
+                              onClick={() => addBet({ id: `arb-h-${a.eventId}-${i}`, eventId: a.eventId, eventName: a.event, selectionName: `${a.homeTeam} Win`, odds: a.homeOdds, stake: 5000, market: 'Match Winner', homeTeam: a.homeTeam, awayTeam: a.awayTeam, currency: 'SBETS' })}
+                              data-testid={`arb-add-home-${i}`}>
+                              + {a.homeTeam}
+                            </Button>
+                            {a.drawOdds && (
+                              <Button size="sm"
+                                className="h-7 text-xs bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex-shrink-0"
+                                onClick={() => addBet({ id: `arb-d-${a.eventId}-${i}`, eventId: a.eventId, eventName: a.event, selectionName: 'Draw', odds: a.drawOdds!, stake: 5000, market: 'Match Winner', homeTeam: a.homeTeam, awayTeam: a.awayTeam, currency: 'SBETS' })}
+                                data-testid={`arb-add-draw-${i}`}>
+                                + Draw
+                              </Button>
+                            )}
+                            <Button size="sm"
+                              className="h-7 text-xs bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex-shrink-0"
+                              onClick={() => addBet({ id: `arb-a-${a.eventId}-${i}`, eventId: a.eventId, eventName: a.event, selectionName: `${a.awayTeam} Win`, odds: a.awayOdds, stake: 5000, market: 'Match Winner', homeTeam: a.homeTeam, awayTeam: a.awayTeam, currency: 'SBETS' })}
+                              data-testid={`arb-add-away-${i}`}>
+                              + {a.awayTeam}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
