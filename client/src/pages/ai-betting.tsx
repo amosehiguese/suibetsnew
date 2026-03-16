@@ -1137,6 +1137,7 @@ export default function AIBettingPage() {
     const logs: string[] = [];
     let placed = 0;
     let skipped = 0;
+    let dailySkips = 0;
     let sessionStake = 0;
 
     if (allValueBets.length === 0) {
@@ -1180,7 +1181,7 @@ export default function AIBettingPage() {
 
         // Check remaining daily limit
         if (dailyStaked + sessionStake + stake > strategy.dailyLimit) {
-          logs.push(`⚠️ Skipping #${placed + 1} — would exceed daily limit`);
+          dailySkips++;
           return;
         }
 
@@ -1214,9 +1215,16 @@ export default function AIBettingPage() {
       }
     });
 
+    if (dailySkips > 0) {
+      const remaining = strategy.dailyLimit - dailyStaked - sessionStake;
+      logs.push(`⚠️ ${dailySkips} opportunity${dailySkips !== 1 ? 'ies' : 'y'} skipped — daily cap reached (${remaining.toLocaleString()} SBETS remaining)`);
+    } else if (skipped > 2) {
+      logs.push(`⏭ ${skipped} other opportunities filtered out by current strategy settings`);
+    }
+
     if (placed === 0) {
       setUsedAutoBetKeys(new Set());
-      logs.push(`\n❌ No bets placed. ${allValueBets.length} opportunities found but none met all filters.`);
+      logs.push(`❌ No bets placed. ${allValueBets.length} opportunities scanned, none passed all filters.`);
       logs.push(`💡 Try a preset: Conservative / Balanced / Aggressive, or widen your filters.`);
     } else {
       setUsedAutoBetKeys(prev => {
@@ -1225,8 +1233,7 @@ export default function AIBettingPage() {
         return next;
       });
       setDailyStaked(d => d + sessionStake);
-      logs.push(`\n✓ ${placed} bet${placed > 1 ? 's' : ''} added — ${sessionStake.toLocaleString()} SBETS total stake.`);
-      if (skipped > 2) logs.push(`  (${skipped} other opportunities filtered out)`);
+      logs.push(`✓ ${placed} bet${placed > 1 ? 's' : ''} queued — ${sessionStake.toLocaleString()} SBETS total stake`);
     }
 
     setAutoLog(logs);
@@ -2752,23 +2759,66 @@ export default function AIBettingPage() {
                 </Button>
 
                 {autoLog.length > 0 && (
-                  <div className="bg-[#0b1618] rounded-lg p-3 border border-[#1e3a3f] space-y-1">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-xs text-gray-400 font-medium">Auto-Bet Log</div>
-                      <button onClick={() => { setAutoLog([]); setUsedAutoBetKeys(new Set()); }} className="text-[10px] text-gray-500 hover:text-red-400 transition-colors">Clear</button>
+                  <div className="rounded-xl border border-cyan-900/40 bg-gradient-to-b from-[#060e14] to-[#0a1520] overflow-hidden shadow-lg shadow-cyan-900/10">
+                    {/* Header bar */}
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-cyan-900/30 bg-[#071018]">
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                        <span className="text-[10px] font-semibold tracking-widest text-cyan-400/80 uppercase">AI Analysis Output</span>
+                      </div>
+                      <button
+                        onClick={() => { setAutoLog([]); setUsedAutoBetKeys(new Set()); }}
+                        className="text-[10px] text-gray-600 hover:text-red-400 transition-colors tracking-wider uppercase"
+                      >
+                        Clear
+                      </button>
                     </div>
-                    {autoLog.map((line, i) => (
-                      <div key={i} className={`text-xs font-mono ${
-                        line.startsWith('✅') ? 'text-green-400' :
-                        line.startsWith('❌') ? 'text-red-400' :
-                        line.startsWith('💡') ? 'text-yellow-400' :
-                        line.startsWith('📊') ? 'text-cyan-400' :
-                        line.startsWith('🎯') ? 'text-purple-400' :
-                        line.startsWith('🛑') ? 'text-red-400' :
-                        line.startsWith('⚠️') ? 'text-yellow-400' :
-                        line.startsWith('✓') ? 'text-cyan-300' : 'text-gray-400'
-                      }`}>{line}</div>
-                    ))}
+
+                    {/* Log lines */}
+                    <div className="p-3 space-y-1.5">
+                      {autoLog.map((line, i) => {
+                        const isPlaced   = line.startsWith('✅');
+                        const isSuccess  = line.startsWith('✓');
+                        const isError    = line.startsWith('❌');
+                        const isTip      = line.startsWith('💡');
+                        const isScan     = line.startsWith('📊');
+                        const isStrategy = line.startsWith('🎯');
+                        const isStop     = line.startsWith('🛑');
+                        const isWarn     = line.startsWith('⚠️');
+                        const isSkip     = line.startsWith('⏭');
+
+                        const colorClass =
+                          isPlaced   ? 'text-emerald-400' :
+                          isSuccess  ? 'text-cyan-300' :
+                          isError    ? 'text-red-400' :
+                          isTip      ? 'text-amber-400' :
+                          isScan     ? 'text-cyan-400' :
+                          isStrategy ? 'text-violet-400' :
+                          isStop     ? 'text-red-500' :
+                          isWarn     ? 'text-amber-500' :
+                          isSkip     ? 'text-gray-500' :
+                          'text-gray-400';
+
+                        const bgClass =
+                          isPlaced  ? 'bg-emerald-500/5 border border-emerald-500/10 rounded' :
+                          isSuccess ? 'bg-cyan-500/5 border border-cyan-500/10 rounded' :
+                          isError   ? 'bg-red-500/5 border border-red-500/10 rounded' :
+                          isStop    ? 'bg-red-500/5 border border-red-500/10 rounded' :
+                          isWarn    ? 'bg-amber-500/5 border border-amber-500/10 rounded' :
+                          '';
+
+                        return (
+                          <div key={i} className={`text-[11px] font-mono leading-5 px-2 py-0.5 ${colorClass} ${bgClass}`}>
+                            {line}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="px-3 py-1.5 border-t border-cyan-900/20 bg-[#040c12]">
+                      <span className="text-[9px] text-gray-600 tracking-widest uppercase">SuiBets Neural Engine v2</span>
+                    </div>
                   </div>
                 )}
               </div>
