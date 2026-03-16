@@ -350,20 +350,87 @@
   }
 }
 
-/* ── Range input track — SuiBets cyan ───────────────────────── */
-input[type="range"]::-webkit-slider-runnable-track {
-  background: rgba(6, 182, 212, 0.25);
+/* ── SuiBets range sliders ───────────────────────────────────── */
+.sui-range,
+.sui-range-red {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  width: 100%;
+}
+.sui-range {
+  background: rgba(6, 182, 212, 0.22);
+  accent-color: #06b6d4;
+}
+.sui-range-red {
+  background: rgba(239, 68, 68, 0.22);
+  accent-color: #ef4444;
+}
+
+/* Thumb — webkit */
+.sui-range::-webkit-slider-thumb,
+.sui-range-red::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin-top: -5px;
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+.sui-range::-webkit-slider-thumb {
+  background: #06b6d4;
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.18);
+}
+.sui-range-red::-webkit-slider-thumb {
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+}
+.sui-range::-webkit-slider-thumb:hover  { box-shadow: 0 0 0 5px rgba(6, 182, 212, 0.30); }
+.sui-range-red::-webkit-slider-thumb:hover { box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.30); }
+
+/* Track — webkit */
+.sui-range::-webkit-slider-runnable-track {
+  background: rgba(6, 182, 212, 0.22);
   height: 4px;
   border-radius: 2px;
 }
-input[type="range"]::-moz-range-track {
-  background: rgba(6, 182, 212, 0.25);
+.sui-range-red::-webkit-slider-runnable-track {
+  background: rgba(239, 68, 68, 0.22);
   height: 4px;
   border-radius: 2px;
 }
-input[type="range"].accent-red-500::-webkit-slider-runnable-track {
-  background: rgba(239, 68, 68, 0.25);
+
+/* Thumb — Firefox */
+.sui-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #06b6d4;
+  border: none;
+  cursor: pointer;
 }
-input[type="range"].accent-red-500::-moz-range-track {
-  background: rgba(239, 68, 68, 0.25);
+.sui-range-red::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: none;
+  cursor: pointer;
+}
+
+/* Track — Firefox */
+.sui-range::-moz-range-track {
+  background: rgba(6, 182, 212, 0.22);
+  height: 4px;
+  border-radius: 2px;
+}
+.sui-range-red::-moz-range-track {
+  background: rgba(239, 68, 68, 0.22);
+  height: 4px;
+  border-radius: 2px;
 }

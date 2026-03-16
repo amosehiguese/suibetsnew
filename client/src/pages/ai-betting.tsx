@@ -2040,7 +2040,7 @@ export default function AIBettingPage() {
                   <input
                     type="range" min="0.005" max="0.10" step="0.005" value={minEdgeFilter}
                     onChange={e => setMinEdgeFilter(parseFloat(e.target.value))}
-                    className="w-full accent-cyan-500"
+                    className="sui-range"
                     data-testid="min-edge-filter"
                   />
                   <div className="flex items-center justify-between text-[10px] text-gray-600 mt-0.5">
@@ -2744,25 +2744,25 @@ export default function AIBettingPage() {
                     <label className="text-xs text-gray-400 block mb-1">Min Edge: <span className="text-cyan-400 font-mono font-bold">{(strategy.minEdge * 100).toFixed(1)}%</span></label>
                     <input type="range" min="0.005" max="0.12" step="0.005" value={strategy.minEdge}
                       onChange={e => { setActivePreset(''); setStrategy(s => ({ ...s, minEdge: parseFloat(e.target.value) })); }}
-                      className="w-full accent-cyan-500" data-testid="strategy-min-edge" />
+                      className="sui-range" data-testid="strategy-min-edge" />
                   </div>
                   <div>
                     <label className="text-xs text-gray-400 block mb-1">Max Stake: <span className="text-cyan-400 font-mono font-bold">{strategy.maxStake.toLocaleString()} SBETS</span></label>
                     <input type="range" min="1000" max="100000" step="1000" value={strategy.maxStake}
                       onChange={e => { setActivePreset(''); setStrategy(s => ({ ...s, maxStake: Number(e.target.value) })); }}
-                      className="w-full accent-cyan-500" data-testid="strategy-max-stake" />
+                      className="sui-range" data-testid="strategy-max-stake" />
                   </div>
                   <div>
                     <label className="text-xs text-gray-400 block mb-1">Min Odds: <span className="text-cyan-400 font-mono font-bold">{strategy.minOdds.toFixed(1)}</span></label>
                     <input type="range" min="1.1" max="5.0" step="0.1" value={strategy.minOdds}
                       onChange={e => { setActivePreset(''); setStrategy(s => ({ ...s, minOdds: parseFloat(e.target.value) })); }}
-                      className="w-full accent-cyan-500" data-testid="strategy-min-odds" />
+                      className="sui-range" data-testid="strategy-min-odds" />
                   </div>
                   <div>
                     <label className="text-xs text-gray-400 block mb-1">Max Odds: <span className="text-cyan-400 font-mono font-bold">{strategy.maxOdds.toFixed(1)}</span></label>
                     <input type="range" min="1.5" max="15.0" step="0.5" value={strategy.maxOdds}
                       onChange={e => { setActivePreset(''); setStrategy(s => ({ ...s, maxOdds: parseFloat(e.target.value) })); }}
-                      className="w-full accent-cyan-500" data-testid="strategy-max-odds" />
+                      className="sui-range" data-testid="strategy-max-odds" />
                   </div>
                   <div className="col-span-2">
                     <label className="text-xs text-gray-400 block mb-1">
@@ -2771,7 +2771,7 @@ export default function AIBettingPage() {
                     </label>
                     <input type="range" min="1" max="20" step="1" value={strategy.maxBets}
                       onChange={e => { setActivePreset(''); setStrategy(s => ({ ...s, maxBets: Number(e.target.value) })); }}
-                      className="w-full accent-cyan-500" data-testid="strategy-max-bets" />
+                      className="sui-range" data-testid="strategy-max-bets" />
                     <div className="flex justify-between text-[10px] text-gray-600 mt-0.5">
                       <span>1</span><span>5</span><span>10</span><span>15</span><span>20</span>
                     </div>
@@ -2794,7 +2794,7 @@ export default function AIBettingPage() {
                     <label className="text-xs text-gray-400 block mb-1">Daily Limit: <span className="text-cyan-400 font-mono font-bold">{strategy.dailyLimit.toLocaleString()}</span></label>
                     <input type="range" min="10000" max="1000000" step="10000" value={strategy.dailyLimit}
                       onChange={e => setStrategy(s => ({ ...s, dailyLimit: Number(e.target.value) }))}
-                      className="w-full accent-red-500" data-testid="strategy-daily-limit" />
+                      className="sui-range-red" data-testid="strategy-daily-limit" />
                     <div className="flex items-center justify-between text-[10px] mt-0.5">
                       <span className="text-gray-600">Protection limit</span>
                       {dailyStaked > 0 && (
