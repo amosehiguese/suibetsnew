@@ -481,39 +481,71 @@ export default function AIBettingPage() {
   const valueBets = allValueBets.filter(v => v.edge >= minEdgeFilter);
 
   // ── Arbitrage ────────────────────────────────────────────────────────────
-  // Real arbitrage requires different bookmakers. Since we have one odds source,
-  // we surface events where the bookmaker's margin is lowest (closest to fair odds)
-  // — these are the best candidates for cross-bookmaker arbitrage.
+  // Shows lowest-margin events (best cross-bookmaker arb targets).
+  // Filters out multi-runner events (horse racing etc.) where 2-outcome
+  // implied is unrealistically low.
   const buildArbOpps = (events: any[]) => {
     return events
-      .filter(e => getRealOdds(e, 'home') && getRealOdds(e, 'away'))
+      .filter(e => {
+        const h = getRealOdds(e, 'home');
+        const a = getRealOdds(e, 'away');
+        if (!h || !a) return false;
+        const d = getRealOdds(e, 'draw');
+        const total = (1 / h) + (1 / a) + (d ? 1 / d : 0);
+        // Reject multi-runner events: real 2-way or 3-way markets always have
+        // total implied between 85% and 125%. Lower = horse race / multi-runner.
+        return total >= 0.85;
+      })
       .map(e => {
         const homeOdds = getRealOdds(e, 'home')!;
         const awayOdds = getRealOdds(e, 'away')!;
         const drawOdds = getRealOdds(e, 'draw');
-        const impliedProb = (1 / homeOdds) + (drawOdds ? 1 / drawOdds : 0) + (1 / awayOdds);
-        const margin = +((impliedProb - 1) * 100).toFixed(2);
-        // True arb: implied < 1.0. With one bookmaker this won't occur,
-        // but low-margin events are best targets for cross-bookmaker arb.
-        const profit = impliedProb < 1 ? +((1 - impliedProb) * 100).toFixed(2) : 0;
+        const impliedH = 1 / homeOdds;
+        const impliedA = 1 / awayOdds;
+        const impliedD = drawOdds ? 1 / drawOdds : 0;
+        const impliedTotal = impliedH + impliedA + impliedD;
+        const margin = +((impliedTotal - 1) * 100).toFixed(2);
+
+        // True arb only when total implied < 100%
+        const isArb = impliedTotal < 1.0;
+        const profit = isArb ? +((1 - impliedTotal) * 100).toFixed(2) : 0;
+
+        // Arb stake calculator: for a 100K SBETS total outlay
+        // Stake on each outcome = totalStake × (1/odds) / impliedTotal
+        const totalForCalc = 100000;
+        const stakeH = isArb ? Math.round((totalForCalc * (1 / homeOdds)) / impliedTotal) : 0;
+        const stakeA = isArb ? Math.round((totalForCalc * (1 / awayOdds)) / impliedTotal) : 0;
+        const stakeD = (isArb && drawOdds) ? Math.round((totalForCalc * (1 / drawOdds)) / impliedTotal) : 0;
+        const guaranteedReturn = isArb ? Math.round(totalForCalc / impliedTotal) : 0;
+        const guaranteedProfit = isArb ? guaranteedReturn - totalForCalc : 0;
+
+        // Quality tier
+        const tier: 'low' | 'medium' | 'good' =
+          margin < 2 ? 'good' : margin < 5 ? 'medium' : 'low';
+
         return {
           event: `${e.homeTeam} vs ${e.awayTeam}`,
           league: e.leagueName || '',
-          bookA: 'Bookmaker A',
-          oddsA: +homeOdds.toFixed(2),
-          bookB: 'Bookmaker B',
-          oddsB: +awayOdds.toFixed(2),
-          impliedProb: +impliedProb.toFixed(4),
-          margin,
-          profit,
-          eventId: e.id,
           homeTeam: e.homeTeam,
           awayTeam: e.awayTeam,
+          homeOdds: +homeOdds.toFixed(2),
+          awayOdds: +awayOdds.toFixed(2),
+          drawOdds: drawOdds ? +drawOdds.toFixed(2) : null,
+          impliedTotal: +impliedTotal.toFixed(4),
+          margin,
+          isArb,
+          profit,
+          tier,
+          stakeH,
+          stakeA,
+          stakeD,
+          guaranteedReturn,
+          guaranteedProfit,
+          eventId: e.id,
         };
       })
-      // Sort by lowest margin first — these are the best arb targets
       .sort((a, b) => a.margin - b.margin)
-      .slice(0, 6);
+      .slice(0, 8);
   };
 
   // ── String hash helper (stable across events) ────────────────────────────
@@ -2192,39 +2224,120 @@ export default function AIBettingPage() {
             {/* ── 5. Arbitrage ───────────────────────────────────────── */}
             {activeTab === 'arbitrage' && (
               <div className="space-y-3">
-                <div className="text-xs text-gray-400">
-                  Sorted by lowest bookmaker margin — these are the best cross-bookmaker arbitrage targets.
-                  <span className="text-yellow-400 font-mono ml-1">Implied &lt; 100% → true arbitrage</span>
+                {/* Summary header */}
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-gray-400">
+                    Sorted by lowest bookmaker margin
+                    <span className="text-yellow-400 font-mono ml-1">— lower margin = better arb target</span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    {arbiOpps.filter((a: any) => a.isArb).length > 0 && (
+                      <Badge className="bg-green-500/20 text-green-400 border-green-500/40 text-[10px]">
+                        {arbiOpps.filter((a: any) => a.isArb).length} True Arb
+                      </Badge>
+                    )}
+                    <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/40 text-[10px]">
+                      {arbiOpps.filter((a: any) => !a.isArb && a.tier !== 'low').length} Low Margin
+                    </Badge>
+                  </div>
                 </div>
+
+                {/* Explainer */}
                 <div className="bg-[#0b1618] rounded-lg p-2.5 border border-yellow-500/20 text-[11px] text-yellow-400/80 flex items-start gap-2">
                   <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
-                  Real arbitrage requires placing opposing bets across multiple bookmakers simultaneously. Odds shown are from our live feed — compare with a second bookmaker to confirm the opportunity.
+                  <span>These odds are from our live feed. To arb: find the same event at another bookmaker with different odds, then combine. Only 2-way and 3-way markets shown — multi-runner events are excluded.</span>
                 </div>
+
                 {arbiOpps.length === 0 ? (
-                  <div className="text-gray-400 text-sm text-center py-4">No odds data for arbitrage calculation.</div>
+                  <div className="text-gray-400 text-sm text-center py-4">No 2-way or 3-way events available for arbitrage analysis.</div>
                 ) : (arbiOpps as any[]).map((a: any, i: number) => {
-                  const marginPct = a.margin ?? +((a.impliedProb - 1) * 100).toFixed(2);
-                  const isLowMargin = marginPct < 3;
+                  const tierColors = {
+                    good:   { card: 'bg-green-900/15 border-green-500/40',  badge: 'bg-green-500/20 text-green-400 border-green-500/40',  dot: 'bg-green-400' },
+                    medium: { card: 'bg-yellow-900/10 border-yellow-500/25', badge: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', dot: 'bg-yellow-400' },
+                    low:    { card: 'bg-[#0b1618] border-[#1e3a3f]',         badge: 'bg-gray-500/15 text-gray-400 border-gray-500/30',       dot: 'bg-gray-500' },
+                  };
+                  const tc = a.isArb
+                    ? tierColors.good
+                    : tierColors[a.tier as 'low' | 'medium' | 'good'];
+
+                  // Margin bar: 0% = perfect arb, 10%+ = bad
+                  const marginBarPct = Math.min(100, Math.max(0, a.margin * 10));
+                  const marginBarColor = a.margin < 2 ? 'bg-green-500' : a.margin < 5 ? 'bg-yellow-500' : 'bg-red-500/60';
+
                   return (
-                    <div key={i} className={`rounded-lg p-3 border transition-all ${a.profit > 0 ? 'bg-green-900/20 border-green-500/30' : isLowMargin ? 'bg-yellow-900/10 border-yellow-500/20' : 'bg-[#0b1618] border-[#1e3a3f]'}`}>
-                      <div className="flex items-center gap-3">
+                    <div key={i} className={`rounded-lg p-3 border space-y-2.5 transition-all ${tc.card}`}>
+                      {/* Header */}
+                      <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm text-white truncate">{a.event}</div>
-                          {a.league && <div className="text-[10px] text-gray-500">{a.league}</div>}
-                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-400 mt-1">
-                            <span>Home @ {a.oddsA}</span>
-                            <span>Away @ {a.oddsB}</span>
-                            <span>Implied: {(a.impliedProb * 100).toFixed(1)}%</span>
+                          <div className="text-sm text-white font-medium truncate">{a.event}</div>
+                          {a.league && <div className="text-[10px] text-gray-500 mt-0.5">{a.league}</div>}
+                        </div>
+                        <Badge className={`text-[10px] whitespace-nowrap shrink-0 ${tc.badge}`}>
+                          {a.isArb ? `✓ True Arb +${a.profit}%` : a.tier === 'good' ? `★ ${a.margin}% margin` : `${a.margin}% margin`}
+                        </Badge>
+                      </div>
+
+                      {/* Odds row */}
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <div className="flex items-center gap-1.5 bg-black/20 rounded px-2 py-1">
+                          <span className="text-gray-500 text-[10px]">HOME</span>
+                          <span className="text-white font-mono font-bold">@ {a.homeOdds}</span>
+                          <span className="text-gray-500 text-[10px]">{(100/a.homeOdds).toFixed(1)}%</span>
+                        </div>
+                        {a.drawOdds && (
+                          <div className="flex items-center gap-1.5 bg-black/20 rounded px-2 py-1">
+                            <span className="text-gray-500 text-[10px]">DRAW</span>
+                            <span className="text-white font-mono font-bold">@ {a.drawOdds}</span>
+                            <span className="text-gray-500 text-[10px]">{(100/a.drawOdds).toFixed(1)}%</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5 bg-black/20 rounded px-2 py-1">
+                          <span className="text-gray-500 text-[10px]">AWAY</span>
+                          <span className="text-white font-mono font-bold">@ {a.awayOdds}</span>
+                          <span className="text-gray-500 text-[10px]">{(100/a.awayOdds).toFixed(1)}%</span>
+                        </div>
+                      </div>
+
+                      {/* Margin bar */}
+                      <div>
+                        <div className="flex items-center justify-between text-[10px] mb-1">
+                          <span className="text-gray-500">Bookmaker margin</span>
+                          <span className={a.margin < 2 ? 'text-green-400 font-bold' : a.margin < 5 ? 'text-yellow-400' : 'text-gray-400'}>
+                            {a.isArb ? '0% (true arb!)' : `${a.margin}%`}
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-[#0a1315] rounded-full">
+                          <div className={`h-1.5 rounded-full transition-all ${marginBarColor}`}
+                            style={{ width: `${a.isArb ? 2 : marginBarPct}%` }} />
+                        </div>
+                        <div className="flex justify-between text-[9px] text-gray-600 mt-0.5">
+                          <span>0% ideal</span><span>5% avg</span><span>10%+ bad</span>
+                        </div>
+                      </div>
+
+                      {/* Arb stakes calculator — only shown for true arbs */}
+                      {a.isArb && (
+                        <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-2.5 space-y-1.5">
+                          <div className="text-[10px] text-green-400 font-bold uppercase tracking-wide">Guaranteed Profit Calculator (per 100K SBETS)</div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                            <span className="text-gray-300">Stake {a.homeTeam}: <span className="text-cyan-400 font-mono">{a.stakeH.toLocaleString()}</span></span>
+                            {a.stakeD > 0 && <span className="text-gray-300">Stake Draw: <span className="text-cyan-400 font-mono">{a.stakeD.toLocaleString()}</span></span>}
+                            <span className="text-gray-300">Stake {a.awayTeam}: <span className="text-cyan-400 font-mono">{a.stakeA.toLocaleString()}</span></span>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs">
+                            <span className="text-gray-400">Return: <span className="text-white font-mono">{a.guaranteedReturn.toLocaleString()}</span></span>
+                            <span className="text-green-400 font-bold">Profit: +{a.guaranteedProfit.toLocaleString()} SBETS guaranteed</span>
                           </div>
                         </div>
-                        {a.profit > 0 ? (
-                          <Badge className="bg-green-500/20 text-green-400 border-green-500/40 text-xs whitespace-nowrap">True Arb +{a.profit}%</Badge>
-                        ) : (
-                          <Badge className={`text-xs whitespace-nowrap ${isLowMargin ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' : 'bg-gray-500/20 text-gray-400 border-gray-500/40'}`}>
-                            {isLowMargin ? `Low margin ${marginPct}%` : `Margin ${marginPct}%`}
-                          </Badge>
-                        )}
-                      </div>
+                      )}
+
+                      {/* Cross-bookmaker hint for non-arb low-margin events */}
+                      {!a.isArb && a.tier !== 'low' && (
+                        <div className="text-[10px] text-cyan-500/70 flex items-center gap-1">
+                          <Zap className="h-2.5 w-2.5" />
+                          Low margin target — compare odds at a 2nd bookmaker to find a true arb
+                        </div>
+                      )}
                     </div>
                   );
                 })}
