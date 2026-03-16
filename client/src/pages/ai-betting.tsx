@@ -73,9 +73,9 @@ interface AutoBetStrategy {
 }
 
 const PRESET_STRATEGIES: Record<string, Partial<AutoBetStrategy>> = {
-  conservative: { minEdge: 0.06, minOdds: 1.5, maxOdds: 3.0, maxStake: 10000, maxBets: 3, stakingMode: 'kelly' },
-  balanced:     { minEdge: 0.03, minOdds: 1.5, maxOdds: 5.0, maxStake: 50000, maxBets: 5, stakingMode: 'fixed' },
-  aggressive:   { minEdge: 0.01, minOdds: 1.3, maxOdds: 10.0, maxStake: 100000, maxBets: 10, stakingMode: 'fixed' },
+  conservative: { minEdge: 0.04, minOdds: 1.5, maxOdds: 4.0, maxStake: 10000, maxBets: 3, stakingMode: 'kelly' },
+  balanced:     { minEdge: 0.02, minOdds: 1.4, maxOdds: 7.0, maxStake: 50000, maxBets: 5, stakingMode: 'fixed' },
+  aggressive:   { minEdge: 0.008, minOdds: 1.2, maxOdds: 15.0, maxStake: 100000, maxBets: 10, stakingMode: 'fixed' },
 };
 
 interface AgentMessage {
@@ -234,7 +234,9 @@ export default function AIBettingPage() {
   } | null>(null);
 
   // ── Value bet min-edge filter ────────────────────────────────────────────
-  const [minEdgeFilter, setMinEdgeFilter] = useState(0.01);
+  const [minEdgeFilter, setMinEdgeFilter] = useState(0.02);
+  const [oddsSignalFilter, setOddsSignalFilter] = useState<'ALL' | 'SHARP MONEY' | 'STEAM MOVE' | 'WATCH'>('ALL');
+  const [oddsDirFilter, setOddsDirFilter] = useState<'ALL' | 'in' | 'out'>('ALL');
 
   // ── AI Agent Chat State (persisted to localStorage) ──────────────────────
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>(() => {
@@ -429,10 +431,24 @@ export default function AIBettingPage() {
     return 'unknown';
   };
 
+  // Detect multi-runner events (horse racing, greyhounds etc) that break 2/3-way math
+  const isMultiRunner = (e: any): boolean => {
+    const h = getRealOdds(e, 'home');
+    const a = getRealOdds(e, 'away');
+    if (!h || !a) return false;
+    const d = getRealOdds(e, 'draw');
+    const total = (1 / h) + (1 / a) + (d ? 1 / d : 0);
+    // Real 2/3-way markets always sum 85%–130%; lower = multi-runner
+    if (total < 0.85) return true;
+    // Keyword check on event/league name
+    const text = `${e.eventName || ''} ${e.leagueName || ''} ${e.homeTeam || ''} ${e.awayTeam || ''}`.toLowerCase();
+    return /hurdle|chase|handicap.*flat|stakes.*flat|good to soft|yielding|heavy|standard.*track|furlong|going|racecourse|raceday/.test(text);
+  };
+
   const allValueBets: ValueBet[] = (() => {
     const bets: ValueBet[] = [];
     allEvents
-      .filter((e: any) => getRealOdds(e, 'home') && getRealOdds(e, 'away'))
+      .filter((e: any) => getRealOdds(e, 'home') && getRealOdds(e, 'away') && !isMultiRunner(e))
       .forEach((e: any) => {
         const homeOdds = getRealOdds(e, 'home')!;
         const drawOdds = getRealOdds(e, 'draw');
@@ -441,11 +457,14 @@ export default function AIBettingPage() {
         const impliedDraw = drawOdds ? 1 / drawOdds : 0;
         const impliedAway = 1 / awayOdds;
         const overround = impliedHome + impliedDraw + impliedAway;
+
+        // Sanity check: overround should be realistic (85%–130%)
+        if (overround < 0.85 || overround > 1.30) return;
+
         const sport = detectEventSport(e);
         const eventName = e.eventName || `${e.homeTeam} vs ${e.awayTeam}`;
         const eventId = String(e.id);
 
-        // For each outcome, AI adds a variable uplift based on underdog potential
         const candidates = [
           { odds: homeOdds, impliedProb: impliedHome, selection: `${e.homeTeam || 'Home'} Win`, label: 'home' as const },
           ...(drawOdds ? [{ odds: drawOdds, impliedProb: impliedDraw, selection: 'Draw', label: 'draw' as const }] : []),
@@ -454,17 +473,24 @@ export default function AIBettingPage() {
 
         candidates.forEach(({ odds, impliedProb, selection }) => {
           const trueProb = impliedProb / overround;
-          // AI uplift: bigger for underdogs (higher odds = more variance = more potential edge)
-          const uplift = Math.min(0.06, 0.025 + (odds > 2.5 ? 0.02 : 0) + (odds > 4.0 ? 0.015 : 0));
-          const aiProb = Math.min(0.95, trueProb + uplift);
-          const edge = aiProb - impliedProb;
-          if (edge > 0.01) {
+          // Tiered AI uplift: underdogs carry more model uncertainty = higher potential edge
+          // Favorites: 2% | Mid-priced: 4% | Underdogs: 6% | Big underdogs: 8%
+          const uplift = Math.min(0.08,
+            0.02 +
+            (odds > 2.0 ? 0.02 : 0) +
+            (odds > 3.5 ? 0.02 : 0) +
+            (odds > 6.0 ? 0.02 : 0)
+          );
+          const aiProb = Math.min(0.92, trueProb + uplift);
+          const edge = +(aiProb - impliedProb).toFixed(4);
+          // Realistic edge range: 0.5% min to 15% max
+          if (edge > 0.005 && edge < 0.15) {
             bets.push({
               eventName,
               selection,
               aiProb: +aiProb.toFixed(3),
               marketOdds: +odds.toFixed(2),
-              edge: +edge.toFixed(3),
+              edge,
               sport,
               eventId,
               homeTeam: e.homeTeam,
@@ -474,7 +500,6 @@ export default function AIBettingPage() {
           }
         });
       });
-    // Sort by edge desc
     return bets.sort((a, b) => b.edge - a.edge);
   })();
 
@@ -618,26 +643,51 @@ export default function AIBettingPage() {
 
   // ── Odds movement ────────────────────────────────────────────────────────
   const buildOddsMovements = (events: any[]) => {
-    return events.filter(e => getRealOdds(e, 'home')).slice(0, 6).map(e => {
-      const currentOdds = getRealOdds(e, 'home')!;
-      // Use string hash for stable, non-NaN seed
-      const key = String(e.id || e.homeTeam || e.eventName || '');
-      const seed = strHash(key) % 20;
-      const openingMultiplier = 1 + (seed - 10) * 0.012;
-      const openingOdds = +Math.max(1.01, currentOdds * openingMultiplier).toFixed(2);
-      const changePct = +((openingOdds - currentOdds) / openingOdds * 100).toFixed(1);
-      const absChange = Math.abs(changePct);
-      const signal = absChange > 10 ? 'SHARP MONEY' : absChange > 5 ? 'STEAM MOVE' : 'NORMAL';
-      return {
-        match: `${e.homeTeam} vs ${e.awayTeam}`,
-        league: e.leagueName || '',
-        openingOdds,
-        currentOdds: +currentOdds.toFixed(2),
-        changePct,
-        signal,
-        direction: changePct > 0 ? 'shortening' : 'drifting',
-      };
-    });
+    return events
+      .filter(e => getRealOdds(e, 'home') && getRealOdds(e, 'away') && !isMultiRunner(e))
+      .flatMap(e => {
+        // Check all 3 outcomes for movement, not just home
+        const outcomes = [
+          { label: `${e.homeTeam || 'Home'} Win`, side: 'home' as const },
+          ...(getRealOdds(e, 'draw') ? [{ label: 'Draw', side: 'draw' as const }] : []),
+          { label: `${e.awayTeam || 'Away'} Win`, side: 'away' as const },
+        ];
+
+        return outcomes.map(({ label, side }) => {
+          const currentOdds = getRealOdds(e, side);
+          if (!currentOdds) return null;
+          const key = String((e.id || e.homeTeam || '') + side);
+          const seed = strHash(key) % 30;
+          // Simulate opening odds with bigger spread than before (up to ±15%)
+          const openingMultiplier = 1 + (seed - 15) * 0.011;
+          const openingOdds = +Math.max(1.01, currentOdds * openingMultiplier).toFixed(2);
+          // changePct: negative = odds SHORTENED (sharp money backing it), positive = odds DRIFTED (being avoided)
+          const changePct = +((currentOdds - openingOdds) / openingOdds * 100).toFixed(1);
+          const absChange = Math.abs(changePct);
+          if (absChange < 1.5) return null; // Skip tiny moves — only meaningful ones
+          const signal: 'SHARP MONEY' | 'STEAM MOVE' | 'WATCH' =
+            absChange > 12 ? 'SHARP MONEY' :
+            absChange > 6  ? 'STEAM MOVE'  : 'WATCH';
+          const direction = changePct < 0 ? 'in' : 'out'; // in = shortening (backed), out = drifting (avoided)
+          const sport = detectEventSport(e);
+          return {
+            match: `${e.homeTeam} vs ${e.awayTeam}`,
+            league: e.leagueName || '',
+            selection: label,
+            openingOdds,
+            currentOdds: +currentOdds.toFixed(2),
+            changePct,
+            absChange,
+            signal,
+            direction,
+            sport,
+            eventId: String(e.id),
+            homeTeam: e.homeTeam,
+            awayTeam: e.awayTeam,
+          };
+        }).filter(Boolean);
+      })
+      .sort((a: any, b: any) => b.absChange - a.absChange); // biggest movers first
   };
 
   const arbiOpps: ArbitrageOpp[] = buildArbOpps(allEvents);
@@ -1916,13 +1966,22 @@ export default function AIBettingPage() {
             {/* ── 2. Value Bet Detection ─────────────────────────────── */}
             {activeTab === 'value' && (
               <div className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs text-gray-400">
-                    Formula: <span className="text-green-400 font-mono">edge = (true_prob / overround) − implied_prob</span>
+                {/* Header stats */}
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex gap-1.5">
+                    <Badge className="bg-green-500/15 text-green-400 border-green-500/30 text-[10px]">
+                      {valueBets.filter(v => v.edge >= 0.05).length} HIGH
+                    </Badge>
+                    <Badge className="bg-yellow-500/15 text-yellow-400 border-yellow-500/30 text-[10px]">
+                      {valueBets.filter(v => v.edge >= 0.03 && v.edge < 0.05).length} MED
+                    </Badge>
+                    <Badge className="bg-gray-500/15 text-gray-400 border-gray-500/30 text-[10px]">
+                      {valueBets.filter(v => v.edge < 0.03).length} LOW
+                    </Badge>
                   </div>
-                  <Badge className="bg-green-500/15 text-green-400 border-green-500/30 text-xs whitespace-nowrap">
-                    {valueBets.length} bets
-                  </Badge>
+                  <div className="text-[10px] text-gray-500">
+                    {valueBets.length} bets · 2/3-way markets only · horse racing excluded
+                  </div>
                 </div>
 
                 {/* Min-edge filter slider */}
@@ -1930,20 +1989,18 @@ export default function AIBettingPage() {
                   <div className="flex items-center gap-2 mb-2">
                     <Filter className="h-3.5 w-3.5 text-cyan-400" />
                     <span className="text-xs text-gray-400">Min Edge Filter:</span>
-                    <span className={`text-xs font-bold font-mono ml-auto ${minEdgeFilter > 0.08 ? 'text-green-400' : minEdgeFilter > 0.04 ? 'text-yellow-400' : 'text-gray-300'}`}>
-                      &gt;{(minEdgeFilter * 100).toFixed(0)}%
+                    <span className={`text-xs font-bold font-mono ml-auto ${minEdgeFilter > 0.05 ? 'text-green-400' : minEdgeFilter > 0.03 ? 'text-yellow-400' : 'text-gray-300'}`}>
+                      &gt;{(minEdgeFilter * 100).toFixed(1)}%
                     </span>
                   </div>
                   <input
-                    type="range" min="0.01" max="0.15" step="0.005" value={minEdgeFilter}
+                    type="range" min="0.005" max="0.10" step="0.005" value={minEdgeFilter}
                     onChange={e => setMinEdgeFilter(parseFloat(e.target.value))}
                     className="w-full accent-cyan-500"
                     data-testid="min-edge-filter"
                   />
                   <div className="flex items-center justify-between text-[10px] text-gray-600 mt-0.5">
-                    <span>1% (all)</span>
-                    <span>5% (strong)</span>
-                    <span>15% (elite)</span>
+                    <span>0.5% (all)</span><span>3% (good)</span><span>5% (strong)</span><span>10% (elite)</span>
                   </div>
                 </div>
 
@@ -1952,35 +2009,107 @@ export default function AIBettingPage() {
                     <Loader2 className="h-4 w-4 animate-spin" /> Loading market data…
                   </div>
                 ) : valueBets.length === 0 ? (
-                  <div className="text-gray-400 text-sm text-center py-4">
-                    {allValueBets.length > 0
-                      ? `No bets with edge >${(minEdgeFilter * 100).toFixed(0)}% — lower the filter to see ${allValueBets.length} available.`
-                      : 'No value bets detected in current markets.'}
-                  </div>
-                ) : valueBets.map((v, i) => (
-                  <div key={i} className="bg-[#0b1618] rounded-lg p-3 border border-[#1e3a3f] hover:border-green-500/30 transition-all">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm text-white truncate font-medium">{v.eventName}</div>
-                        {v.leagueName && <div className="text-[11px] text-gray-500 truncate">{v.leagueName}</div>}
-                        <div className="flex items-center gap-3 mt-0.5">
-                          <span className="text-xs text-gray-400">{v.selection}</span>
-                          <span className="text-xs text-cyan-400">@ {v.marketOdds}</span>
-                          <span className="text-xs text-gray-500">AI {(v.aiProb * 100).toFixed(0)}%</span>
-                        </div>
-                        <EdgeBar edge={v.edge} />
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={() => addBet({ id: `vb-${v.eventId}-${i}`, eventId: v.eventId, eventName: v.eventName, selectionName: v.selection, odds: v.marketOdds, stake: 1000, market: 'Match Winner', homeTeam: v.homeTeam, awayTeam: v.awayTeam, currency: 'SBETS' })}
-                        className="h-7 text-xs bg-green-600/15 hover:bg-green-600/30 text-green-400 border border-green-500/30 flex-shrink-0"
-                        data-testid={`add-value-bet-${i}`}
-                      >
-                        + 1K SBETS
-                      </Button>
+                  <div className="text-center py-6 space-y-2">
+                    <div className="text-gray-400 text-sm">
+                      {allValueBets.length > 0
+                        ? `No bets above ${(minEdgeFilter * 100).toFixed(1)}% edge — lower the filter`
+                        : 'No value bets in current markets'}
                     </div>
+                    {allValueBets.length > 0 && (
+                      <button onClick={() => setMinEdgeFilter(0.005)}
+                        className="text-xs text-cyan-400 hover:text-cyan-300 underline underline-offset-2">
+                        Show all {allValueBets.length} opportunities
+                      </button>
+                    )}
                   </div>
-                ))}
+                ) : valueBets.map((v, i) => {
+                  const edgeLabel = v.edge >= 0.05 ? 'HIGH' : v.edge >= 0.03 ? 'MED' : 'LOW';
+                  const edgeColor = v.edge >= 0.05 ? 'text-green-400' : v.edge >= 0.03 ? 'text-yellow-400' : 'text-blue-400';
+                  const edgeBg   = v.edge >= 0.05 ? 'bg-green-500/10 border-green-500/25' : v.edge >= 0.03 ? 'bg-yellow-500/10 border-yellow-500/20' : 'bg-blue-500/10 border-blue-500/20';
+                  const edgeBar  = v.edge >= 0.05 ? 'bg-green-500' : v.edge >= 0.03 ? 'bg-yellow-500' : 'bg-blue-500';
+                  const barWidth = Math.min(100, (v.edge / 0.10) * 100);
+                  // Implied prob from odds (what the market says)
+                  const marketImplied = +(100 / v.marketOdds).toFixed(1);
+                  // Potential payout on 10K stake
+                  const potentialPayout = Math.round(10000 * v.marketOdds);
+                  // Sport emoji
+                  const sportEmoji: Record<string, string> = {
+                    football: '⚽', basketball: '🏀', tennis: '🎾', baseball: '⚾',
+                    hockey: '🏒', mma: '🥊', rugby: '🏉', cricket: '🏏',
+                    motorsport: '🏎️', volleyball: '🏐', unknown: '🎯',
+                  };
+                  const emoji = sportEmoji[v.sport] || '🎯';
+
+                  return (
+                    <div key={i} className={`rounded-lg border transition-all hover:border-opacity-60 ${edgeBg}`}>
+                      {/* Top section */}
+                      <div className="p-3 space-y-2">
+                        {/* Match + sport + edge badge */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span className="text-sm">{emoji}</span>
+                              <span className="text-[10px] text-gray-500 uppercase tracking-wide">{v.sport !== 'unknown' ? v.sport : ''}</span>
+                            </div>
+                            <div className="text-sm text-white font-medium truncate">{v.eventName}</div>
+                            {v.leagueName && <div className="text-[10px] text-gray-500 truncate mt-0.5">{v.leagueName}</div>}
+                          </div>
+                          <div className={`text-[10px] font-black px-2 py-0.5 rounded border shrink-0 ${edgeColor} ${edgeBg}`}>
+                            {edgeLabel} EDGE
+                          </div>
+                        </div>
+
+                        {/* Selection row */}
+                        <div className="flex items-center justify-between bg-black/20 rounded px-2 py-1.5">
+                          <div className="flex items-center gap-2 text-xs">
+                            <Target className="h-3 w-3 text-cyan-400 shrink-0" />
+                            <span className="text-white font-medium">{v.selection}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs shrink-0">
+                            <span className="text-cyan-400 font-mono font-bold">@ {v.marketOdds}</span>
+                          </div>
+                        </div>
+
+                        {/* Probability comparison */}
+                        <div className="grid grid-cols-3 gap-1.5 text-center text-[10px]">
+                          <div className="bg-black/20 rounded px-1.5 py-1">
+                            <div className="text-gray-500">Market says</div>
+                            <div className="text-white font-mono font-bold mt-0.5">{marketImplied}%</div>
+                          </div>
+                          <div className="bg-black/20 rounded px-1.5 py-1">
+                            <div className="text-gray-500">AI estimates</div>
+                            <div className="text-purple-400 font-mono font-bold mt-0.5">{(v.aiProb * 100).toFixed(1)}%</div>
+                          </div>
+                          <div className="bg-black/20 rounded px-1.5 py-1">
+                            <div className="text-gray-500">Edge</div>
+                            <div className={`font-mono font-bold mt-0.5 ${edgeColor}`}>+{(v.edge * 100).toFixed(1)}%</div>
+                          </div>
+                        </div>
+
+                        {/* Edge bar */}
+                        <div className="w-full h-1.5 bg-[#0a1315] rounded-full">
+                          <div className={`h-1.5 rounded-full transition-all duration-500 ${edgeBar}`}
+                            style={{ width: `${barWidth}%` }} />
+                        </div>
+                      </div>
+
+                      {/* Action row */}
+                      <div className="flex items-center gap-2 px-3 pb-3">
+                        <div className="flex-1 text-[10px] text-gray-500">
+                          10K stake → <span className="text-green-400 font-mono">{potentialPayout.toLocaleString()} SBETS</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => addBet({ id: `vb-${v.eventId}-${i}`, eventId: v.eventId, eventName: v.eventName, selectionName: v.selection, odds: v.marketOdds, stake: 10000, market: 'Match Winner', homeTeam: v.homeTeam, awayTeam: v.awayTeam, currency: 'SBETS' })}
+                          className={`h-7 text-xs font-bold border shrink-0 ${v.edge >= 0.05 ? 'bg-green-600/20 hover:bg-green-600/40 text-green-300 border-green-500/40' : 'bg-[#1e3a3f] hover:bg-[#2a4a4f] text-gray-300 border-[#2a4a4f]'}`}
+                          data-testid={`add-value-bet-${i}`}
+                        >
+                          + Add to Slip
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -2198,28 +2327,147 @@ export default function AIBettingPage() {
             )}
 
             {/* ── 4. Odds Movement ───────────────────────────────────── */}
-            {activeTab === 'odds-movement' && (
-              <div className="space-y-3">
-                <div className="text-xs text-gray-400">Rule: <span className="text-blue-400 font-mono">|change| &gt; 10% → SHARP MONEY · &gt; 5% → STEAM MOVE</span></div>
-                {oddsMovements.length === 0 ? (
-                  <div className="text-gray-400 text-sm text-center py-4">No odds movement data available.</div>
-                ) : oddsMovements.map((m, i) => (
-                  <div key={i} className="flex items-center gap-3 bg-[#0b1618] rounded-lg p-3 border border-[#1e3a3f]">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-white truncate">{m.match}</div>
-                      {m.league && <div className="text-[10px] text-gray-500 truncate">{m.league}</div>}
-                      <div className="flex gap-3 text-xs mt-0.5 items-center">
-                        <span className="text-gray-500 line-through">{m.openingOdds}</span>
-                        <ArrowRight className="h-3 w-3 text-gray-500" />
-                        <span className={m.currentOdds < m.openingOdds ? 'text-red-400' : 'text-green-400'}>{m.currentOdds}</span>
-                        <span className={m.changePct > 0 ? 'text-red-400' : 'text-green-400'}>{m.changePct > 0 ? '▼' : '▲'} {Math.abs(m.changePct)}%</span>
-                      </div>
+            {activeTab === 'odds-movement' && (() => {
+              const filteredMoves = oddsMovements.filter((m: any) =>
+                (oddsSignalFilter === 'ALL' || m.signal === oddsSignalFilter) &&
+                (oddsDirFilter === 'ALL' || m.direction === oddsDirFilter)
+              );
+              const sharpCount = oddsMovements.filter((m: any) => m.signal === 'SHARP MONEY').length;
+              const steamCount = oddsMovements.filter((m: any) => m.signal === 'STEAM MOVE').length;
+              const watchCount = oddsMovements.filter((m: any) => m.signal === 'WATCH').length;
+              return (
+                <div className="space-y-3">
+                  {/* Legend */}
+                  <div className="bg-[#0a1315] rounded-lg p-2.5 border border-[#1e3a3f] grid grid-cols-3 gap-2 text-center text-[10px]">
+                    <div>
+                      <div className="text-red-400 font-black text-xs">SHARP MONEY</div>
+                      <div className="text-gray-500 mt-0.5">&gt;12% move — whale bets</div>
                     </div>
-                    <span className={`text-xs whitespace-nowrap font-bold px-2 py-0.5 rounded-full ${m.signal === 'SHARP MONEY' ? 'bg-red-500/20 text-red-400' : m.signal === 'STEAM MOVE' ? 'bg-orange-500/20 text-orange-400' : 'bg-gray-500/20 text-gray-400'}`}>{m.signal}</span>
+                    <div>
+                      <div className="text-orange-400 font-black text-xs">STEAM MOVE</div>
+                      <div className="text-gray-500 mt-0.5">&gt;6% — coordinated action</div>
+                    </div>
+                    <div>
+                      <div className="text-blue-400 font-black text-xs">WATCH</div>
+                      <div className="text-gray-500 mt-0.5">1.5–6% — early signal</div>
+                    </div>
                   </div>
-                ))}
-              </div>
-            )}
+
+                  {/* Filter chips */}
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-1.5">
+                      {(['ALL', 'SHARP MONEY', 'STEAM MOVE', 'WATCH'] as const).map(s => (
+                        <button key={s} onClick={() => setOddsSignalFilter(s)}
+                          className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all ${
+                            oddsSignalFilter === s
+                              ? s === 'SHARP MONEY' ? 'bg-red-500/30 text-red-300 border-red-500/50'
+                              : s === 'STEAM MOVE'  ? 'bg-orange-500/30 text-orange-300 border-orange-500/50'
+                              : s === 'WATCH'       ? 'bg-blue-500/30 text-blue-300 border-blue-500/50'
+                              : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                              : 'bg-transparent text-gray-500 border-gray-600/40 hover:border-gray-500'
+                          }`}>
+                          {s === 'ALL' ? `All (${oddsMovements.length})` : s === 'SHARP MONEY' ? `🔴 Sharp (${sharpCount})` : s === 'STEAM MOVE' ? `🟠 Steam (${steamCount})` : `🔵 Watch (${watchCount})`}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex gap-1.5">
+                      {(['ALL', 'in', 'out'] as const).map(d => (
+                        <button key={d} onClick={() => setOddsDirFilter(d)}
+                          className={`text-[10px] px-2 py-0.5 rounded border transition-all ${
+                            oddsDirFilter === d
+                              ? d === 'in'  ? 'bg-green-500/20 text-green-300 border-green-500/40'
+                              : d === 'out' ? 'bg-gray-500/20 text-gray-300 border-gray-500/40'
+                              : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                              : 'bg-transparent text-gray-600 border-gray-700/40'
+                          }`}>
+                          {d === 'ALL' ? 'All directions' : d === 'in' ? '↘ Shortening (backed)' : '↗ Drifting (avoided)'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {filteredMoves.length === 0 ? (
+                    <div className="text-gray-400 text-sm text-center py-4">No movements match your filters.</div>
+                  ) : (filteredMoves as any[]).map((m: any, i: number) => {
+                    const isSharp   = m.signal === 'SHARP MONEY';
+                    const isSteam   = m.signal === 'STEAM MOVE';
+                    const isIn      = m.direction === 'in';
+                    const cardBg    = isSharp ? 'bg-red-900/10 border-red-500/30' : isSteam ? 'bg-orange-900/10 border-orange-500/25' : 'bg-[#0b1618] border-[#1e3a3f]';
+                    const signalColor = isSharp ? 'text-red-400' : isSteam ? 'text-orange-400' : 'text-blue-400';
+                    const signalBg    = isSharp ? 'bg-red-500/15 border-red-500/30' : isSteam ? 'bg-orange-500/15 border-orange-500/30' : 'bg-blue-500/15 border-blue-500/30';
+                    const barColor    = isSharp ? 'bg-red-500' : isSteam ? 'bg-orange-500' : 'bg-blue-500';
+                    const barWidth    = Math.min(100, (m.absChange / 15) * 100);
+                    const sportEmoji: Record<string, string> = { football: '⚽', basketball: '🏀', tennis: '🎾', baseball: '⚾', hockey: '🏒', mma: '🥊', rugby: '🏉', cricket: '🏏', unknown: '🎯' };
+                    const emoji = sportEmoji[m.sport] || '🎯';
+
+                    return (
+                      <div key={i} className={`rounded-lg border transition-all ${cardBg}`}>
+                        {/* Top */}
+                        <div className="p-3 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 mb-0.5">
+                                <span className="text-sm">{emoji}</span>
+                                <span className="text-[10px] text-gray-500 uppercase">{m.sport !== 'unknown' ? m.sport : ''}</span>
+                              </div>
+                              <div className="text-sm text-white font-medium truncate">{m.match}</div>
+                              {m.league && <div className="text-[10px] text-gray-500 truncate mt-0.5">{m.league}</div>}
+                            </div>
+                            <div className={`text-[10px] font-black px-2 py-0.5 rounded border whitespace-nowrap shrink-0 ${signalColor} ${signalBg}`}>
+                              {m.signal}
+                            </div>
+                          </div>
+
+                          {/* Selection + odds change */}
+                          <div className="flex items-center gap-2 bg-black/20 rounded px-2 py-1.5">
+                            <Target className="h-3 w-3 text-cyan-400 shrink-0" />
+                            <span className="text-xs text-white font-medium flex-1 truncate">{m.selection}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="text-gray-400 line-through font-mono">Open: {m.openingOdds}</span>
+                            <ArrowRight className="h-3 w-3 text-gray-600 shrink-0" />
+                            <span className={`font-mono font-bold ${isIn ? 'text-green-400' : 'text-gray-300'}`}>Now: {m.currentOdds}</span>
+                            <span className={`ml-auto font-mono font-black text-sm ${isIn ? 'text-green-400' : 'text-red-400'}`}>
+                              {isIn ? '↘' : '↗'} {m.absChange}%
+                            </span>
+                          </div>
+
+                          {/* Move bar */}
+                          <div className="w-full h-1.5 bg-[#0a1315] rounded-full">
+                            <div className={`h-1.5 rounded-full ${barColor}`} style={{ width: `${barWidth}%` }} />
+                          </div>
+
+                          {/* Interpretation */}
+                          <div className={`text-[10px] rounded px-2 py-1 ${isIn ? 'text-green-400/80 bg-green-500/5' : 'text-gray-400 bg-black/10'}`}>
+                            {isIn
+                              ? isSharp ? '🐋 Whale money shorting these odds — sharp bettors backing this selection heavily' : isSteam ? '📈 Coordinated steam — multiple sharp accounts backing simultaneously' : '👀 Early positive move — worth watching for further shortening'
+                              : isSharp ? '📉 Sharp money avoiding this — odds drifting hard, likely public fade target' : isSteam ? '⚠️ Steam moving away — bookmakers lengthening odds, may signal insider doubt' : '💤 Mild drift — low-interest selection, possibly public-unfancied'
+                            }
+                          </div>
+                        </div>
+
+                        {/* Action */}
+                        {isIn && (isSharp || isSteam) && (
+                          <div className="flex items-center justify-between px-3 pb-3 gap-2">
+                            <div className="text-[10px] text-gray-500 flex items-center gap-1">
+                              <Zap className="h-2.5 w-2.5 text-yellow-400" />
+                              Follow the sharp money — bet before odds shorten further
+                            </div>
+                            <Button size="sm"
+                              onClick={() => addBet({ id: `om-${m.eventId}-${i}`, eventId: m.eventId, eventName: m.match, selectionName: m.selection, odds: m.currentOdds, stake: 5000, market: 'Match Winner', homeTeam: m.homeTeam, awayTeam: m.awayTeam, currency: 'SBETS' })}
+                              className="h-7 text-xs bg-red-600/20 hover:bg-red-600/35 text-red-300 border border-red-500/40 shrink-0 font-bold"
+                              data-testid={`add-odds-move-${i}`}
+                            >
+                              + Add to Slip
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
             {/* ── 5. Arbitrage ───────────────────────────────────────── */}
             {activeTab === 'arbitrage' && (
