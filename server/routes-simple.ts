@@ -45,6 +45,11 @@ function isWalletBlocked(wallet: string): boolean {
 const MAX_BETS_PER_DAY = 7; // Maximum 7 bets per wallet per 24 hours
 const MAX_BETS_PER_EVENT = 2;
 
+// ── Configurable stake limits (admin-adjustable at runtime) ────────────────
+// These can be updated via POST /api/admin/update-stake-limits without a restart
+let RUNTIME_MAX_STAKE_SBETS = 100000; // 100,000 SBETS max per bet
+const RUNTIME_MAX_STAKE_SUI = 100;    // 100 SUI max (fixed)
+
 async function checkBetRateLimitDB(walletAddress: string): Promise<{ allowed: boolean; remaining?: number; message?: string }> {
   const key = walletAddress.toLowerCase();
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -718,6 +723,31 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
     } catch (error) {
       res.status(500).json({ message: "Login failed" });
     }
+  });
+
+  // Admin: update backend stake limits at runtime (no restart required)
+  app.post("/api/admin/update-stake-limits", async (req: Request, res: Response) => {
+    try {
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.replace('Bearer ', '');
+      if (!token || !isValidAdminSession(token)) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const { maxStakeSbets } = req.body;
+      if (!maxStakeSbets || isNaN(Number(maxStakeSbets)) || Number(maxStakeSbets) <= 0) {
+        return res.status(400).json({ message: "Invalid maxStakeSbets value" });
+      }
+      RUNTIME_MAX_STAKE_SBETS = Number(maxStakeSbets);
+      console.log(`[Admin] SBETS max stake updated to ${RUNTIME_MAX_STAKE_SBETS}`);
+      return res.json({ success: true, maxStakeSbets: RUNTIME_MAX_STAKE_SBETS });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Admin: get current stake limits
+  app.get("/api/admin/stake-limits", async (req: Request, res: Response) => {
+    return res.json({ maxStakeSbets: RUNTIME_MAX_STAKE_SBETS, maxStakeSui: RUNTIME_MAX_STAKE_SUI });
   });
 
   // Admin get all bets endpoint
@@ -3144,8 +3174,8 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         });
       }
       
-      const MAX_STAKE_SUI = 100;
-      const MAX_STAKE_SBETS = 10000; // 10,000 SBETS max per bet
+      const MAX_STAKE_SUI = RUNTIME_MAX_STAKE_SUI;
+      const MAX_STAKE_SBETS = RUNTIME_MAX_STAKE_SBETS;
       const maxStake = betCurrency === 'SBETS' ? MAX_STAKE_SBETS : MAX_STAKE_SUI;
       
       if (betAmount > maxStake) {
@@ -3917,9 +3947,9 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
         });
       }
       
-      // MAX STAKE VALIDATION - Backend enforcement (100 SUI / 10,000 SBETS)
-      const MAX_STAKE_SUI = 100;
-      const MAX_STAKE_SBETS = 10000; // 10,000 SBETS max per parlay
+      // MAX STAKE VALIDATION - Backend enforcement
+      const MAX_STAKE_SUI = RUNTIME_MAX_STAKE_SUI;
+      const MAX_STAKE_SBETS = RUNTIME_MAX_STAKE_SBETS;
       const maxStake = currency === 'SBETS' ? MAX_STAKE_SBETS : MAX_STAKE_SUI;
       
       if (betAmount > maxStake) {
@@ -4106,8 +4136,8 @@ export async function registerRoutes(app: express.Express): Promise<Server> {
       const currency: 'SUI' | 'SBETS' = feeCurrency === 'SBETS' ? 'SBETS' : 'SUI';
 
       // MAX STAKE VALIDATION
-      const MAX_STAKE_SUI = 100;
-      const MAX_STAKE_SBETS = 10000;
+      const MAX_STAKE_SUI = RUNTIME_MAX_STAKE_SUI;
+      const MAX_STAKE_SBETS = RUNTIME_MAX_STAKE_SBETS;
       const maxStake = currency === 'SBETS' ? MAX_STAKE_SBETS : MAX_STAKE_SUI;
       if (betAmount > maxStake) {
         console.log(`❌ On-chain parlay rejected (max stake exceeded): ${betAmount} ${currency} > ${maxStake} ${currency}`);

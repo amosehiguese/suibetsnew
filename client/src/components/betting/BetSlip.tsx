@@ -141,7 +141,7 @@ export function BetSlip() {
   const MIN_STAKE_SUI = 0.05;
   const MAX_STAKE_SUI = 100;
   const MIN_STAKE_SBETS = 1000;
-  const MAX_STAKE_SBETS = 10000;
+  const MAX_STAKE_SBETS = 100000;
   
   const MIN_STAKE = betCurrency === 'SBETS' ? MIN_STAKE_SBETS : MIN_STAKE_SUI;
   const MAX_STAKE = betCurrency === 'SBETS' ? MAX_STAKE_SBETS : MAX_STAKE_SUI;

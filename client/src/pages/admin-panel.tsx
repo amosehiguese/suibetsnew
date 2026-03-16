@@ -418,11 +418,6 @@ export default function AdminPanel() {
 
   // Update SBETS bet limits
   const updateBetLimitsSbets = async () => {
-    if (!currentAccount?.address || !isAdminWallet) {
-      toast({ title: 'Error', description: 'Connect admin wallet first', variant: 'destructive' });
-      return;
-    }
-
     const minBet = parseFloat(newMinBetSbets);
     const maxBet = parseFloat(newMaxBetSbets);
     
@@ -442,39 +437,67 @@ export default function AdminPanel() {
     }
 
     setUpdatingLimitsSbets(true);
+    let backendUpdated = false;
+
+    // ── Step 1: Always update backend limit via API (reliable, no wallet needed) ──
     try {
-      const minBetMist = Math.floor(minBet * 1_000_000_000);
-      const maxBetMist = Math.floor(maxBet * 1_000_000_000);
-      
-      const tx = new Transaction();
-      
-      tx.moveCall({
-        target: `${BETTING_PACKAGE_ID}::betting::update_limits_sbets`,
-        arguments: [
-          tx.object(ADMIN_CAP_ID),
-          tx.object(BETTING_PLATFORM_ID),
-          tx.pure.u64(minBetMist),
-          tx.pure.u64(maxBetMist),
-        ],
+      const res = await fetch('/api/admin/update-stake-limits', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({ maxStakeSbets: maxBet }),
       });
-
-      toast({ title: 'Signing Transaction', description: 'Please approve in your wallet...' });
-
-      const result = await signAndExecute({ transaction: tx });
-
-      if (result.digest) {
-        await suiClient.waitForTransaction({ digest: result.digest });
-        toast({ 
-          title: 'SBETS Limits Updated', 
-          description: `Min: ${minBet} SBETS, Max: ${maxBet} SBETS. TX: ${result.digest.slice(0, 10)}...` 
-        });
-        await fetchPlatformInfo();
+      if (res.ok) {
+        backendUpdated = true;
+        console.log('[Admin] Backend stake limit updated to', maxBet);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.warn('[Admin] Backend limit update failed:', err.message);
       }
-    } catch (error: unknown) {
-      console.error('Update SBETS limits failed:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Transaction failed';
-      toast({ title: 'Update Failed', description: errorMessage, variant: 'destructive' });
+    } catch (err) {
+      console.warn('[Admin] Backend limit update error:', err);
     }
+
+    // ── Step 2: Try to also update on-chain limits (optional, requires wallet) ──
+    if (currentAccount?.address && isAdminWallet) {
+      try {
+        const minBetMist = Math.floor(minBet * 1_000_000_000);
+        const maxBetMist = Math.floor(maxBet * 1_000_000_000);
+        
+        const tx = new Transaction();
+        tx.moveCall({
+          target: `${BETTING_PACKAGE_ID}::betting::update_limits_sbets`,
+          arguments: [
+            tx.object(ADMIN_CAP_ID),
+            tx.object(BETTING_PLATFORM_ID),
+            tx.pure.u64(minBetMist),
+            tx.pure.u64(maxBetMist),
+          ],
+        });
+
+        const result = await signAndExecute({ transaction: tx });
+        if (result.digest) {
+          await suiClient.waitForTransaction({ digest: result.digest });
+          console.log('[Admin] On-chain limits updated. TX:', result.digest);
+        }
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : 'On-chain update failed';
+        console.warn('[Admin] On-chain limit update failed (backend still updated):', msg);
+      }
+    }
+
+    if (backendUpdated) {
+      toast({ 
+        title: 'SBETS Limits Updated', 
+        description: `Max bet set to ${maxBet.toLocaleString()} SBETS. Active immediately.`,
+      });
+      await fetchPlatformInfo();
+    } else {
+      toast({ title: 'Update Failed', description: 'Could not update limits. Check admin login.', variant: 'destructive' });
+    }
+
     setUpdatingLimitsSbets(false);
   };
 
